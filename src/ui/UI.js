@@ -2139,7 +2139,7 @@ export class UI {
 				<header class="tw-help-head">
 					<div>
 						<h2 id="tw-help-title">Controls</h2>
-						<p>Click the view to capture the mouse. Esc releases it.</p>
+						<p>Use the arrow keys to look around, or click the view to capture the mouse. Esc releases it.</p>
 						<p class="tw-help-touch-hint">On a touch screen, use the left stick to move and the right stick to look. Tap an action prompt to interact.</p>
 					</div>
 					<button type="button" class="tw-icon-btn tw-help-close" aria-label="Close" data-tip="Close (F1)">${ icon( 'close' ) }</button>
@@ -2149,6 +2149,7 @@ export class UI {
 						<h3>Move</h3>
 						${ row( wasd, 'Move' ) }
 						${ row( mouse, 'Look around<small>Click to capture</small>' ) }
+						${ row( k( '←', '↑', '↓', '→' ), 'Look around<small>Left / right turn; up / down look vertically. No mouse capture needed.</small>' ) }
 						${ row( k( 'Shift' ), 'Sprint, boat boost' ) }
 						${ row( k( 'Space' ), 'Jump, swim up' ) }
 						${ row( k( 'C' ), 'Crouch, dive' ) }
@@ -2205,7 +2206,7 @@ export class UI {
 				<div class="tw-start-touch-hint">Left stick moves · right stick looks · tap action prompts</div>
 				<div class="tw-start-keys">
 					<span><span class="tw-wasd"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span>Move</span>
-					<span><kbd class="tw-kbd-ico">${ icon( 'mouse' ) }</kbd>Look</span>
+					<span><kbd class="tw-kbd-ico">${ icon( 'mouse' ) }</kbd><kbd>↑↓←→</kbd>Look</span>
 					<span><kbd>E</kbd>Interact</span>
 					<span><kbd>H</kbd>Settings</span>
 					<span><kbd>F1</kbd>All controls</span>
