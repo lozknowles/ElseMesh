@@ -169,7 +169,7 @@ export class ThirdIslandSystem {
   if(this.network && !this.granted){if(!this.pending){this.pending=true;this.network('claim');}return false;}
   this.active=true;this.pending=false;p.mode='helicopter';p.velocity.set(0,0,0);this.app.pistol.equipped=false;
   this.app.input.setHelicopterTouchMode(true);
-  this.peek=0;this.lookPitch=-.10;this.toast(this.app.input.touchInterface?'Rotor starting · Hold Up / Down for altitude · Move to fly · Look to steer · Land and stop to exit':'Rotor starting · Space ascend · C descend · WASD fly · mouse heading · ← / → side windows');return true;
+  this.peek=0;this.lookPitch=-.10;this.toast(this.app.input.touchInterface?'Rotor starting · Hold Up / Down for altitude · Move to fly · Look to steer · Land and stop to exit':'Rotor starting · Space ascend · C descend · WASD fly · mouse or arrows steer · comma / full stop: side windows');return true;
  }
  exit() {
   const s=this.state;if(!this.active)return false;
@@ -196,10 +196,10 @@ export class ThirdIslandSystem {
    const obstruction=(x,y,z,nx,nz)=>{const v=new Vector3(nx-x,0,nz-z),d=v.length();if(d<1e-6)return false;v.multiplyScalar(1/d);if(this.app.colliders.raycast(new Vector3(x,y,z),v,d+2)<d+2)return true;return this.app.colliders.cylinders.some(c=>y+2>c.yMin&&y-1<c.yMax&&Math.hypot(nx-c.x,nz-c.z)<c.radius+2);};
    flightStep(s,{active:true,x:axes.x,forward:axes.y,lift:(inp.down('Space')?1:0)-(inp.down('KeyC')?1:0),boost:inp.down('ShiftLeft')},dt,(x,z)=>this.ground(x,z),obstruction);
    this.resetPose();p.position.set(s.x,s.y,s.z);p.velocity.set(s.vx,s.vy,s.vz);p.yaw=s.yaw;p.prompt={key:'E',text:s.grounded?'Leave helicopter':'Land before leaving'};
-   this.peek+=(((inp.down('ArrowLeft')?1:0)-(inp.down('ArrowRight')?1:0))*Math.PI/2-this.peek)*(1-Math.exp(-dt*8));
+   this.peek+=(((inp.down('Comma')?1:0)-(inp.down('Period')?1:0))*Math.PI/2-this.peek)*(1-Math.exp(-dt*8));
    camera.position.copy(this.helicopter.localToWorld(new Vector3(-.48,2.22,-.04)));
    camera.quaternion.copy(this.helicopter.quaternion).multiply(new (camera.quaternion.constructor)().setFromEuler(new Euler(this.lookPitch,this.peek,0,'YXZ')));
-   const controls=inp.touchInterface?'Move to fly · Look to steer · Hold Up / Down · Land and stop, then tap Leave helicopter':'WASD fly · mouse steer · Space ↑ · C ↓ · Shift boost · ← → look · E exit when landed';
+   const controls=inp.touchInterface?'Move to fly · Look to steer · Hold Up / Down · Land and stop, then tap Leave helicopter':'WASD fly · mouse / arrows steer · Space ↑ · C ↓ · Shift boost · comma / full stop: side windows · E exit when landed';
    this.hud.style.display='block';this.hud.innerHTML=`<b>LOZ AIR · ISLAND HOPPER</b><br>IAS ${Math.round(Math.hypot(s.vx,s.vz)*1.944)} kt &nbsp; AGL ${Math.round(s.y-this.ground(s.x,s.z))} m &nbsp; HDG ${((s.yaw*-180/Math.PI+360)%360).toFixed(0)}° &nbsp; ROTOR ${Math.round(s.rpm*100)}%<br><small>${controls}</small>`;
    if(inp.hit('KeyE'))this.exit();
   }else{

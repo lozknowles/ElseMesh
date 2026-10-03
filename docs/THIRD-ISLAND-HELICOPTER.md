@@ -13,10 +13,10 @@ Meet Loz outside **Loz's Helicopter Rental** and press E for the key. Follow the
 | Control | In the helicopter |
 |---|---|
 | WASD | Forward/back and lateral movement, relative to heading |
-| Mouse | Steer heading and look up/down |
+| Mouse or cursor keys ↑ ↓ ← → | Steer heading and look up/down |
 | Space / C | Ascend / descend |
 | Shift | Higher cruise speed |
-| Left / right cursor | Look through side windows; release to face forward |
+| Comma / full stop | Look through left / right side windows; release to face forward |
 | E | Exit only while landed and stopped on dry ground |
 
 The cockpit has a physical instrument console, window frames and live speed, height-above-ground, heading and rotor indicators. Rotor spin-up takes a moment. Flight is assisted game flight, with damped acceleration and automatic hover, not an aviation simulator. Trees and a windsock show gusts on the third island. Height is capped at 450 m. Terrain/box/tree avoidance is conservative; complex overhang and rotor-volume contact are not a full rigid-body aircraft simulation.
