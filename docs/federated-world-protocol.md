@@ -2,6 +2,11 @@
 
 **The world is the protocol.** This document describes the first bounded protocol model in `network/federation.mjs`. It is a tested library and fixture set; a live cave-triggered authority transfer, remote Ed World renderer, and physical cross-node portal are not yet implemented.
 
+The [provider-neutral networking plan](networking/architecture.md) is the current
+forward design. It separates federation, connectivity and game transport, and
+defines phased acceptance tests. The schemas described below are existing v1
+foundations, not an implementation of that proposed ownership/admission protocol.
+
 ```mermaid
 flowchart LR
   A[Island exterior\nowner Loz, authority Node A] -->|Cave portal\nsigned handoff| B[UNDERNEATH\nowner Loz]
@@ -34,7 +39,21 @@ The fixtures include STANDARD exterior, NIGHT UNDERNEATH, SMALL WORLD (0.2 avata
 
 ## Transport and control
 
-Portal and region semantics are transport independent. The repository's reference TCP/UDP transport, QUIC probe and local browser demo are separate from the federation module. Libp2p/QUIC, GameNetworkingSockets, WebRTC, Tailscale and ZeroTier could carry messages through adapters; none is privileged by the world schema. The reference transport is currently **unencrypted** and is for controlled qualification, not an internet-facing secure service.
+Portal and region semantics are transport independent. Public Internet, LAN,
+Tailscale and ZeroTier are connectivity choices; WebSocket, WebRTC and suitable
+native QUIC/UDP libraries are transport choices. They are not interchangeable
+game protocols. The reference TCP/UDP transport, native QUIC probe and local
+browser demo are separate from the federation module. Their existence does not
+verify provider or cross-transport interoperability. The reference transport is
+currently **unencrypted** and is for controlled qualification, not an
+internet-facing secure service.
+
+Destination admission remains an explicit implementation gap: the current
+`acceptPortalHandoff()` does not itself apply destination-owner access policy or
+the portal player allowlist. A valid source signature or network membership must
+not confer admission. The new plan requires a destination policy gate, and treats
+initial portal travel as a new destination session. Inventory hashes in v1 are
+not an atomic inventory transfer, and scripts/session continuity are separate work.
 
 `HUMAN`, `AI_ASSISTED`, `AI_AUTONOMOUS` describe avatar controller mode. Switching mode preserves `PlayerID`; it does not create another avatar. The existing provider-independent `AgentInput` action adapter can feed the same player update path as human input. It has `walk_to`, `follow_player`, `look_at`, `stop`, jump and interact actions. Speech and a local model provider are not integrated. Public state may show controller mode, but not private instructions.
 
