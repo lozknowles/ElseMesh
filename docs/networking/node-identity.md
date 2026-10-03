@@ -7,3 +7,9 @@ The demo uses an explicit public-key trust file. Exchanging that file is an out-
 The reference transport does not yet bind a TCP hello to a fresh challenge. Thus possession of a signed old hello is not sufficient production authentication, and TCP traffic is unencrypted. A production adapter needs an authenticated encrypted transport and a fresh channel binding. Messages carry a per-process session UUID and sequence. UDP messages must match the current TCP peer session; older transient sequences are dropped. Durable replay state is still needed for production.
 
 Do not commit private identity JSON files, auth keys, Tailscale state, ZeroTier tokens, packet captures or machine-specific endpoints. The `test/network-foundation.mjs` identities are ephemeral in memory.
+
+The separate [cooperative discovery service](discovery-nodes.md) now uses the same
+Ed25519 key for ElseMesh NodeID and libp2p PeerID, authenticates its configured
+peers with Noise, and exchanges self-signed expiring contact records. It retains
+record revision guards across normal restarts. This does not upgrade the older
+TCP/UDP reference transport or grant world permissions to discovery peers.

@@ -1,6 +1,12 @@
 # Provider-neutral, decentralised networking plan
 
-Design revision: 2026-10-03. Inspected implementation: `9671381`.
+Design revision: 2026-10-03. Baseline implementation: `9671381`.
+
+Implementation update: [cooperative discovery nodes](discovery-nodes.md) now
+provide signed self-owned contact records, persisted revision guards, an explicit
+multi-helper libp2p exchange and a resolver bound to an owner-pinned region
+manifest. This is a bounded discovery cohort, not a DHT, browser gateway, relay
+or world-server implementation. The remaining architecture below stays a plan.
 This is a proposed architecture and acceptance plan, not a claim that the proposed
 adapters or federated browser travel already work. It supersedes any plan that
 requires choosing a ZeroTier membership arrangement. No networking provider is
@@ -32,10 +38,10 @@ system, arbitrary protocol bridge or seamless state migration.
 | --- | --- | --- |
 | [`network/identity.mjs`](../../network/identity.mjs) | Ed25519 NodeID fingerprints, canonical signing, asset hashes | Node key change changes NodeID. Does not yet establish durable world ownership independent of hosting keys. |
 | [`network/federation.mjs`](../../network/federation.mjs) and fixtures | Versioned region/portal/rule schemas, signed manifests, invitations, authority epochs, handoff validation | Node experimental library; gameplay cave crossing does not invoke remote federation. Current owner binding uses `ownerNodeId`. |
-| `PortalGraph`, `endpointFor()` | Address-free portal destinations; resolution outside portal descriptors | `endpointFor` reads one endpoint from an injected map, not a signed multi-endpoint discovery protocol. `REPLICA_AVAILABLE` is not proof of an authorised running game authority. |
+| `PortalGraph`, `endpointFor()` | Address-free portal destinations; resolution outside portal descriptors | Legacy `endpointFor` reads one endpoint from an injected map. The additive `resolveRegionContact` verifies an owner-pinned manifest and signed contact; it does not dial or admit a player. `REPLICA_AVAILABLE` is not proof of an authorised running game authority. |
 | [`network/routes.mjs`](../../network/routes.mjs) | Scoped candidates and injected reachability probe, direct/relay ordering | Simulated route tests do not prove NAT traversal, overlay connectivity or a functioning relay. No authenticated negotiation/time budget is supplied by this model. |
 | [`network/transport.mjs`](../../network/transport.mjs) | Lifecycle and reliable/transient vocabulary | Contract mixes identity, discovery, advertising and delivery. Split responsibilities incrementally; an interface alone proves no support. |
-| [`network/tcp-udp-transport.mjs`](../../network/tcp-udp-transport.mjs) | Real local TCP/UDP test transport, signatures and stale-state rejection | Unencrypted development reference; not a secure public service. No implemented discovery or relay. |
+| [`network/tcp-udp-transport.mjs`](../../network/tcp-udp-transport.mjs) | Real local TCP/UDP test transport, signatures and stale-state rejection | Unencrypted development reference; not a secure public service. No relay; the separate libp2p discovery service does not upgrade this transport. |
 | [`OnlineRoomTransport`](../../src/network/OnlineRoomTransport.js), [`online-server`](../../tools/networking/online-server.mjs), [`RoomSecurity`](../../tools/networking/RoomSecurity.mjs) | Browser-native WebSocket, same-origin `/ws`, invitation/host bearer credentials in first frame, bounds, sequence checks, role/capacity checks, proxy deployment | Independent of overlay providers. Current browser path cannot select an arbitrary advertised destination. Origin checks are not player authentication; room-supplied NodeID is not proof of key possession. |
 | [`BrowserIdentity`](../../src/network/BrowserIdentity.js) | Local WebCrypto key storage | Keys are not used for a federation challenge during the existing room join. Role identities are not yet persistent cross-world player accounts. |
 | Room `ItemEconomy` and `HelicopterLease` | In-memory room inventory/economy/trading and vehicle ownership | Useful local authority examples, not durable cross-world inventory, accounts or ownership transfer. Some older room documentation understates these implemented features. |
