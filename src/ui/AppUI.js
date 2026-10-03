@@ -311,6 +311,8 @@ export class AppUI {
 		// Agent Control: explicit quality and automatic-resolution controls, with a manual escape hatch.
 		s.quality = app.settings.quality;
 		s.autoResolution = app.settings.autoResolution;
+		s.terrainShading = app.settings.terrainShading;
+		quality.addSelect({ label: 'Terrain shading', object: s, key: 'terrainShading', options: [{label:'Full',value:'full'},{label:'Simple',value:'simple'}], tooltip: 'Simple reduces ground texture and surface detail for faster rendering. Terrain shape and gameplay stay the same.', onChange: v => app.setTerrainShading(v) });
 		quality.addSelect({ label: 'Quality profile', object: s, key: 'quality', options: ['auto', 'high', 'balanced', 'mobile'].map(value => ({label: value[0].toUpperCase() + value.slice(1), value})), onChange: v => app.setQuality(v) });
 		quality.addToggle({ label: 'Adaptive resolution', object: s, key: 'autoResolution', onChange: v => { app.settings.autoResolution = v; app.adaptiveResolution.reset(); } });
 		quality.addSlider( { label: 'Render scale', object: s, key: 'renderScale', min: 0.5, max: 1, step: 0.05, format: ( v ) => `${ Math.round( v * 100 ) }%`, tooltip: 'Manual internal resolution; changing this turns adaptive resolution off.', onChange: ( v ) => { app.settings.autoResolution = false; app.setRenderScale( v ); } } );

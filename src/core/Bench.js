@@ -28,6 +28,7 @@ export class Bench {
 		this.frames = [];
 		this._labels = [];
 		this._capture = false;
+		this._captureId = 0;
 		this.captureDiagnostics = { submitted: 0, captured: 0, ringDrops: 0, mapFailures: 0, invalidFrames: 0, truncatedPasses: 0, lastMapError: null };
 		if ( ! this.enabled ) return;
 		const d = GPU.device;
@@ -78,6 +79,8 @@ export class Bench {
 	_resolveFrame() {
 
 		this.captureDiagnostics.submitted ++;
+		// Bind identity to encoding/submission, never the asynchronous map callback.
+		const identity = { gpuFrame: GPU.frame, captureId: ++ this._captureId };
 		const n = this._labels.length;
 		const labels = this._labels;
 		this._labels = [];
@@ -94,7 +97,7 @@ export class Bench {
 				const t = new BigInt64Array( slot.buffer.getMappedRange().slice( 0, n * 16 ) );
 				slot.buffer.unmap();
 				slot.busy = false;
-				this._frameResult( labels, t );
+				this._frameResult( labels, t, identity );
 
 			} ).catch( ( error ) => {
 
@@ -108,7 +111,7 @@ export class Bench {
 
 	}
 
-	_frameResult( labels, t ) {
+	_frameResult( labels, t, identity = { gpuFrame: null, captureId: null } ) {
 
 		const order = [];
 		let first = null, last = null;
@@ -138,7 +141,11 @@ export class Bench {
 
 		}
 
-		this.frames.push( { gpu: Number( last - first ) / 1e6, passes } );
+		// Occurrences retain descriptor order and full begin/end duration. Existing
+		// passes remain end-ordered incremental charges for compatibility. Relative
+		// timestamps avoid loss of precision converting a large GPU clock to Number.
+		const occurrences = order.map( o => ( { index: o.i, label: labels[ o.i ], beginMs: Number( o.a - first ) / 1e6, endMs: Number( o.b - first ) / 1e6, durationMs: Number( o.b - o.a ) / 1e6 } ) ).sort( ( a, b ) => a.index - b.index );
+		this.frames.push( { gpu: Number( last - first ) / 1e6, passes, ...identity, occurrences } );
 		this.captureDiagnostics.captured ++;
 
 	}

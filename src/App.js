@@ -96,6 +96,7 @@ export class App {
 			timeSpeed: 0, // hours per real second
 			exposure: 0.55,
 			renderScale: 1, // internal resolution (the temporal upscaler reconstructs the output), Performance tab
+			terrainShading: 'full',
 		};
 		this.qs = new URLSearchParams( location.search );
 
@@ -376,6 +377,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		// Agent Control: automatic budgets apply to Windows and mobile as well as Linux.
 		this.adaptiveResolution = new AdaptiveResolution();
 		this.setQuality(qs.get('quality') || 'auto');
+		this.setTerrainShading(qs.get('terrainShading'));
 		if (qs.has('scale')) {
 			this.settings.autoResolution = false;
 			this.setRenderScale(Number(qs.get('scale')) || 1);
@@ -444,6 +446,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 
 		const mr = this.engine.meshRenderer;
 		const refr = this.refraction.enabled;
+		const terrainSimple = this.terrain.simpleShading;
 		// compute / post pipelines were requested while the systems were built: let them finish first
 		// (the frame below would otherwise compile each one again, synchronously); the post chain
 		// builds its passes on first use, so build it now
@@ -465,8 +468,9 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		try {
 
 			// both water variants: with the hull-mask discard (a hull on screen) and without
-			for ( const hull of [ 0, 1 ] ) {
+			for ( const simple of [ false, true ] ) for ( const hull of [ 0, 1 ] ) {
 
+				this.terrain.simpleShading = simple;
 				this.waterMaterial.hullOverride = hull;
 				this.frame( 1 / 60 );
 
@@ -479,6 +483,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		}
 
 		this.waterMaterial.hullOverride = null;
+		this.terrain.simpleShading = terrainSimple;
 		mr.precompiling = false;
 		this.refraction.enabled = refr;
 		await GPU.pipelinesReady();
@@ -845,6 +850,17 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.waterMaterial.params.ssr.value = q.reflections ? 1 : 0;
 		this.setRenderScale(q.scale);
 		this.adaptiveResolution?.reset();
+	}
+
+	setTerrainShading( value ) {
+
+		const mode = value === 'simple' ? 'simple' : 'full';
+		const changed = this.settings.terrainShading !== mode;
+		this.settings.terrainShading = mode;
+		this.terrain.simpleShading = mode === 'simple';
+		if ( changed ) this.post?.taau?.resetHistory();
+		return mode;
+
 	}
 
 	setRenderScale( v ) {

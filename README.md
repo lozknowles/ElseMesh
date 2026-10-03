@@ -32,6 +32,21 @@ saved settings from the private prototype are not migrated.
 
 ## Controls
 
+For reduced ground detail, choose **Settings → Performance → Terrain shading →
+Simple**, or open [Simple terrain mode](https://lozknowles.github.io/ElseMesh/?terrainShading=simple).
+Full remains the default. The choice is independent of the quality profile and
+applies for the current session; the URL flag selects it again after a reload.
+Simple preserves terrain shape, collisions, the cave opening and lighting, while
+using the existing terrain maps instead of fine procedural surface layers.
+Its performance benefit depends on the view and GPU.
+
+An Intel Xe-LPG comparison at 1600×900 output, Balanced quality and 0.75 internal
+scale measured 31.62 → 33.20 FPS at the villa and 30.21 → 32.05 FPS at the western
+headland. Each result uses two ABBA cycles, with 720 foreground frame intervals
+per mode. Separate GPU timestamp runs measured 26.33 → 24.43 ms and
+27.56 → 25.26 ms respectively. These are fixed-camera measurements, not phone,
+thermal or general gameplay guarantees. Simple is an intentional detail trade-off.
+
 | Input | Action |
 | --- | --- |
 | WASD / mouse | Move and look |

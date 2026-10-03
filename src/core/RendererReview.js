@@ -45,6 +45,7 @@ function configuration(app) {
 }
 
 function switches(app, stage = 1) {
+  if(stage===4)return [[app.terrain,'simpleShading','terrain']];
   if (stage === 3) return [
     [app.fourthIsland, 'optimizeAnimatedForest', 'animatedForest'],
     [app.colliders, 'optimizeSpatialQueries', 'collisions'],
@@ -63,6 +64,7 @@ function switches(app, stage = 1) {
 }
 
 function applyVariant(app, variant, candidate, stage = 1) {
+  if(stage===4){app.setTerrainShading(candidate?'simple':'full');return;}
   for (const [target, key, name] of switches(app, stage)) {
     if (typeof target[key] !== 'boolean') throw Error(`Renderer candidate unavailable: ${key}`);
     target[key] = candidate && (variant === 'combined' || variant === name || (variant === 'safeCombined' && name !== 'depthSort'));
@@ -85,8 +87,8 @@ function nextFrame(signal) {
 
 // Explicit developer tool. It never runs automatically and is excluded from production imports.
 export function installRendererReview(app, views) {
-  const stage = ['2', '3'].includes(app.qs.get('rendererStage')) ? Number(app.qs.get('rendererStage')) : 1;
-  const variants = stage === 3 ? ARCHITECTURE_VARIANTS : stage === 2 ? STAGE_TWO_VARIANTS : VARIANTS;
+  const stage = ['2', '3', '4'].includes(app.qs.get('rendererStage')) ? Number(app.qs.get('rendererStage')) : 1;
+  const variants = stage === 4 ? {combined:'Simple terrain shading'} : stage === 3 ? ARCHITECTURE_VARIANTS : stage === 2 ? STAGE_TWO_VARIANTS : VARIANTS;
   views = { ...views, forestTransition: { p: [-500, 24, 850], yaw: 0, pitch: -.08, time: 16.4 } };
   const panel = document.createElement('section');
   panel.setAttribute('aria-label', 'Renderer development review');
@@ -101,7 +103,7 @@ export function installRendererReview(app, views) {
   const option = (select, value, text) => { const o = document.createElement('option'); o.value = value; o.textContent = text; select.append(o); };
   for (const name of REVIEW_VIEWS) option(view, name, name);
   option(view, 'all', 'All six views');
-  for (const name of ['forestTransition', 'islandFourAerial', 'deepBlue', 'pierShallows', 'waterline', 'surf']) option(view, name, name);
+  for (const name of ['forestTransition', 'islandFourAerial', 'deepBlue', 'pierShallows', 'waterline', 'surf', 'cave', 'tHeadW', 'tCove']) option(view, name, name);
   for (const [key, name] of Object.entries(variants)) option(variant, key, name);
   option(variant, 'all', 'Every variant separately + combined'); variant.value = 'combined';
   option(preset, 'unchanged', 'Existing quality settings');
@@ -162,7 +164,8 @@ export function installRendererReview(app, views) {
     if (app.networkDemo) throw Error('Network sessions cannot be used for renderer comparisons');
     if (app.game?.salvage?.open) throw Error('Close the salvage camera before comparison');
     if (stage >= 2 && switches(app).some(([target, key]) => target[key] !== true)) throw Error('Baseline requires all published stage-one optimizations enabled');
-    if (stage === 3 && switches(app, 2).some(([target, key, name]) => target[key] !== (name !== 'depthSort'))) throw Error('Architecture baseline requires the published stage-two settings');
+    if (stage >= 3 && switches(app, 2).some(([target, key, name]) => target[key] !== (name !== 'depthSort'))) throw Error('Architecture baseline requires the published stage-two settings');
+    if(stage===4&&switches(app,3).some(([target,key])=>target[key]!==true))throw Error('Terrain baseline requires published architecture settings');
     await Promise.all([app.clouds?.ready, app.fourthIsland?.ready, app.avatar?.ready,
       app.game?.stand?.ready, app.game?.chandlery?.ready, app.portIsland?.vehicleAssetsReady,
       app.portIsland?.cargoVehicleReady, app.portIsland?.gatehouseReady, app.portIsland?.ivyReady]);
@@ -185,6 +188,7 @@ export function installRendererReview(app, views) {
     bench.setSize(...SIZE); FrameUniforms.fields.outputResolution.value.set(...SIZE);
     return () => {
       for (const [target, key, value] of snapshot.flags) target[key] = value;
+      if(stage===4)app.setTerrainShading(app.terrain.simpleShading?'simple':'full');
       app.settings.autoResolution = snapshot.autoResolution;
       app.settings.clockMode = snapshot.clockMode; app.settings.timeSpeed = snapshot.timeSpeed;
       app.post.params.aoStrength.value = snapshot.ao; app.post.params.bloom.value = snapshot.bloom;
@@ -261,6 +265,7 @@ export function installRendererReview(app, views) {
     for (let frame = 0; frame < 180; frame++) {
       const now = await nextFrame(signal);
       run.intervalsMs.push(now - previous); previous = now;
+      if(stage===4&&run.intervalsMs.filter(x=>x>=500).length>=5)throw Error('Repeated slow scheduling; foreground comparison invalid');
       run.cpuSubmitMs.push(render(signal, signature));
       if (run.internal[0] !== app.sceneRenderer.width || run.internal[1] !== app.sceneRenderer.height) throw Error('Internal render size changed during sampling');
       if ((frame + 1) % 30 === 0) output.textContent = `${label}\nForeground samples ${frame + 1}/180`;
@@ -302,7 +307,7 @@ export function installRendererReview(app, views) {
       while (bench.ring.some(slot => slot.busy) && performance.now() < deadline) await nextFrame(signal);
       guard(signal, signature);
       if (run.internal[0] !== app.sceneRenderer.width || run.internal[1] !== app.sceneRenderer.height) throw Error('Internal render size changed during GPU sampling');
-      run.gpuFrames = bench.frames.map(frame => ({ gpuMs: frame.gpu, passesMs: Object.fromEntries(frame.passes) }));
+      run.gpuFrames = bench.frames.map(frame => ({ gpuMs: frame.gpu, occurrences:frame.occurrences, passesMs: Object.fromEntries(frame.passes) }));
       run.captureDiagnostics = { ...bench.captureDiagnostics };
       if (run.captureDiagnostics.ringDrops || run.captureDiagnostics.mapFailures || run.captureDiagnostics.invalidFrames || run.captureDiagnostics.truncatedPasses) throw Error('GPU capture diagnostics report lost or incomplete timestamp data');
       if (run.gpuFrames.length !== 90) throw Error(`Incomplete GPU readback: ${run.gpuFrames.length}/90 frames`);
@@ -340,7 +345,7 @@ export function installRendererReview(app, views) {
     report = { schema: 'elsemesh.renderer-review/v1', startedAt: new Date().toISOString(), kind,
       status: 'running', valid: false, stage, output: SIZE, simulationDt: kind === 'preview' ? 1 / 60 : 0, simulationTime: 1000,
       cameraMotion: motion.value, windTimeStep: motion.value === 'windSweep' ? 1 / 60 : 0,
-      baseline: stage === 3 ? 'Published stage-one and stage-two settings remain enabled; only architecture flags toggle; timing correction shared by both modes' : stage === 2 ? 'Published stage-one optimizations remain enabled; only stage-two flags toggle' : 'Original renderer',
+      baseline: stage === 4 ? 'Published b765236 renderer; Full versus selectable Simple terrain shading; intentional reduced detail' : stage === 3 ? 'Published stage-one and stage-two settings remain enabled; only architecture flags toggle; timing correction shared by both modes' : stage === 2 ? 'Published stage-one optimizations remain enabled; only stage-two flags toggle' : 'Original renderer',
       effectPreset: preset.value, effectPresetNote: preset.value === 'effectsOff'
         ? 'AO and bloom are both zero for baseline and candidate; this is a separate scenario, not a default-quality speedup.' : 'Existing quality and effect settings preserved.',
       platform: navigator.userAgent, selectedViews, selectedVariants, cycles: ['still', 'preview'].includes(kind) ? 0 : 2,
@@ -348,10 +353,11 @@ export function installRendererReview(app, views) {
       runs: [], limitations: ['Fixed-camera screening with dt=0, not live gameplay or thermal qualification',
         'Simulation clock is fixed, but renderer frame counters and some frame-driven animation advance',
         'Foreground intervals include refresh-rate limits; GPU samples are a separate instrumented run',
-        stage === 3 ? 'Frozen physics does not measure collision-index gameplay benefit; windSweep advances wind and camera only; normal-dt previews are visual checks, not equivalent-state FPS comparisons' : stage === 2 ? 'Distant forest motion and converged water optics may differ; moving visual review required' : 'No asset removal or quality reduction; candidate work savings depend on the recorded effect settings'] };
+        stage === 4 ? 'Simple intentionally reduces fine terrain surface detail; geometry and published renderer settings are preserved' : stage === 3 ? 'Frozen physics does not measure collision-index gameplay benefit; windSweep advances wind and camera only; normal-dt previews are visual checks, not equivalent-state FPS comparisons' : stage === 2 ? 'Distant forest motion and converged water optics may differ; moving visual review required' : 'No asset removal or quality reduction; candidate work savings depend on the recorded effect settings'] };
     publish(); let restore;
     try {
       await prepare(controller.signal); restore = freeze();
+      if(stage===4){applyVariant(app,'combined',false,stage);pose(selectedViews[0]);await paced(60,controller.signal);report.intentionalQualityChange=true;}
       report.configuration = configuration(app); const signature = JSON.stringify(report.configuration);
       report.adapter = GPU.adapter.info ? { vendor: GPU.adapter.info.vendor, architecture: GPU.adapter.info.architecture,
         device: GPU.adapter.info.device, description: GPU.adapter.info.description } : null;
@@ -383,6 +389,7 @@ export function installRendererReview(app, views) {
           run.internal = [app.sceneRenderer.width, app.sceneRenderer.height];
           run.cameraAfter = { position: app.camera.position.toArray(), quaternion: app.camera.quaternion.toArray(), timeOfDay: app.settings.timeOfDay };
           run.drawStats = { ...app.engine.meshRenderer.stats };
+          if(stage===4)run.terrain={mode:app.settings.terrainShading,nodes:Array.from(app.terrain.lod.nodeArray.subarray(0,app.terrain.lod.count*4)),instances:app.terrain.lod.geometry.instanceCount};
           run.submissionStats = { ...app.engine.meshRenderer.submissionStats };
           run.forestStats = { ...app.fourthIsland?.forestStats };
           if (stage === 3) run.animatedForestStats = { ...app.fourthIsland?.animatedForestStats };

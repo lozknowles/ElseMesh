@@ -5,6 +5,7 @@ import { standard } from '../materials/Materials.js';
 import { G } from '../engine/render/Frame.js';
 import { WORLD } from './WorldLayout.js';
 import { srgb, rot2, terrainShadingModule } from './terrain/TerrainShading.js';
+import { SIMPLE_TERRAIN_SURFACE } from './terrain/SimpleTerrainSurface.js';
 
 // = GrassField FADE_T0 (vegetation/GrassField.js): tier 0 blades drop out at random distances in
 // this range. Kept as a literal so the terrain doesn't pull in the grass field's shaders.
@@ -66,6 +67,14 @@ export class Terrain {
 			},
 			attributes: { nodeData: 'vec4f' },
 		} );
+		this._simpleShading = false;
+		mat.defines.TERRAIN_SIMPLE_SHADING = 0;
+		const basePipelineKey = mat.pipelineKey;
+		mat.pipelineKey = function () {
+
+			return basePipelineKey.call( this ) + '|terrainSimple:' + this.defines.TERRAIN_SIMPLE_SHADING;
+
+		};
 		this.params = { wetDarken: mat.uniforms.wetDarken };
 		this.uViewPos = mat.uniforms.viewPos;
 
@@ -91,6 +100,20 @@ export class Terrain {
 
 	}
 
+	// Appearance-quality option; geometry, material identity and lighting stay shared.
+	get simpleShading() { return this._simpleShading; }
+	set simpleShading( enabled ) {
+
+		enabled = Boolean( enabled );
+		if ( enabled === this._simpleShading ) return;
+		this._simpleShading = enabled;
+		const mat = this.material;
+		mat.defines.TERRAIN_SIMPLE_SHADING = enabled ? 1 : 0;
+		mat.surface = enabled ? SIMPLE_TERRAIN_SURFACE : TERRAIN_SURFACE;
+		mat.__pkFrame = - 1;
+
+	}
+
 	// (Re)build the fragment code. Called again once the shore system provides wetness.
 	finalizeMaterial() {
 
@@ -107,8 +130,10 @@ export class Terrain {
 		mat.modules = modules;
 		mat.defines.HAS_WETNESS = this.wetness ? 1 : 0;
 		mat.defines.MATERIAL_SUN_MODULATION = this.sunShadow ? 1 : 0;
-		mat.surface = TERRAIN_SURFACE;
+		mat.defines.TERRAIN_SIMPLE_SHADING = this._simpleShading ? 1 : 0;
+		mat.surface = this._simpleShading ? SIMPLE_TERRAIN_SURFACE : TERRAIN_SURFACE;
 		mat.needsUpdate = true;
+		mat.__pkFrame = - 1;
 
 	}
 
