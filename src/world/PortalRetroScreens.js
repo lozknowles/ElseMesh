@@ -71,7 +71,7 @@ function drawSunDesktop(ctx, width, height) {
     ctx.strokeRect(x + 12, y + 11, 25, 25);
   };
 
-  windowFrame(105, 145, 790, 650, 'File Manager - /home/demo');
+  windowFrame(105, 145, 790, 650, 'File Manager - /workspace/demo');
   ctx.save();
   ctx.beginPath();
   ctx.rect(110, 198, 780, 592);
@@ -118,7 +118,7 @@ function drawSunDesktop(ctx, width, height) {
   const terminal = [
     'SunOS 4.1.3 (GENERIC)',
     'demo@warehouse% pwd',
-    '/home/demo',
+    '/workspace/demo',
     'demo@warehouse% ls -F',
     'Calendar/ Demos/ Documents/',
     'Mail/ Projects/',

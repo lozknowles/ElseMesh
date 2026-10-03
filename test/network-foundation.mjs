@@ -58,8 +58,8 @@ test('deterministic chaos: overlapping subnets, route change, direct failure, re
   assert.notDeepEqual(routes.get(a.nodeId)[0], routes.get(b.nodeId)[0]);
   assert.equal((await routes.connect(a.nodeId, async (r) => r.kind === 'direct')).kind, 'direct');
   assert.equal((await routes.connect(a.nodeId, async (r) => r.kind === 'relay')).kind, 'relay');
-  routes.set(a.nodeId, [{ kind: 'direct', address: '10.0.0.30', scope: 'site-C' }]);
-  assert.equal((await routes.connect(a.nodeId, async (r) => r.address === '10.0.0.30')).address, '10.0.0.30');
+  routes.set(a.nodeId, [{ kind: 'direct', address: '203.0.113.30', scope: 'site-C' }]);
+  assert.equal((await routes.connect(a.nodeId, async (r) => r.address === '203.0.113.30')).address, '203.0.113.30');
   await assert.rejects(routes.connect(a.nodeId, async () => false), /No reachable route/);
 });
 

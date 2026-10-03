@@ -4,17 +4,21 @@ This directory contains the deterministic, reusable preparation program for Buil
 
 ## Prerequisites
 
-Use Blender 4.5.9 at the configured path. The immutable source is:
+Use Blender 4.5.9 from your installation. Set the source and output paths for your own machine; no private development host or directory is required. Obtain the original `warehouseupload2.blend` separately and verify its immutable source hash:
 
-- `/fast/qualification/building-002/source-original/warehouseupload2.blend`
 - SHA-256: `caa62559dc36b70ebf5f4d2b8b3fe8e3d3b55ff2d45e829aa0293239b11b9d81`
 
-## Exact command
+## Portable command template
 
-The output paths deliberately live outside the repository. The directories are created by the script when necessary.
+The output paths deliberately live outside the repository. Replace the example paths below with absolute paths on your machine. The directories are created by the script when necessary. This shell example assumes `blender` is on `PATH`; otherwise use the path to your Blender executable.
 
 ```sh
-/fast/tools/blender-portal/blender-4.5.9-linux-x64/blender --background --python tools/building_pipeline/process_building.py -- --source /fast/qualification/building-002/source-original/warehouseupload2.blend --working /fast/qualification/building-002/output/building-002-working.blend --glb /fast/qualification/building-002/output/building-002.glb
+BLENDER_SOURCE=/path/to/source/warehouseupload2.blend
+BLENDER_OUTPUT=/path/to/output/building-002
+blender --background --python tools/building_pipeline/process_building.py -- \
+  --source "$BLENDER_SOURCE" \
+  --working "$BLENDER_OUTPUT/building-002-working.blend" \
+  --glb "$BLENDER_OUTPUT/building-002.glb"
 ```
 
 Run this command from the repository root. The optional `--max-texture-size` argument defaults to `1024`; it may be supplied after `--glb` to select another positive pixel cap. On success, the final standard-output line is a compact JSON result recording the verified source hash, output paths, runtime object count, the three excluded helpers, planning zones, configured cap, source and runtime texture counts and maximum dimensions, measured GLB byte size, and export feature flags. Blender execution and visual qualification remain a Codex follow-up; Agent Control authored this refinement and documentation but did not run Blender.
