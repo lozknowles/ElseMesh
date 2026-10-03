@@ -11,7 +11,7 @@
     "test:cargo": "node --test test/port-cargo.mjs",
     "test:demo": "node --test test/network-demo.mjs",
     "test:vehicle-steering": "node --test test/port-wheel-rig.mjs test/port-traffic.mjs",
-    "test:network": "node --test test/network-foundation.mjs test/network-player.mjs test/federation.mjs test/online-room.mjs test/ten-player-room.mjs test/network-speech.mjs test/avatar-appearance.mjs test/network-demo.mjs",
+    "test:network": "node --test test/network-foundation.mjs test/network-player.mjs test/federation.mjs test/online-room.mjs test/ten-player-room.mjs test/network-speech.mjs test/avatar-appearance.mjs test/network-demo.mjs test/discovery-records.mjs test/discovery-resolver.mjs test/discovery-network.mjs test/discovery-cli.mjs",
     "verify:portal-detail": "node tools/portal_interior/verify-reference-detail.mjs",
     "world:export": "node tools/blender/export-terrain.mjs artifacts/world",
     "test:security": "node --test test/online-security.mjs",
@@ -19,7 +19,9 @@
     "test:renderer": "node --test test/bench-timestamps.mjs test/scene-transform-cache.mjs test/render-pass-scheduling.mjs test/scene-submission.mjs test/distant-forest.mjs test/water-optical-lod.mjs && node test/water-optical-lod-gpu.mjs",
     "test:terrain-quality": "node --test test/terrain-shading-quality.mjs && node test/terrain-shading-quality.mjs --gpu",
     "test:publication": "node --test test/publication-privacy.mjs && node tools/check-publication.mjs",
-    "test:architecture": "node --test test/frame-timing.mjs test/collider-spatial-queries.mjs test/collision-review.mjs test/animated-forest.mjs && node test/animated-forest-gpu.mjs"
+    "test:architecture": "node --test test/frame-timing.mjs test/collider-spatial-queries.mjs test/collision-review.mjs test/animated-forest.mjs && node test/animated-forest-gpu.mjs",
+    "node:discovery": "node tools/networking/discovery-node.mjs",
+    "test:discovery": "node --test test/discovery-records.mjs test/discovery-resolver.mjs test/discovery-network.mjs test/discovery-cli.mjs"
   },
   "devDependencies": {
     "vite": "^8.3.0",
@@ -29,6 +31,14 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@chainsafe/libp2p-noise": "17.0.0",
+    "@chainsafe/libp2p-yamux": "8.0.1",
+    "@libp2p/crypto": "5.1.23",
+    "@libp2p/peer-id": "6.0.15",
+    "@libp2p/tcp": "11.0.28",
+    "@libp2p/utils": "7.4.1",
+    "@multiformats/multiaddr": "13.0.3",
+    "libp2p": "3.3.11",
     "ws": "^8.22.0"
   },
   "description": "ElseMesh — an experimental WebGPU island exploration game"
