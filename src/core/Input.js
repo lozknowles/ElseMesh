@@ -8,6 +8,9 @@ export class Input {
 		this.dom = dom;
 		this.keys = new Set();
 		this.pressed = new Set();
+		this._touchHeld = new Map();
+		this._helicopterTouchMode = false;
+		this._touchFlightResetters = [];
 		this.look = { x: 0, y: 0 };
 		this.moveStick = { x: 0, y: 0 };
 		this.lookStick = { x: 0, y: 0 };
@@ -89,6 +92,18 @@ export class Input {
 		this.enabled = true;
 	}
 
+	get touchInterface() { return Boolean( window.matchMedia?.( '(pointer: coarse)' ).matches ); }
+
+	setHelicopterTouchMode( active ) {
+
+		active = Boolean( active );
+		if ( active === this._helicopterTouchMode ) return;
+		this._helicopterTouchMode = active;
+		if ( this._touchFlight ) this._touchFlight.hidden = ! active;
+		if ( ! active ) for ( const reset of this._touchFlightResetters ) reset();
+
+	}
+
 	_createTouchSticks() {
 
 		const root = document.querySelector( '.tw-root' );
@@ -162,6 +177,53 @@ export class Input {
 
 		}
 
+		const flight = this._touchFlight = document.createElement( 'div' );
+		flight.className = 'tw-touch-flight';
+		flight.hidden = true;
+		flight.setAttribute( 'aria-label', 'Helicopter altitude controls' );
+		for ( const [ label, code ] of [ [ 'Up', 'Space' ], [ 'Down', 'KeyC' ] ] ) {
+
+			const button = document.createElement( 'button' );
+			button.type = 'button';
+			button.className = 'tw-touch-flight-button tw-interactive';
+			button.textContent = label;
+			button.setAttribute( 'aria-label', `Helicopter ${ label.toLowerCase() } — hold` );
+			button.tabIndex = -1;
+			const pointers = new Set();
+			this._touchHeld.set( code, pointers );
+			const stop = e => { e.preventDefault(); e.stopPropagation(); };
+			const release = e => {
+
+				stop( e );
+				pointers.delete( e.pointerId );
+				if ( button.hasPointerCapture?.( e.pointerId ) ) button.releasePointerCapture( e.pointerId );
+				button.classList.toggle( 'is-active', pointers.size > 0 );
+
+			};
+			this._touchFlightResetters.push( () => {
+
+				const captured = [ ...pointers ];
+				pointers.clear();
+				for ( const id of captured ) if ( button.hasPointerCapture?.( id ) ) button.releasePointerCapture( id );
+				button.classList.remove( 'is-active' );
+
+			} );
+			button.addEventListener( 'pointerdown', e => {
+
+				stop( e );
+				if ( ! this.enabled || ! this._helicopterTouchMode ) return;
+				try { button.setPointerCapture( e.pointerId ); } catch { return; }
+				pointers.add( e.pointerId );
+				button.classList.add( 'is-active' );
+
+			} );
+			button.addEventListener( 'pointermove', stop );
+			for ( const event of [ 'pointerup', 'pointercancel', 'lostpointercapture' ] ) button.addEventListener( event, release );
+			button.addEventListener( 'click', stop );
+			flight.append( button );
+
+		}
+		controls.append( flight );
 		root.append( controls );
 
 	}
@@ -176,6 +238,7 @@ export class Input {
 		this.moveStick.x = this.moveStick.y = 0;
 		this.lookStick.x = this.lookStick.y = 0;
 		for ( const reset of this._touchStickResetters || [] ) reset();
+		for ( const reset of this._touchFlightResetters ) reset();
 
 	}
 
@@ -233,6 +296,7 @@ export class Input {
 
 		if ( ! this.enabled ) return false;
 		if ( this.keys.has( code ) ) return true;
+		if ( this._touchHeld.get( code )?.size ) return true;
 		const { x, y } = this.moveStick;
 		if ( code === 'KeyW' ) return y > 0.18;
 		if ( code === 'KeyS' ) return y < - 0.18;

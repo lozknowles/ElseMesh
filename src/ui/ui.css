@@ -386,6 +386,48 @@ body {
 	right: calc(16px + env(safe-area-inset-right, 0px));
 }
 
+.tw-touch-flight {
+	position: absolute;
+	right: calc(80px + env(safe-area-inset-right, 0px));
+	bottom: calc(164px + env(safe-area-inset-bottom, 0px));
+	display: flex;
+	gap: 8px;
+}
+
+.tw-touch-flight[hidden] { display: none; }
+
+.tw-touch-flight-button {
+	min-width: 58px;
+	min-height: 48px;
+	border: 1px solid rgba(194, 235, 240, 0.5) !important;
+	border-radius: 12px;
+	background: rgba(3, 23, 30, 0.8) !important;
+	color: #e4f6f8 !important;
+	font: inherit;
+	font-weight: 600;
+	touch-action: none;
+	user-select: none;
+	-webkit-user-select: none;
+	-webkit-tap-highlight-color: transparent;
+	pointer-events: auto;
+}
+
+.tw-touch-flight-button.is-active { background: rgba(35, 110, 112, 0.9) !important; }
+
+@media (pointer: coarse) {
+	#elsemesh-flight-hud {
+		bottom: calc(224px + env(safe-area-inset-bottom, 0px)) !important;
+		width: calc(100vw - 100px);
+		max-width: 420px !important;
+		padding: 8px 10px !important;
+		font-size: 11px !important;
+	}
+}
+
+@media (pointer: coarse) and (max-height: 500px) {
+	#elsemesh-flight-hud small { display: none; }
+}
+
 .tw-touch-stick.is-active {
 	border-color: rgba(var(--tw-aqua-rgb), 0.72) !important;
 	background: radial-gradient(circle, rgba(44, 115, 118, 0.48), rgba(3, 13, 20, 0.64)) !important;

@@ -59,6 +59,10 @@ thermal or general gameplay guarantees. Simple is an intentional detail trade-of
 | M | Mute |
 | F1 or ? | Full controls |
 
+On a phone, use the Move and Look sticks. While piloting the helicopter, hold
+**Up** to climb or **Down** to descend. Land on dry ground, stop, release the
+controls, then tap **Leave helicopter**. Altitude buttons disappear after exiting.
+
 The cargo sequence can be reviewed with `?view=portCargoDelivery&quality=high&noAudio`.
 Its delivery vehicle is MMCWorks' Generic Sedan Car, with separate animated
 wheels and collision bounds checked against the actual model.
@@ -74,6 +78,7 @@ npm run test:vehicle-steering
 npm run test:vehicle-material
 npm run test:graphics
 npm run test:renderer
+npm run test:terrain-quality
 npm run test:architecture
 npm run test:publication
 npm run build
