@@ -1,15 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { loadPrivateTerms, scanPublicationTree } from './publication-privacy.mjs';
+import { publicationPrivacyCheck } from './publication-privacy.mjs';
 const root=path.resolve(import.meta.dirname,'..');
 const issues=[];
 let operatorScan = false;
 let scan;
 try {
- const config=loadPrivateTerms(root,process.env.ELSEMESH_PUBLICATION_PRIVATE_TERMS_FILE);
- operatorScan=config.operatorScan;
- scan=scanPublicationTree(root,config.terms);
+ const result=publicationPrivacyCheck(root,process.env.ELSEMESH_PUBLICATION_PRIVATE_TERMS_FILE);
+ operatorScan=result.operatorScan;
+ scan=result.scan;
  issues.push(...scan.issues);
 } catch (error) { console.error(error.message); process.exit(1); }
 const manifest=JSON.parse(fs.readFileSync(path.join(root,'public/models/port/licensing/vehicle-manifest.json'),'utf8'));

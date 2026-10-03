@@ -72,3 +72,19 @@ export function scanPublicationTree(root, terms = []) {
   walk(root);
   return { issues, files, textFiles };
 }
+
+// Keep filesystem exception details out of CLI output: they can contain a
+// private checkout root or private filename before ordinary redaction runs.
+export function publicationPrivacyCheck(root, configFile, scanner = scanPublicationTree) {
+  let config;
+  try {
+    config = loadPrivateTerms(root, configFile);
+  } catch {
+    throw new Error('Operator private-term configuration unavailable, empty, malformed, or inside repository.');
+  }
+  try {
+    return { scan: scanner(root, config.terms), operatorScan: config.operatorScan };
+  } catch {
+    throw new Error('Publication privacy scan failed; filesystem details withheld.');
+  }
+}

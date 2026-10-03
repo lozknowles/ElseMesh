@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
-import { loadPrivateTerms, privacyFindings, scanPublicationTree } from '../tools/publication-privacy.mjs';
+import { loadPrivateTerms, privacyFindings, scanPublicationTree, publicationPrivacyCheck } from '../tools/publication-privacy.mjs';
 
 const ip = (...octets) => octets.join('.');
 function fixture(t) {
@@ -90,6 +90,26 @@ test('publication CLI fails closed for a supplied unavailable operator file with
   assert.match(result.stderr, /Operator private-term configuration unavailable/);
   assert.ok(!result.stderr.includes(missing));
   assert.ok(!result.stdout.includes('checks passed'));
+});
+
+test('publication filesystem failures redact absolute roots and private filenames', t => {
+  const { temp, root } = fixture(t);
+  const term = 'fixture-private-device';
+  const configFile = path.join(temp, 'operator-terms.txt');
+  fs.writeFileSync(configFile, term);
+  const privateFile = path.join(root, term + '.md');
+  const failingScanner = (scanRoot, terms) => {
+    assert.equal(scanRoot, root);
+    assert.deepEqual(terms, [term]);
+    throw new Error(`EACCES: permission denied, open '${privateFile}'`);
+  };
+  assert.throws(() => publicationPrivacyCheck(root, configFile, failingScanner), error => {
+    assert.equal(error.message, 'Publication privacy scan failed; filesystem details withheld.');
+    assert.ok(!error.message.includes(root));
+    assert.ok(!error.message.includes(term));
+    assert.ok(!error.message.includes(configFile));
+    return true;
+  });
 });
 
 test('private file classes and existing project/asset restrictions remain enforced', t => {
