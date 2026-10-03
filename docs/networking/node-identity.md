@@ -1,6 +1,6 @@
 # Node identity and trust
 
-The proof generates Ed25519 keys with Node's crypto API. `NodeID` is SHA-256 over the DER SPKI public key. `loadOrCreateIdentity` verifies keypair consistency on reload and writes new identity files with owner-only mode where supported. The private key file belongs outside the repository (for example on D: under a local qualification directory). Back it up securely if a node is meant to persist: losing it creates a new node.
+The proof generates Ed25519 keys with Node's crypto API. `NodeID` is SHA-256 over the DER SPKI public key. `loadOrCreateIdentity` verifies keypair consistency on reload and writes new identity files with owner-only mode where supported. The private key file belongs in an operator-configured private directory outside the repository and any web-served directory. Back it up securely if a node is meant to persist: losing it creates a new node.
 
 The demo uses an explicit public-key trust file. Exchanging that file is an out-of-band trust/bootstrap step, not open discovery. Signed objects carry a public key and are accepted only when its derived NodeID is trusted. A signed manifest additionally requires a trusted publisher; a signed handoff requires the current sector authority. Transport encryption alone never authorises a world edit or manifest.
 

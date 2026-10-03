@@ -10,3 +10,9 @@ artifacts/network/
 *.pcapng
 *.pem
 *.key
+.env
+.env.*
+*.env
+!*.env.example
+!**/.env.example
+.publication-private-terms*

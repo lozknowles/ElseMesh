@@ -84,6 +84,10 @@ npm run test:publication
 npm run build
 ```
 
+Publication checks distinguish generic patterns from an optional private
+operator-specific scan. See [portable source and publication checks](docs/publication-portability.md)
+for configuration and the separate treatment of build output and Git history.
+
 ## Rendering performance
 
 The 2 October renderer update shares scene transforms across passes and skips
