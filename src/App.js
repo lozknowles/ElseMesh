@@ -125,7 +125,9 @@ export class App {
 		this.scene = scene;
 		this.camera = camera;
 
-		this.input = new Input( engine.domElement );
+		this.input = new Input( engine.domElement, {
+			keyboardLookBlocked: () => Boolean( window.__ui?._start || window.__ui?.helpOpen || this.game?.guide?.open ),
+		} );
 		this.fly = new FlyCamera( camera, engine.domElement, this.input );
 		this.fly.setPose( new Vector3( 20, 6, - 20 ), Math.PI * 0.9, - 0.12 );
 

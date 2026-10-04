@@ -49,7 +49,9 @@ thermal or general gameplay guarantees. Simple is an intentional detail trade-of
 
 | Input | Action |
 | --- | --- |
-| WASD / mouse | Move and look |
+| WASD | Move |
+| Mouse or cursor keys ↑ ↓ ← → | Look up/down and turn left/right |
+| Comma / full stop in helicopter | Look through left / right side windows |
 | Shift / Space | Sprint / jump |
 | E | Interact, board or leave a vehicle |
 | WASD / Space / R in car | Drive / brake / recover |
@@ -58,6 +60,9 @@ thermal or general gameplay guarantees. Simple is an intentional detail trade-of
 | K | Avatar chooser |
 | M | Mute |
 | F1 or ? | Full controls |
+
+Cursor-key look works without capturing the mouse. Menus, text fields and the
+introductory guide keep their own keyboard controls.
 
 On a phone, use the Move and Look sticks. While piloting the helicopter, hold
 **Up** to climb or **Down** to descend. Land on dry ground, stop, release the

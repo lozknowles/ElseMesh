@@ -1,9 +1,15 @@
 // Keyboard / mouse input with pointer lock support.
 const LOOK_VERTICAL_DEAD_ZONE = 0.78;
+const KEYBOARD_LOOK_SPEED = 700; // Mouse-equivalent units per second (about 88 degrees/s on foot).
+const LOOK_KEYS = new Set( [ 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown' ] );
+const ownsKeyboard = target => Boolean( target && (
+	[ 'INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'A', 'SUMMARY' ].includes( target.tagName ) ||
+	target.isContentEditable || target.closest?.( '.tw-interactive, [role="dialog"]' )
+) );
 
 export class Input {
 
-	constructor( dom ) {
+	constructor( dom, { keyboardLookBlocked = () => false } = {} ) {
 
 		this.dom = dom;
 		this.keys = new Set();
@@ -19,16 +25,37 @@ export class Input {
 		this.rightDown = false;
 		this.locked = false;
 		this.enabled = true;
+		this.keyboardLookBlocked = keyboardLookBlocked;
+
+		// Capture releases even when a menu consumes the corresponding key event.
+		window.addEventListener( 'keyup', ( e ) => this.keys.delete( e.code ), true );
+		window.addEventListener( 'keydown', ( e ) => {
+
+			if ( e.ctrlKey || e.metaKey || e.altKey ) this.clearKeyboardLook();
+
+		}, true );
+		document.addEventListener( 'focusin', ( e ) => {
+
+			if ( ownsKeyboard( e.target ) ) this.clearKeyboardLook();
+
+		}, true );
 
 		window.addEventListener( 'keydown', ( e ) => {
 
+			if ( LOOK_KEYS.has( e.code ) && ( e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || ! this._keyboardLookAllowed( e.target ) ) ) {
+
+				this.clearKeyboardLook();
+				return;
+
+			}
+			// Focus/modal changes require a fresh press, not the tail of an old hold.
+			if ( LOOK_KEYS.has( e.code ) && e.repeat && ! this.keys.has( e.code ) ) return;
 			if ( e.target && ( e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA' ) ) return;
 			if ( ! this.keys.has( e.code ) ) this.pressed.add( e.code );
 			this.keys.add( e.code );
 			if ( [ 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab' ].includes( e.code ) ) e.preventDefault();
 
 		} );
-		window.addEventListener( 'keyup', ( e ) => this.keys.delete( e.code ) );
 		window.addEventListener( 'blur', () => this._clearTransientInput() );
 		document.addEventListener( 'visibilitychange', () => {
 
@@ -90,6 +117,24 @@ export class Input {
 	resume() {
 		this._clearTransientInput();
 		this.enabled = true;
+	}
+
+	_keyboardLookAllowed( target ) {
+
+		return this.enabled && ! document.hidden && ! this.keyboardLookBlocked() &&
+			! ownsKeyboard( target ) && ! ownsKeyboard( document.activeElement );
+
+	}
+
+	clearKeyboardLook() {
+
+		for ( const code of LOOK_KEYS ) {
+
+			this.keys.delete( code );
+			this.pressed.delete( code );
+
+		}
+
 	}
 
 	get touchInterface() { return Boolean( window.matchMedia?.( '(pointer: coarse)' ).matches ); }
@@ -320,6 +365,7 @@ export class Input {
 	}
 
 	consumeLook( dt = 1 / 60 ) {
+		if ( ! this._keyboardLookAllowed() ) this.clearKeyboardLook();
 		if ( ! this.enabled ) { this.look.x = this.look.y = 0; return { x: 0, y: 0 }; }
 
 		const { x, y } = this.lookStick;
@@ -335,8 +381,8 @@ export class Input {
 
 		}
 		const l = {
-			x: this.look.x + sx * 420 * dt,
-			y: this.look.y - sy * 420 * dt,
+			x: this.look.x + sx * 420 * dt + ( Number( this.keys.has( 'ArrowRight' ) ) - Number( this.keys.has( 'ArrowLeft' ) ) ) * KEYBOARD_LOOK_SPEED * dt,
+			y: this.look.y - sy * 420 * dt + ( Number( this.keys.has( 'ArrowDown' ) ) - Number( this.keys.has( 'ArrowUp' ) ) ) * KEYBOARD_LOOK_SPEED * dt,
 		};
 		this.look.x = 0;
 		this.look.y = 0;
@@ -354,6 +400,7 @@ export class Input {
 
 	endFrame() {
 
+		if ( ! this._keyboardLookAllowed() ) this.clearKeyboardLook();
 		this.pressed.clear();
 
 	}

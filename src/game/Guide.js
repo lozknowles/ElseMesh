@@ -88,7 +88,8 @@ const CARDS = [
 		eyebrow: 'Getting around',
 		title: 'Joe and Marta',
 		body: `<div class="gm-guide-list">
-			${ row( k( 'W', 'A', 'S', 'D' ), 'Move, mouse to look, <kbd>Shift</kbd> to run' ) }
+			${ row( k( 'W', 'A', 'S', 'D' ), 'Move, <kbd>Shift</kbd> to run' ) }
+			${ row( k( '←', '↑', '↓', '→' ), 'Look around, or use the mouse' ) }
 			${ row( k( 'E' ), 'Board the boat, take the helm, talk to Joe and Marta' ) }
 			${ row( k( 'F1' ), 'All controls, and this guide again' ) }
 		</div>
@@ -270,6 +271,7 @@ export class Guide {
 		this._whereT = 0;
 		if ( ! this.open ) {
 
+			this.game.app.input.clearKeyboardLook();
 			this.open = true;
 			this.el.classList.add( 'is-on' );
 
