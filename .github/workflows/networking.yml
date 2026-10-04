@@ -1,0 +1,35 @@
+name: Networking checks
+
+on:
+  pull_request:
+    paths:
+      - 'network/**'
+      - 'tools/networking/**'
+      - 'test/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/networking.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  network:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: [22, 24]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run test:network
+      - run: npm run test:security
+      - run: npm run test:publication
+      - run: npm run build

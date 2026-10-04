@@ -30,6 +30,11 @@ See [deployment examples](deploy/README.md). The public client and server use
 ElseMesh protocol identifiers and environment variables; older invitations and
 saved settings from the private prototype are not migrated.
 
+Native nodes can now exchange signed connection hints through multiple configured
+libp2p helpers. See [cooperative discovery nodes](docs/networking/discovery-nodes.md)
+for identity setup, configuration and tests. This is a discovery service; browser
+portal travel, public relays and automatic NAT traversal are still separate work.
+
 ## Controls
 
 For reduced ground detail, choose **Settings → Performance → Terrain shading →
