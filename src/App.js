@@ -22,6 +22,12 @@ import { Environment } from './sky/Environment.js';
 import { TerrainData } from './world/TerrainData.js';
 import { TerrainGPU } from './world/TerrainGPU.js';
 import { Terrain } from './world/Terrain.js';
+import { ProceduralWorld } from './world/ProceduralWorld.js';
+import { PROCEDURAL_SEED } from './world/ProceduralHeight.js';
+import { LandscapeBuilder, readSavedLandscapeSpec } from './world/LandscapeBuilder.js';
+import { landscapePathLayout } from './world/LandscapeHeight.js';
+import { effectiveLandscapeSpec, readSavedLandscapeWorldDocument } from './world/LandscapeWorldDocument.js';
+import { LandscapeWarehouse } from './world/LandscapeWarehouse.js';
 import { computeShoreField } from './world/ShoreField.js';
 import { WORLD } from './world/WorldLayout.js';
 import { Colliders } from './world/Colliders.js';
@@ -156,6 +162,13 @@ export class App {
 		// ---------------------------------------------------------------- island
 		await progress( 0.06, 'Shaping the island…' );
 		this.terrainData = new TerrainData();
+		// Resolve the saved, validated definition before any terrain WGSL is built.
+		// The authored islands remain untouched; the new domain lies outside them.
+		this.landscapeDocument = qs.has( 'landscapeBuilder' ) && qs.get( 'generated' ) === '1' ? readSavedLandscapeWorldDocument() : null;
+		this.landscapeSpec = this.landscapeDocument ? effectiveLandscapeSpec( this.landscapeDocument ) : qs.has( 'landscapeBuilder' ) && qs.get( 'generated' ) === '1' ? readSavedLandscapeSpec() : null;
+		if ( this.landscapeSpec ) { this.terrainData.landscapeSpec = this.landscapeSpec; this.terrainData.landscapeEdits = this.landscapeDocument?.terrain ?? []; }
+		// Experimental outer world is opt-in; the authored grid is generated unchanged.
+		if ( ! this.landscapeSpec && qs.has( 'procedural' ) ) this.terrainData.proceduralSeed = PROCEDURAL_SEED;
 		this.colliders = new Colliders();
 		// the village flattens building pads into the heightmap: build it before any terrain
 		// data is derived (shore field, GPU textures, meshes)
@@ -347,10 +360,49 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.avatar = new PlayerAvatar( scene, this.boatCtl );
 		this.avatarChooser = new AvatarChooser({ app: this });
 		this.thirdIsland = new ThirdIslandSystem( this );
+		// The reference-guided candidate is a local experiment. Keep its images and
+		// restricted GLB out of production bundles, including opt-in URLs.
+		this.aiWarehouse = null;
+		if ( import.meta.env.DEV && qs.has( 'aiWarehouse' ) ) {
+			const { ImageGuidedWarehouse } = await import( './world/ImageGuidedWarehouse.js' );
+			this.aiWarehouse = new ImageGuidedWarehouse( this );
+		}
 		this.fourthIsland = new FourthIslandSystem( this );
 		this.fifthIsland = new IslandFiveSystem( this );
 		this.portIsland = new PortIslandSystem( this );
 		this.monorail.restorePlayer( this.player );
+		if ( this.landscapeSpec || qs.has( 'procedural' ) ) {
+			this.procedural = new ProceduralWorld( this, this.landscapeSpec?.seed ?? PROCEDURAL_SEED, { landscapeSpec: this.landscapeSpec, landscapeEdits: this.landscapeDocument?.terrain ?? [], worldId: this.landscapeDocument?.worldId } );
+			const saved = this.procedural.savedPosition;
+			const spawn = this.landscapeSpec ? landscapePathLayout( this.landscapeSpec, this.landscapeDocument?.terrain ?? [] ).spawn : null;
+			const x = saved?.[0] ?? spawn?.x ?? 100, z = saved?.[2] ?? spawn?.z ?? 584;
+			const y = saved?.[1] ?? this.player.groundAt( x, z, 1000 );
+			this.monorail.teleport( this.player, x, y, z, this.landscapeSpec ? - Math.PI / 2 : Math.PI );
+			if ( typeof window !== 'undefined' ) window.__procedural = this.procedural;
+		}
+		if ( this.landscapeSpec?.structures.some( placement => placement.assetId === 'abandoned-warehouse' ) ) {
+			try { this.landscapeWarehouse = new LandscapeWarehouse( this, this.landscapeSpec ); }
+			catch ( error ) { this.landscapeWarehouseError = error; console.warn( 'Generated warehouse could not be placed', error ); }
+		}
+		if ( qs.has( 'landscapeBuilder' ) ) {
+			this.landscapeBuilder = new LandscapeBuilder( {
+				spec: this.landscapeDocument?.spec ?? this.landscapeSpec ?? readSavedLandscapeSpec() ?? undefined,
+				worldDocument: this.landscapeDocument,
+				onGetPosition: () => ( { x: this.player.position.x, z: this.player.position.z } ),
+				onGoHome: this.landscapeSpec ? () => {
+					if ( this.thirdIsland.portalInterior.inside ) { this.thirdIsland.portalInterior.c64.close(); this.thirdIsland.portalInterior.exit(); }
+					const x = 100, z = 584;
+					this.monorail.teleport( this.player, x, this.player.groundAt( x, z, 1000 ), z, Math.PI );
+				} : undefined,
+				onGoLandscape: this.landscapeSpec ? () => {
+					if ( this.thirdIsland.portalInterior.inside ) { this.thirdIsland.portalInterior.c64.close(); this.thirdIsland.portalInterior.exit(); }
+					const spawn = landscapePathLayout( this.landscapeSpec, this.landscapeDocument?.terrain ?? [] ).spawn;
+					this.monorail.teleport( this.player, spawn.x, this.player.groundAt( spawn.x, spawn.z, 1000 ), spawn.z, - Math.PI / 2 );
+				} : undefined,
+			} );
+			if ( qs.get( 'generated' ) === '1' && ! this.landscapeSpec ) this.landscapeBuilder.notice( 'Saved landscape is missing or invalid. Review and save the specification before exploring.', true );
+			if ( this.landscapeWarehouseError ) this.landscapeBuilder.notice( 'Generated warehouse could not be placed. The original island remains available; move the structure onto dry land and save again.', true );
+		}
 		this.pistol = new SurvivalPistol( scene );
 		// birds, beach crabs, sanderlings (after spray / query / boat, which they use)
 		this.wildlife = new Wildlife( {
@@ -725,9 +777,11 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		else if ( this.monorail.state !== 'riding' && !this.thirdIsland.active && !this.portIsland.driving ) this.player.update( dt );
 		if ( ! this.freeCam && !this.thirdIsland.active ) this.monorail.update( dt, this.player, this.input, this.camera, ( message ) => this.ui?.ui.toast( message ) );
 		this.thirdIsland.update( dt );
+		this.aiWarehouse?.update();
 		this.fourthIsland.update( dt );
 		this.fifthIsland.update( dt );
 		this.portIsland.update( dt );
+		if ( this.procedural ) this.procedural.update( dt );
 		this.esmie.update( dt );
 		this.monorail.marine.update(dt, this.camera.position);
 		this.avatar.update( dt, this.player, this.camera, this.freeCam );
