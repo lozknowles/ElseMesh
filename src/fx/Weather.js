@@ -25,6 +25,7 @@ export class Weather {
 		this.bolt = create( 12, 'weather-lightning', '#e2ebff', 1 );
 		this._time = 0; this._started = 0; this._mode = 'clear'; this._seed = this.settings.seed;
 		this._disposed = false;
+		this._generation = 0; this._thunderEvent = -1;
 	}
 
 	update( dt, time, camera, { underwater = false, sheltered = false, waterHeight = -Infinity } = {} ) {
@@ -34,6 +35,7 @@ export class Weather {
 		const settings = normalizeWeatherSettings( this.settings );
 		if ( settings.mode !== this._mode || settings.seed !== this._seed || this._time < previous ) {
 			this._started = this._time; this._mode = settings.mode; this._seed = settings.seed;
+			this._generation ++; this._thunderEvent = -1;
 		}
 		if ( underwater || sheltered || settings.mode === 'clear' ) {
 			this.rain.visible = false; this.bolt.visible = false;
@@ -54,7 +56,9 @@ export class Weather {
 			writeLightningQuad( positions.array, camera.position, yaw, settings.seed, state.event, water );
 			positions.needsUpdate = true;
 		}
-		return { ...state, particles };
+		const strike = this.bolt.visible && state.event !== this._thunderEvent;
+		if ( strike ) this._thunderEvent = state.event;
+		return { ...state, particles, strike, generation: this._generation, strikeTime: this._time };
 	}
 
 	dispose() {

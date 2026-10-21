@@ -1,5 +1,5 @@
 // Sample-based sound for the island: real field recordings only (public/audio, sources and licences in
-// public/audio/CREDITS.md). Nothing is synthesised. Files are fetched and decoded after the first user
+// public/audio/CREDITS.md). Thunder is the sole procedural effect. Files are fetched and decoded after the first user
 // gesture (resume()); boat, underwater, pier and night sounds load the first time they become audible.
 //
 // Surf is wave by wave, driven by the game's own shore waves (ShoreWaves): a CPU mirror of their phase
@@ -34,6 +34,7 @@
 
 import { WORLD } from '../world/WorldLayout.js';
 import { BANK } from './soundBank.js';
+import { Thunder } from './Thunder.js';
 
 const clamp = ( v, a, b ) => ( v < a ? a : v > b ? b : v );
 const lerp = ( a, b, t ) => a + ( b - a ) * t;
@@ -133,6 +134,7 @@ export class SoundScape {
 
 		this.baseUrl = baseUrl;
 		this.ctx = null;
+		this.thunder = new Thunder();
 		this._failed = false;
 		this._muted = false;
 		this._volume = 0.8;
@@ -196,6 +198,7 @@ export class SoundScape {
 
 				this.ctx = new AC( { latencyHint: 'balanced' } );
 				this._build();
+				this.ctx.addEventListener( 'statechange', () => { if ( ! this.enabled ) this.stopThunder(); } );
 
 			} catch ( e ) {
 
@@ -244,6 +247,7 @@ export class SoundScape {
 	setMuted( m ) {
 
 		this._muted = !! m;
+		if ( this._muted ) this.stopThunder();
 		this._applyVolume();
 
 	}
@@ -252,9 +256,17 @@ export class SoundScape {
 	setMasterVolume( v ) {
 
 		this._volume = clamp( num( v, this._volume ), 0, 1 );
+		if ( this._volume === 0 ) this.stopThunder();
 		this._applyVolume();
 
 	}
+
+	weatherThunder( state, active ) {
+		if ( ! active || ! this.enabled || this._muted || this._volume === 0 ) { this.stopThunder(); return; }
+		if ( state.strike ) this.thunder.play( this.ctx, this.above, state );
+	}
+
+	stopThunder() { this.thunder.stop( this.ctx ); }
 
 	// Per frame: listener pose, mixer ramps and surf / life events at ~30 Hz. Cheap.
 	update( dt, state ) {
@@ -444,6 +456,7 @@ export class SoundScape {
 
 	dispose() {
 
+		this.stopThunder();
 		if ( ! this.ctx ) return;
 		try {
 

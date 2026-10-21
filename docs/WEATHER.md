@@ -22,7 +22,22 @@ Underwater cameras, recognised caves and dry rail transit suppress weather; mist
 is also suppressed in those sheltered locations. Rain is camera-local and is
 clipped below the supplied water surface. It does not trace individual roof or
 terrain collisions or create splashes. Lightning adds a visible bolt and air-only
-flash, not a shadow-casting point light. Thunder audio is not added in this change.
+flash, not a shadow-casting point light.
+
+Thunder now follows the first visible flash of each strike with an approximate
+0.32-second delay, scheduled on the existing SoundScape AudioContext clock. The
+three flickers in one strike produce one rumble. Mode/seed/clock resets create a
+new storm generation. Skipped flashes and events while sound is locked, muted or
+at zero volume are not queued. Enter the game/click the scene to unlock audio.
+The normal mute key and master volume apply; `?noAudio` creates no audio context.
+
+Thunder is a procedural stereo noise effect, the sole exception to the recorded
+ambience policy, with a reusable five-second buffer and at most two voices.
+It routes through the existing above-water bus, master and limiter. Clear/Rain,
+shelter, submersion, hidden documents, suspended audio and page exit cancel it.
+Cancellation fades for 30 ms; source/filter/gain nodes disconnect on completion.
+`?weatherAudioDebug` logs strike identity and both scheduling clocks for manual
+diagnosis. Scheduling evidence does not establish perceived sound quality.
 
 The controller releases its own meshes and materials on non-cached page exit.
 Changing weather does not reset the existing ocean wind/swell controls or game
