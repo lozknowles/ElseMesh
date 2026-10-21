@@ -434,7 +434,8 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.scene.add( this.weather.group );
 		if ( this.clouds ) this.clouds.coverage.value = this.settings.weather.cloudCoverage;
 		this.applyWeatherSettings();
-		window.addEventListener( 'pagehide', event => { if ( ! event.persisted ) this.weather.dispose(); } );
+		window.addEventListener( 'pagehide', event => { this.audio?.stopThunder(); if ( ! event.persisted ) this.weather.dispose(); } );
+		document.addEventListener( 'visibilitychange', () => { if ( document.hidden ) this.audio?.stopThunder(); } );
 		this.post = new PostFX( renderer, { sceneRenderer: this.sceneRenderer, camera, underwater: this.underwater, clouds: this.clouds, sunDir: this.atmosphere.sunDir, haze: this.haze } );
 		G.exposure.value = this.settings.exposure;
 		// Agent Control: automatic budgets apply to Windows and mobile as well as Linux.
@@ -849,6 +850,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			sheltered: weatherSheltered,
 			waterHeight: this.cameraWaterHeight ?? G.seaLevel.value,
 		} );
+		this.audio?.weatherThunder( weatherState, this.settings.weather.mode === 'storm' && ! weatherSheltered && ! document.hidden && G.cameraUnderwater.value <= 0.5 && this.camera.position.y >= ( this.cameraWaterHeight ?? 0 ) );
 		if ( this.haze ) {
 			this.haze.mistBase.value = G.seaLevel.value;
 			this.haze.mistDensity.value = weatherSheltered ? 0 : this.settings.weather.mistDensity;
