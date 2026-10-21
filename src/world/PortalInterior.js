@@ -86,6 +86,7 @@ export class PortalInterior {
     this.textureReady=this.loadSurfaceTextures();
     this.setInteriorCollidersEnabled(false);
     this.buildExteriorPortal();
+    this.landscapeEntrance = null;
     this.inside = false;
     this.cooldown = 0;
     this.returnState = null;
@@ -183,18 +184,42 @@ export class PortalInterior {
     this.exterior = g;
   }
 
+  // A generated warehouse may share the authored, interactive computer room.
+  // The extra entrance reuses the existing sign geometry and materials; the
+  // original island entrance and its interaction coordinates remain intact.
+  addLandscapeEntrance(x, y, z) {
+    if (![x, y, z].every(Number.isFinite)) throw Error('Landscape entrance needs finite coordinates');
+    if (this.landscapeEntrance) {
+      this.app.scene.remove(this.landscapeEntrance.group);
+    }
+    const group = this.exterior.clone(true);
+    group.name = 'Generated landscape warehouse entrance';
+    group.position.set(x, y, z);
+    this.app.scene.add(group);
+    this.landscapeEntrance = { x, y, z, group };
+    return group;
+  }
+
   toast(text) { this.app.ui?.ui.toast(text); }
 
   enter() {
     const p = this.app.player;
     if (this.inside || p.mode !== 'walk') return;
-    this.returnState = { position: p.position.clone(), yaw: p.yaw };
+    const entrance = this.landscapeEntrance;
+    const landscape = !!entrance && Math.hypot(p.position.x - entrance.x, p.position.z - entrance.z) < 4.2;
+    this.returnState = { position: p.position.clone(), yaw: p.yaw, landscape };
     this.setInteriorCollidersEnabled(true);
     for (const source of this.localLightSources) source.enabled = true;
     this.inside = true;
     this.group.visible = true;
-    p.position.set(this.origin.x + this.recipe.zones.arrival[0], this.origin.y + this.recipe.zones.arrival[1], this.origin.z + this.recipe.zones.arrival[2]);
+    const arrival = this.recipe.zones.arrival;
+    const x = this.origin.x + arrival[0], z = this.origin.z + arrival[2];
+    // Spawn on the collider floor. A one-metre drop here can tunnel through
+    // the floor during a long first-frame shader compile after teleporting.
+    const floor = p.groundAt(x, z, this.origin.y + arrival[1] + 1);
+    p.position.set(x, Number.isFinite(floor) ? floor : this.origin.y + arrival[1], z);
     p.velocity.set(0, 0, 0);
+    p.grounded = true;
     this.toast('Warehouse loft entered · E to return');
   }
 
@@ -204,6 +229,7 @@ export class PortalInterior {
     this.group.visible = false;
     for (const source of this.localLightSources) source.enabled = false;
     this.setInteriorCollidersEnabled(false);
+    const landscape = !!this.returnState?.landscape;
     if (this.returnState) {
       p.position.copy(this.returnState.position);
       p.yaw = this.returnState.yaw;
@@ -214,7 +240,7 @@ export class PortalInterior {
     p.velocity.set(0, 0, 0);
     p.grounded = true;
     this.returnState = null;
-    this.toast('Returned to Island 3');
+    this.toast(landscape ? 'Returned to generated warehouse' : 'Returned to Island 3');
   }
 
   update(dt) {
@@ -232,7 +258,10 @@ export class PortalInterior {
     }
     if (this.cooldown > 0 || this.app.freeCam || p.mode !== 'walk') return;
     const exteriorY = p.groundAt(100, 580, 30);
-    const nearOutside = !this.inside && Math.hypot(p.position.x - 100, p.position.z - 580) < 4.2 && (!Number.isFinite(exteriorY) || Math.abs(p.position.y - exteriorY) < 3);
+    const nearOriginal = Math.hypot(p.position.x - 100, p.position.z - 580) < 4.2 && (!Number.isFinite(exteriorY) || Math.abs(p.position.y - exteriorY) < 3);
+    const entrance = this.landscapeEntrance;
+    const nearLandscape = entrance && Math.hypot(p.position.x - entrance.x, p.position.z - entrance.z) < 4.2 && Math.abs(p.position.y - entrance.y) < 3;
+    const nearOutside = !this.inside && (nearOriginal || nearLandscape);
     const nearInside = this.inside && Math.hypot(p.position.x - (this.origin.x - 4), p.position.z - this.origin.z) < 3.5;
     const nearC64 = this.inside && Math.hypot(p.position.x - (this.origin.x - 11.5), p.position.z - (this.origin.z + 8.0)) < 1.9 && Math.abs(p.position.y - (this.origin.y + 4)) < 2;
     if (nearC64) {
@@ -242,7 +271,7 @@ export class PortalInterior {
       p.prompt = { key: 'E', text: 'Enter warehouse loft' };
       if (this.app.input.hit('KeyE')) { this.enter(); this.cooldown = .8; }
     } else if (nearInside) {
-      p.prompt = { key: 'E', text: 'Return to Island 3' };
+      p.prompt = { key: 'E', text: this.returnState?.landscape ? 'Return to generated warehouse' : 'Return to Island 3' };
       if (this.app.input.hit('KeyE')) { this.exit(); this.cooldown = .8; }
     }
   }
