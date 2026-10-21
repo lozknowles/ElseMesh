@@ -22,7 +22,7 @@ export class Thunder {
 			}
 			this.buffer = buffer;
 		}
-		if ( this.voices.size >= 2 ) this._stop( this.voices.values().next().value, context );
+		if ( this.voices.size >= 2 ) this._stop( this.voices.values().next().value, context, true );
 		const source = context.createBufferSource(), filter = context.createBiquadFilter(), gain = context.createGain();
 		source.buffer = this.buffer;
 		filter.type = 'lowpass'; filter.frequency.value = 950; filter.Q.value = 0.5;
@@ -41,12 +41,20 @@ export class Thunder {
 		if ( this.debug ) console.debug( '[weather-audio] scheduled', { generation: strike.generation, event: strike.event, flashGameTime: strike.strikeTime, audioNow: context.currentTime, audioStart: start, route: 'above → master → limiter', voices: this.voices.size } );
 	}
 
-	_stop( voice, context ) {
+	_stop( voice, context, immediate = false ) {
 		const now = context.currentTime;
+		if ( immediate || context.state !== 'running' ) {
+			voice.gain.gain.cancelScheduledValues( now ); voice.gain.gain.value = 0;
+			voice.source.stop(); voice.source.disconnect(); voice.filter.disconnect(); voice.gain.disconnect();
+			this.voices.delete( voice );
+			if ( this.debug ) console.debug( '[weather-audio] retired', { audioTime: now, voices: this.voices.size } );
+			return;
+		}
+		if ( voice.stopping ) return;
+		voice.stopping = true;
 		voice.gain.gain.cancelAndHoldAtTime( now );
 		voice.gain.gain.linearRampToValueAtTime( 0, now + 0.03 );
 		voice.source.stop( now + 0.03 );
-		this.voices.delete( voice );
 		if ( this.debug ) console.debug( '[weather-audio] cancelled', { audioTime: now, voices: this.voices.size } );
 	}
 
