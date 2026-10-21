@@ -7,7 +7,7 @@ import { RAIN_PARTICLES, normalizeWeatherSettings, quadIndices, stormState, writ
  * overrides or audio. The caller owns water/cave state and AirHaze flash input.
  */
 export class Weather {
-	constructor() {
+	constructor( { opaqueDepth = null } = {} ) {
 		this.settings = normalizeWeatherSettings();
 		this.group = new Group();
 		this.group.name = 'Weather';
@@ -23,6 +23,13 @@ export class Weather {
 		};
 		this.rain = create( RAIN_PARTICLES, 'weather-rain', '#c4e3ef', 0.42 );
 		this.bolt = create( 12, 'weather-lightning', '#e2ebff', 1 );
+		// Read the renderer's opaque depth COPY, never the attached depth target.
+		// Sky-only contribution: mountains, buildings and trees hide the bolt even
+		// when their world distance exceeds this camera-local weather geometry.
+		if ( opaqueDepth ) {
+			this.bolt.material.bindings.weatherOpaqueDepth = { texture: opaqueDepth };
+			this.bolt.material.surface = 'if ( textureLoad( weatherOpaqueDepth, vec2i( in.pixel ), 0 ) > 1e-7 ) { discard; }';
+		}
 		this._time = 0; this._started = 0; this._mode = 'clear'; this._seed = this.settings.seed;
 		this._disposed = false;
 		this._generation = 0; this._thunderEvent = -1;

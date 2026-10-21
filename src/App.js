@@ -429,7 +429,7 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			depthTexture: this.sceneRenderer.sceneRT.depthTexture, underwater: this.underwater, atmosphere: this.atmosphere,
 			sky: this.sky, clouds: this.clouds, terrain: this.terrainGPU, csm: this.csm,
 		} );
-		this.weather = new Weather();
+		this.weather = new Weather( { opaqueDepth: () => this.sceneRenderer.opaqueCopy.depthTexture } );
 		this.weather.settings = this.settings.weather;
 		this.scene.add( this.weather.group );
 		if ( this.clouds ) this.clouds.coverage.value = this.settings.weather.cloudCoverage;
