@@ -27,8 +27,8 @@ Both the flash and the bolt are restricted to sky pixels using scene depth;
 mountains, buildings and opaque tree silhouettes occlude them. The bolt samples
 the existing opaque depth copy rather than the attached render depth texture.
 
-Thunder now follows the first visible flash of each strike with an approximate
-0.32-second delay, scheduled on the existing SoundScape AudioContext clock. The
+Thunder now follows the first flash pulse of each strike with an approximate
+0.32-second artistic delay, scheduled on the existing SoundScape AudioContext clock. A mountain can hide the entire bolt while its thunder remains audible. The
 three flickers in one strike produce one rumble. Mode/seed/clock resets create a
 new storm generation. Skipped flashes and events while sound is locked, muted or
 at zero volume are not queued. Enter the game/click the scene to unlock audio.
