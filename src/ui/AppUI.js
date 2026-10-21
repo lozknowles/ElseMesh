@@ -246,10 +246,25 @@ export class AppUI {
 		} } );
 		speed = sun.addSlider( { label: 'Time speed', object: s, key: 'timeSpeed', min: 0.002, max: 1, log: true, unit: 'h/s', onChange: ( v ) => { if ( s.advance ) { app.settings.clockMode = 'manual'; app.settings.timeSpeed = v; } } } ).setVisible( s.advance );
 		const atmo = sky.addFolder( 'Atmosphere', { icon: 'cloud' } );
-		if ( app.clouds ) atmo.addSlider( { label: 'Cloud cover', object: s, key: 'clouds', min: 0, max: 1, step: 0.01, format: ( v ) => `${ Math.round( v * 100 ) }%`, onChange: ( v ) => { app.clouds.coverage.value = v; } } );
+		const weather = app.settings.weather;
+		const saveWeather = () => app.applyWeatherSettings( true );
+		atmo.addSelect( { label: 'Weather', object: weather, key: 'mode', options: [ { label: 'Clear', value: 'clear' }, { label: 'Rain', value: 'rain' }, { label: 'Thunderstorm', value: 'storm' } ], onChange: value => {
+			if ( app.clouds ) {
+				weather.cloudCoverage = value === 'storm' ? Math.max( 0.88, app.clouds.coverage.value ) : value === 'rain' ? Math.max( 0.65, app.clouds.coverage.value ) : Math.min( 0.49, app.clouds.coverage.value );
+				app.clouds.coverage.value = weather.cloudCoverage;
+				s.clouds = weather.cloudCoverage;
+			}
+			saveWeather(); ui.refresh();
+		} } );
+		if ( app.clouds ) atmo.addSlider( { label: 'Cloud cover', object: s, key: 'clouds', min: 0, max: 1, step: 0.01, format: ( v ) => `${ Math.round( v * 100 ) }%`, onChange: ( v ) => { app.clouds.coverage.value = v; weather.cloudCoverage = v; saveWeather(); } } );
+		atmo.addSlider( { label: 'Rain intensity', object: weather, key: 'rainIntensity', min: 0, max: 1, step: 0.05, format: value => `${ Math.round( value * 100 ) }%`, onChange: saveWeather } );
+		atmo.addSlider( { label: 'Rain wind speed', object: weather, key: 'windSpeed', min: 0, max: 30, step: 0.5, unit: 'm/s', onChange: saveWeather } );
 		if ( app.clouds && app.clouds.cirrus ) atmo.addSlider( { label: 'Cirrus', object: s, key: 'cirrus', min: 0, max: 1, step: 0.01, format: ( v ) => `${ Math.round( v * 100 ) }%`, onChange: ( v ) => { app.clouds.cirrus.value = v; } } );
 		if ( app.haze ) {
 
+			atmo.addSlider( { label: 'Drifting mist', object: weather, key: 'mistDensity', min: 0, max: 0.04, step: 0.001, tooltip: 'Animated sea-level mist. Zero turns it off; high hills remain clearer.', onChange: saveWeather } );
+			atmo.addSlider( { label: 'Mist wind speed', object: weather, key: 'mistSpeed', min: 0, max: 15, step: 0.25, unit: 'm/s', onChange: saveWeather } );
+			atmo.addSlider( { label: 'Mist vertical reach', object: weather, key: 'mistHeight', min: 1, max: 80, step: 1, unit: 'm', tooltip: 'Mist density fades exponentially above the active sea-level datum. This is not a hard ceiling.', onChange: saveWeather } );
 			s.haze = app.haze.density.value;
 			s.shafts = app.haze.shafts.value;
 			atmo.addSlider( { label: 'Haze', object: s, key: 'haze', min: 0, max: 4, step: 0.05, tooltip: 'Aerial perspective and marine haze density (1 = about 20 km visibility at sea level, 0 = clear air).', onChange: ( v ) => { app.haze.density.value = v; } } );
