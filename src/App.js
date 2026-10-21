@@ -81,6 +81,8 @@ import { loadScannedBark } from './world/vegetation/ScannedBark.js';
 import { SoundScape } from './audio/SoundScape.js';
 import { WarehouseGhost } from './world/WarehouseGhost.js';
 import { updateCameraVelocity, useStaticVelocity } from './post/CameraVelocity.js';
+import { Weather } from './fx/Weather.js';
+import { loadWeatherPreferences, saveWeatherPreferences } from './fx/weather-preferences.js';
 
 const _up = new Vector3( 0, 1, 0 );
 
@@ -97,6 +99,7 @@ export class App {
 			exposure: 0.55,
 			renderScale: 1, // internal resolution (the temporal upscaler reconstructs the output), Performance tab
 			terrainShading: 'full',
+			weather: loadWeatherPreferences(),
 		};
 		this.qs = new URLSearchParams( location.search );
 
@@ -374,6 +377,12 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 			depthTexture: this.sceneRenderer.sceneRT.depthTexture, underwater: this.underwater, atmosphere: this.atmosphere,
 			sky: this.sky, clouds: this.clouds, terrain: this.terrainGPU, csm: this.csm,
 		} );
+		this.weather = new Weather();
+		this.weather.settings = this.settings.weather;
+		this.scene.add( this.weather.group );
+		if ( this.clouds ) this.clouds.coverage.value = this.settings.weather.cloudCoverage;
+		this.applyWeatherSettings();
+		window.addEventListener( 'pagehide', event => { if ( ! event.persisted ) this.weather.dispose(); } );
 		this.post = new PostFX( renderer, { sceneRenderer: this.sceneRenderer, camera, underwater: this.underwater, clouds: this.clouds, sunDir: this.atmosphere.sunDir, haze: this.haze } );
 		G.exposure.value = this.settings.exposure;
 		// Agent Control: automatic budgets apply to Windows and mobile as well as Linux.
@@ -494,6 +503,18 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 	}
 
 	// ---------------------------------------------------------------- sun / sky
+	applyWeatherSettings( persist = false ) {
+
+		const weather = this.settings.weather;
+		if ( this.haze ) {
+			this.haze.mistDensity.value = weather.mistDensity;
+			this.haze.mistSpeed.value = weather.mistSpeed;
+			this.haze.mistHeight.value = weather.mistHeight;
+			this.haze.mistBase.value = G.seaLevel.value;
+		}
+		if ( persist ) saveWeatherPreferences( weather );
+
+	}
 
 	updateSun() {
 
@@ -768,6 +789,17 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		// drawn while any part of the view can be under water (the specks above the surface are dropped)
 		this.marineSnow.update( this.camera, this.camera.position.y < ( this.cameraWaterHeight ?? 0 ) + LENS_REACH );
 		this.airMotes.update( dt, this.camera, this.cameraWaterHeight ?? 0 );
+		const weatherSheltered = dryTransit || ( !! this.caves.zoneAt( this.camera.position.x, this.camera.position.z ) && this.camera.position.y < this.terrainData.heightAt( this.camera.position.x, this.camera.position.z ) - 1.5 );
+		const weatherState = this.weather.update( dt, G.time.value, this.camera, {
+			underwater: G.cameraUnderwater.value > 0.5 || this.camera.position.y < ( this.cameraWaterHeight ?? 0 ),
+			sheltered: weatherSheltered,
+			waterHeight: this.cameraWaterHeight ?? G.seaLevel.value,
+		} );
+		if ( this.haze ) {
+			this.haze.mistBase.value = G.seaLevel.value;
+			this.haze.mistDensity.value = weatherSheltered ? 0 : this.settings.weather.mistDensity;
+			this.haze.lightning.value = weatherState.flash;
+		}
 		if ( this.shoreSim ) this.shoreSim.update();
 		this.underwaterLighting.update( this.camera );
 		this.breakers.update( this.camera );

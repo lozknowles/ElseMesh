@@ -90,6 +90,12 @@ export class AirHaze {
 			shafts: [ 'f32', 1.0 ],
 			enabled: [ 'f32', 1 ],
 			frame: [ 'f32', 0 ],
+			// Optional drifting sea-level mist. Zero density preserves the existing haze.
+			mistDensity: [ 'f32', 0 ],
+			mistSpeed: [ 'f32', 2 ],
+			mistHeight: [ 'f32', 12 ],
+			mistBase: [ 'f32', 0 ],
+			lightning: [ 'f32', 0 ],
 			sunUV: [ 'vec2f', new Vector2( 0.5, 0.5 ) ],
 			ssFade: [ 'f32', 0 ], // light in view, low in the sky, camera in air
 			hasMedium: [ 'f32', 0 ],
@@ -100,6 +106,11 @@ export class AirHaze {
 		this.shafts = U.shafts;
 		this.enabled = U.enabled;
 		this.frame = U.frame;
+		this.mistDensity = U.mistDensity;
+		this.mistSpeed = U.mistSpeed;
+		this.mistHeight = U.mistHeight;
+		this.mistBase = U.mistBase;
+		this.lightning = U.lightning;
 		this.sunUV = U.sunUV;
 		this.ssFade = U.ssFade;
 		this.mediumTexture = null; // lens medium (set by the post chain): water pixels are skipped
@@ -174,7 +185,7 @@ export class AirHaze {
 		if ( ! this._passes ) this._build();
 		// Match the composite's gates exactly. Clear history validity so the
 		// first active frame never blends stale shafts from before an interruption.
-		if ( optimizeDisabledEffects && ( this.enabled.value <= 0.5 || this.shafts.value <= 0 || G.cameraUnderwater.value >= 0.5 ) ) {
+		if ( optimizeDisabledEffects && ( this.enabled.value <= 0.5 || ( this.shafts.value <= 0 && this.mistDensity.value <= 0 ) || G.cameraUnderwater.value >= 0.5 ) ) {
 			this._histValid = false;
 			this.uniforms.fields.histValid.value = 0;
 			return;
@@ -183,7 +194,7 @@ export class AirHaze {
 		p.march.render( { colorViews: [ this.low.texture ], clear: CLR } );
 		// accumulate: 16 jittered steps per pixel are noisy, and the final temporal resolve clamps the
 		// noisy history away, so the shafts flickered; here they settle over ~10 frames
-		const on = this.enabled.value > 0.5 && this.shafts.value > 0;
+		const on = this.enabled.value > 0.5 && ( this.shafts.value > 0 || this.mistDensity.value > 0 );
 		this.uniforms.fields.histValid.value = this._histValid && on ? 1 : 0;
 		p.temporal[ this._hc ].render( { colorViews: [ this.hist[ 1 - this._hc ].texture ], clear: CLR } );
 		this._hc = 1 - this._hc;
@@ -237,6 +248,34 @@ const HZ_AEROSOL_SIGMA: f32 = ${ f( AEROSOL.sigma ) };
 const HZ_AEROSOL_H: f32 = ${ f( AEROSOL.H ) };
 const HZ_FAR_CLAMP: f32 = ${ f( FAR_CLAMP ) };
 const HZ_NEAR: f32 = ${ f( NEAR ) };
+
+// Game-owned optional mist, adapted from the standalone world's seeded drifting
+// density concept. Eight taps in the existing half-resolution pass, not a new
+// full-resolution ray march. Air/water ownership remains with hazeApply below.
+fn hazeMistHash( p: vec3f ) -> f32 {
+	return fract( sin( dot( p, vec3f( 127.1, 311.7, 74.7 ) ) ) * 43758.5453 );
+}
+fn hazeMistNoise( p: vec3f ) -> f32 {
+	let i = floor( p ); let q = fract( p ); let u = q * q * ( 3.0 - 2.0 * q );
+	return mix( mix( mix( hazeMistHash( i ), hazeMistHash( i + vec3f( 1, 0, 0 ) ), u.x ),
+		mix( hazeMistHash( i + vec3f( 0, 1, 0 ) ), hazeMistHash( i + vec3f( 1, 1, 0 ) ), u.x ), u.y ),
+		mix( mix( hazeMistHash( i + vec3f( 0, 0, 1 ) ), hazeMistHash( i + vec3f( 1, 0, 1 ) ), u.x ),
+		mix( hazeMistHash( i + vec3f( 0, 1, 1 ) ), hazeMistHash( i + vec3f( 1, 1, 1 ) ), u.x ), u.y ), u.z );
+}
+fn hazeMistDepth( cam: vec3f, dir: vec3f, distance: f32 ) -> f32 {
+	if ( hazeParams.mistDensity <= 0.0 ) { return 0.0; }
+	let step = min( distance, 700.0 ) / 8.0;
+	var optical = 0.0;
+	for ( var i = 0; i < 8; i++ ) {
+		let p = cam + dir * ( f32( i ) + 0.5 ) * step;
+		if ( p.y < frame.seaLevel ) { continue; }
+		let moving = p * vec3f( 0.045, 0.09, 0.045 ) - vec3f( frame.time * hazeParams.mistSpeed * 0.045, 0, frame.time * hazeParams.mistSpeed * 0.018 );
+		let bank = smoothstep( 0.28, 0.7, hazeMistNoise( moving ) );
+		let layer = exp( - max( p.y - hazeParams.mistBase, 0.0 ) / max( hazeParams.mistHeight, 0.5 ) );
+		optical += bank * layer * max( hazeParams.mistDensity, 0.0 ) * step;
+	}
+	return min( optical, 20.0 );
+}
 
 // optical depth of one exponential layer from height hc along a ray with direction y component
 // vy over distance d
@@ -419,6 +458,25 @@ fn hazeApply( uv: vec2f, c: vec4f ) -> vec4f {
 				let k = 1.0 - exp( - HZ_MARINE_SIGMA * 300.0 * hazeParams.density );
 				out += Ep * rays * k * hazeParams.shafts * hazeParams.ssFade * ${ f( SS_GAIN ) };
 			}
+			// Optional mist uses the unused alpha of the half-resolution march.
+			// Depth-aware weights avoid borrowing a long ray across foreground edges.
+			if ( hazeParams.mistDensity > 0.0 ) {
+				let ls = vec2i( textureDimensions( hazeLow ) );
+				let pa = uv * vec2f( ls ) - 0.5; let i0 = floor( pa ); let fr = pa - i0;
+				var optical = 0.0; var weight = 1e-6;
+				for ( var k = 0; k < 4; k++ ) {
+					let o = vec2i( k & 1, k >> 1u );
+					let s = textureLoad( hazeLow, clamp( vec2i( i0 ) + o, vec2i( 0 ), ls - 1 ), 0 );
+					let wb = select( 1.0 - fr.x, fr.x, o.x == 1 ) * select( 1.0 - fr.y, fr.y, o.y == 1 );
+					let wd = 1.0 / pow2( abs( s.z - dist ) / max( dist, 0.5 ) * 10.0 + 1.0 );
+					let w = wb * wd + 1e-5; optical += s.w * w; weight += w;
+				}
+				let T = exp( - optical / weight );
+				let mistLight = frame.skyIrradiance * 0.65 + frame.sunColor * 0.025 + vec3f( 0.003 );
+				out = out * T + mistLight * ( 1.0 - T );
+			}
+			// Air only: neither underwater camera nor water-covered lens pixels flash.
+			out += vec3f( 0.35, 0.45, 0.65 ) * clamp( hazeParams.lightning, 0.0, 1.0 );
 		}
 	}
 	return vec4f( out, c.a );
@@ -442,7 +500,7 @@ fn hazeApply( uv: vec2f, c: vec4f ) -> vec4f {
 fn fragment( in: FSIn ) -> vec4f {
 	let uv = in.uv;
 	let R = hazeRay( uv );
-	var out = vec4f( 0.0, 0.0, R.dist, 1.0 );
+	var out = vec4f( 0.0, 0.0, R.dist, 0.0 );
 	if ( hazeParams.enabled > 0.5 && frame.cameraUnderwater < 0.5 && hazeParams.shafts > 0.0 ) {
 		let cam = underwaterParams.camPos;
 		let tMax = min( R.dist, ${ f( MARCH_DIST ) } );
@@ -490,6 +548,9 @@ fn fragment( in: FSIn ) -> vec4f {
 		// grows with the distance (see the composite)
 		let exact = hazeInScatter( max( cam.y - frame.seaLevel, 0.0 ), R.dir.y, tMax );
 		out = vec4f( lit / max( all, 1e-12 ), all / max( exact, 1e-12 ), R.dist, 1.0 );
+	}
+	if ( hazeParams.enabled > 0.5 && frame.cameraUnderwater < 0.5 && hazeParams.mistDensity > 0.0 ) {
+		out.w = hazeMistDepth( underwaterParams.camPos, R.dir, R.dist );
 	}
 	return out;
 }
@@ -596,7 +657,7 @@ fn fragment( in: FSIn ) -> vec4f {
 				let prev = textureSampleLevel( hzPrev, smpLinearClamp, puv, 0.0 );
 				let expect = length( world - frame.prevCameraPos );
 				if ( abs( prev.z - expect ) < expect * 0.05 + 0.3 ) {
-					out = vec4f( mix( clamp( prev.xy, lo, hi ), cur.xy, 0.12 ), cur.z, 1.0 );
+					out = vec4f( mix( clamp( prev.xy, lo, hi ), cur.xy, 0.12 ), cur.z, cur.w );
 				}
 			}
 		}

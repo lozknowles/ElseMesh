@@ -16,3 +16,4 @@ artifacts/network/
 !*.env.example
 !**/.env.example
 .publication-private-terms*
+artifacts/preview-site/
