@@ -1,5 +1,9 @@
 {
-  "source": "8a93c5be7ea88d33ed662f23655e10c9f984c9ad",
-  "note": "Rebuilt from previously deployed source; not an exact byte backup of the formerly served bundle.",
-  "kind": "reconstructed-rollback"
+  "note": "Preserves existing live features plus merged main weather. Rollback artifact is reconstructed from previous source.",
+  "main": "3f4bfe87403196eb3be0bdb825504744aeb025a9",
+  "weather": "mist, rain and thunderstorms",
+  "previousLiveSource": "8a93c5be7ea88d33ed662f23655e10c9f984c9ad",
+  "rollbackArtifact": "6eec14dfd77281fd97992c7dc811d3ad606a047e",
+  "builtLocally": true,
+  "source": "8676ff7213fdf91eb9cd5898ad45a92a76968ab7"
 }
