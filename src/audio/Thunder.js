@@ -38,7 +38,7 @@ export class Thunder {
 		this.voices.add( voice );
 		source.onended = () => { source.disconnect(); filter.disconnect(); gain.disconnect(); this.voices.delete( voice ); };
 		source.start( start ); source.stop( start + 5 );
-		if ( this.debug ) console.debug( '[weather-audio] scheduled', { generation: strike.generation, event: strike.event, flashGameTime: strike.strikeTime, audioNow: context.currentTime, audioStart: start, route: 'above → master → limiter', voices: this.voices.size } );
+		if ( this.debug ) console.debug( '[weather-audio] scheduled', JSON.stringify( { generation: strike.generation, event: strike.event, flashGameTime: strike.strikeTime, audioNow: context.currentTime, audioStart: start, route: 'above → master → limiter', voices: this.voices.size } ) );
 	}
 
 	_stop( voice, context, immediate = false ) {
@@ -47,7 +47,7 @@ export class Thunder {
 			voice.gain.gain.cancelScheduledValues( now ); voice.gain.gain.value = 0;
 			voice.source.stop(); voice.source.disconnect(); voice.filter.disconnect(); voice.gain.disconnect();
 			this.voices.delete( voice );
-			if ( this.debug ) console.debug( '[weather-audio] retired', { audioTime: now, voices: this.voices.size } );
+			if ( this.debug ) console.debug( '[weather-audio] retired', JSON.stringify( { audioTime: now, voices: this.voices.size } ) );
 			return;
 		}
 		if ( voice.stopping ) return;
@@ -55,7 +55,7 @@ export class Thunder {
 		voice.gain.gain.cancelAndHoldAtTime( now );
 		voice.gain.gain.linearRampToValueAtTime( 0, now + 0.03 );
 		voice.source.stop( now + 0.03 );
-		if ( this.debug ) console.debug( '[weather-audio] cancelled', { audioTime: now, voices: this.voices.size } );
+		if ( this.debug ) console.debug( '[weather-audio] cancelled', JSON.stringify( { audioTime: now, voices: this.voices.size } ) );
 	}
 
 	stop( context ) { if ( context ) for ( const voice of this.voices ) this._stop( voice, context ); }
