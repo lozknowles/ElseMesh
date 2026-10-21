@@ -23,6 +23,9 @@ is also suppressed in those sheltered locations. Rain is camera-local and is
 clipped below the supplied water surface. It does not trace individual roof or
 terrain collisions or create splashes. Lightning adds a visible bolt and air-only
 flash, not a shadow-casting point light.
+Both the flash and the bolt are restricted to sky pixels using scene depth;
+mountains, buildings and opaque tree silhouettes occlude them. The bolt samples
+the existing opaque depth copy rather than the attached render depth texture.
 
 Thunder now follows the first visible flash of each strike with an approximate
 0.32-second delay, scheduled on the existing SoundScape AudioContext clock. The

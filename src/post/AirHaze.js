@@ -477,7 +477,7 @@ fn hazeApply( uv: vec2f, c: vec4f ) -> vec4f {
 				out = out * T + mistLight * ( 1.0 - T );
 			}
 			// Air only: neither underwater camera nor water-covered lens pixels flash.
-			out += vec3f( 0.35, 0.45, 0.65 ) * clamp( hazeParams.lightning, 0.0, 1.0 );
+			if ( sky ) { out += vec3f( 0.35, 0.45, 0.65 ) * clamp( hazeParams.lightning, 0.0, 1.0 ); }
 		}
 	}
 	return vec4f( out, c.a );
