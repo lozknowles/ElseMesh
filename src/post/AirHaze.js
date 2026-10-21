@@ -183,9 +183,10 @@ export class AirHaze {
 	render( optimizeDisabledEffects = false ) {
 
 		if ( ! this._passes ) this._build();
+		const mistDensity = this.mistDensity?.value ?? 0;
 		// Match the composite's gates exactly. Clear history validity so the
 		// first active frame never blends stale shafts from before an interruption.
-		if ( optimizeDisabledEffects && ( this.enabled.value <= 0.5 || ( this.shafts.value <= 0 && this.mistDensity.value <= 0 ) || G.cameraUnderwater.value >= 0.5 ) ) {
+		if ( optimizeDisabledEffects && ( this.enabled.value <= 0.5 || ( this.shafts.value <= 0 && mistDensity <= 0 ) || G.cameraUnderwater.value >= 0.5 ) ) {
 			this._histValid = false;
 			this.uniforms.fields.histValid.value = 0;
 			return;
@@ -194,7 +195,7 @@ export class AirHaze {
 		p.march.render( { colorViews: [ this.low.texture ], clear: CLR } );
 		// accumulate: 16 jittered steps per pixel are noisy, and the final temporal resolve clamps the
 		// noisy history away, so the shafts flickered; here they settle over ~10 frames
-		const on = this.enabled.value > 0.5 && ( this.shafts.value > 0 || this.mistDensity.value > 0 );
+		const on = this.enabled.value > 0.5 && ( this.shafts.value > 0 || mistDensity > 0 );
 		this.uniforms.fields.histValid.value = this._histValid && on ? 1 : 0;
 		p.temporal[ this._hc ].render( { colorViews: [ this.hist[ 1 - this._hc ].texture ], clear: CLR } );
 		this._hc = 1 - this._hc;
