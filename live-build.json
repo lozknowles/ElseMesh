@@ -1,9 +1,7 @@
 {
-  "note": "Preserves existing live features plus merged main weather. Rollback artifact is reconstructed from previous source.",
-  "main": "3f4bfe87403196eb3be0bdb825504744aeb025a9",
-  "weather": "mist, rain and thunderstorms",
-  "previousLiveSource": "8a93c5be7ea88d33ed662f23655e10c9f984c9ad",
-  "rollbackArtifact": "6eec14dfd77281fd97992c7dc811d3ad606a047e",
+  "source": "f91cabbd4bac784076095b73ac45ec1ffc5da9f0",
+  "main": "95b49d0f1364483efd1a78207bc547a544f62d8a",
+  "rollbackArtifact": "8b40e675ca928930749a9286e7fc9258d69eedae",
   "builtLocally": true,
-  "source": "8676ff7213fdf91eb9cd5898ad45a92a76968ab7"
+  "weather": "mist, rain, terrain-occluded lightning and synchronised thunder"
 }
