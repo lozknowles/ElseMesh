@@ -2,7 +2,7 @@ import {loadAppearance} from '../player/AvatarAppearance.js';
 import {FederatedWorldTransition} from '../network/FederatedWorldTransition.js';
 const poseOf=r=>({position:[...r.position],velocity:[...r.velocity],yaw:r.yaw});
 /**
- * Adapter around the recovered client transition and the single server ledger.
+ * Adapter around the recovered client transition and authenticated authority ledgers.
  * load(descriptor) must verify the destination owner/content admission.
  * onFrozen(true) suspends input and the runtime loop; unknown outcomes stay frozen.
  */
@@ -20,13 +20,16 @@ export function createRepositoryPortalTransition({transport,host,portal,sourceAc
    reservation=result;if(result.state!=='committed')throw Error('Destination did not commit: '+result.state);
    for(const fn of listeners)fn({type:'travel-admitted',arrival:{...result,handoffId:result.handoff.handoffId,spawn:poseOf(result)}});
   }};
- const sourceClient={ready:Promise.resolve(),requestHandoff:async()=>{reservation=await transport.handoff(reservation.id);return reservation.handoff;}};
+ const sourceClient={ready:Promise.resolve(),requestHandoff:async()=>{if(transport.ownerHandoffCommits)commitAttempted=true;reservation=await transport.handoff(reservation.id);return reservation.handoff;}};
  const runtimeRegistry={prepare:async({signal})=>{
   try{freeze(true);const p=sourceActive.player;
   const receipt=await transport.sendAcceptedState({position:p.position.toArray(),velocity:p.velocity.toArray(),yaw:p.yaw,appearance:getAppearance()});
   if(!receipt.portalCrossings?.includes(portal.id))throw Error('Authority did not accept this portal crossing');
   if(signal?.aborted)throw Error('World transition cancelled before reservation');
+  if(transport.ownerHandoffCommits)commitAttempted=true;
   reservation=await transport.prepare(portal.id);
+  if(transport.ownerHandoffCommits)commitAttempted=false;
+  if(reservation.state==='cancelled')throw Error(reservation.ownerTombstone?.reason??'Destination rejected entry');
   descriptor=descriptor??await transport.describe(reservation.destinationWorldId);
   if(descriptor.worldId!==reservation.destinationWorldId||descriptor.contentDigest!==reservation.contentDigest||descriptor.epoch!==reservation.epoch)throw Error('Destination descriptor does not match reservation');
   const loaded=await load(descriptor);
@@ -42,7 +45,7 @@ export function createRepositoryPortalTransition({transport,host,portal,sourceAc
    prepared=null;freeze(false);
   },dispose:async()=>{if(commitAttempted)return;if(prepared)host.discardPrepared(prepared);prepared=null;}};
   return candidate;
- }catch(error){if(prepared)host.discardPrepared(prepared);prepared=null;throw error;}
+ }catch(error){if(!reservation&&transport.pendingReservation)reservation=transport.pendingReservation;if(prepared)host.discardPrepared(prepared);prepared=null;throw error;}
  }};
  const transition=new FederatedWorldTransition({sourceClient,destinationClient,runtimeRegistry,sourceRuntime,portal:{portalId:portal.id,destinationRegion:portal.destination.regionId},onState:onStatus});
  return {transition,get frozen(){return frozen;},get reservation(){return reservation;},

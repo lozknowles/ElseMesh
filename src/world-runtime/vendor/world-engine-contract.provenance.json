@@ -1,10 +1,10 @@
 {
   "schema": "elsemesh.world-software-provenance/1",
   "repository": "https://github.com/lozknowles/elsemesh-worlds.git",
-  "commit": "f8374c98d2b7f3b008d99737f0b0e22d801e855b",
+  "commit": "f75d96793f2a268d4abe093065d4ea807b25ac1d",
   "sourceState": "clean",
   "command": "node scripts/build-world-engine-contract.mjs --target=<engine>/src/world-runtime/vendor",
-  "bundleSha256": "d7f471e9ed6a9241cc93047a21d367b498010ebb47a176fbca5fc2b53120a48b",
+  "bundleSha256": "355ab40df9d069d53465c694dd95b159e743b06ea925edbb9732983967dfba47",
   "dependencies": {
     "three": "0.180.0",
     "esbuild": "0.28.2"
@@ -31,7 +31,7 @@
     "src/domain/weather.ts": "2b62e9c576ee81dfa4894028012c40167e6a7a8243aad2d756aeff84b19e4a8b",
     "src/domain/world-repository.ts": "d2cbdb9d31eb9b074027358909fad37f205efdef708d9a5feb5c07841669fc5d",
     "src/domain/world-source.ts": "1ea59d943883ea2f1bb8e82a2bbdadc5bb40cdc122fa842cccbb6e20cc3f3f87",
-    "src/domain/world.ts": "d2b5c40ce32483a4ad9f985ca3a6c06d0e46c3fcc84d983da3a374cec10d99f9",
+    "src/domain/world.ts": "0bcdde489108185a0e8535fa36f39f60406939145b8502807c2dae18c4c20d2e",
     "src/runtime/world-engine-contract.ts": "e178d1cf37b5cf939794f93d8a3e1a8c0c967af6e5bfba13c1aedaa94bd867d8",
     "src/ui/asset-admission.ts": "b68db5789f8212c4f8e70326d4a01e4a49034a39d37fc3067f4a6bd15ef73708",
     "src/ui/landscape-render.ts": "2a278eb5668c251513aad51528ff90ce699b6177d0a981a01ae37cebddc7f0f8",

@@ -43,8 +43,10 @@ const output=/* wgsl */`
  * State becomes live only after this frame actually draws an authorized destination.
  */
 export class PortalViews {
- constructor({engine,meshRenderer,mainCamera,maxLongEdge=512,prepareResources}) {
-  this.forkOptions={engine,meshRenderer,mainCamera,maxLongEdge,prepareResources};this.prepareResources=prepareResources;this.maxLongEdge=maxLongEdge;this.engine=engine;this.meshRenderer=meshRenderer;this.mainCamera=mainCamera;
+ constructor({engine,meshRenderer,mainCamera,maxLongEdge=512,prepareResources,background}) {
+  if(background&&mainCamera.reversedDepth===false)throw Error('Portal sky requires reversed-depth camera');
+  this.background=background;
+  this.forkOptions={engine,meshRenderer,mainCamera,maxLongEdge,prepareResources,background};this.prepareResources=prepareResources;this.maxLongEdge=maxLongEdge;this.engine=engine;this.meshRenderer=meshRenderer;this.mainCamera=mainCamera;
   this.entries=new Map();this.active=null;
  }
  fork(){return new PortalViews(this.forkOptions);}
@@ -83,9 +85,9 @@ export class PortalViews {
    e.aperture.position.fromArray(e.source.position);e.aperture.rotation.set(0,e.source.yaw||0,0);
    e.aperture.scale.set(e.source.width||2,e.source.height||3,1);
   }
-  if(this.prepareResources&&(!e.resourcesReady||options.candidate&&!options.candidate.residentReady)){
+  if((this.prepareResources||this.background)&&(!e.resourcesReady||options.candidate&&!options.candidate.residentReady)){
    const token=(e.prepareToken??0)+1;e.prepareToken=token;e.preparing=true;e.aperture.visible=false;const candidate=e.candidate;
-   e.readyPromise=Promise.all([this.prepareResources(e.aperture),...(candidate?[this.prepareResources(candidate.root)]:[])]).then(()=>{
+   e.readyPromise=Promise.all([...(this.prepareResources?[this.prepareResources(e.aperture),...(candidate?[this.prepareResources(candidate.root)]:[])]:[]),...(this.background?[this.background.readyPromise]:[])]).then(()=>{
     if(this.entries.get(portalId)!==e||e.prepareToken!==token)return false;
     e.preparing=false;e.resourcesReady=true;e.aperture.visible=true;this._status(e);return true;
    },error=>{if(this.entries.get(portalId)===e&&e.prepareToken===token){e.preparing=false;e.state='unavailable';e.readinessError=error.message;this._status(e);}throw error;});
@@ -103,12 +105,14 @@ export class PortalViews {
   e.aperture.userData.portalViewState=state==='live'&&!drawn?(e.hasImage?'cached':'loading'):state;
  }
  render({width=1,height=1,time=0}={}) {
+  if(this.background&&this.mainCamera.reversedDepth===false)throw Error('Portal sky requires reversed-depth camera');
   this.mainCamera.updateMatrixWorld();
   const frustum=new N.Frustum().setFromProjectionMatrix(new N.Matrix4().multiplyMatrices(this.mainCamera.projectionMatrix,this.mainCamera.matrixWorldInverse),this.mainCamera.coordinateSystem,this.mainCamera.reversedDepth);
   const cameraPosition=new N.Vector3().setFromMatrixPosition(this.mainCamera.matrixWorld);
   for(const e of this.entries.values()) {
    this._status(e);
    if(e.preparing||e.state!=='live'||!e.authorizedView||!e.candidate||!e.source||!e.destination)continue;
+   if(this.background&&!this.background.isReady()){e.state='unavailable';e.hasImage=false;this._status(e);continue;}
    const normal=new N.Vector3(Math.sin(e.source.yaw||0),0,Math.cos(e.source.yaw||0));
    if(normal.dot(cameraPosition.clone().sub(new N.Vector3(...e.source.position)))<=0)continue;
    const sphere=new N.Sphere(new N.Vector3(...e.source.position),Math.hypot(e.source.width||2,e.source.height||3)/2);
@@ -131,6 +135,7 @@ export class PortalViews {
    this.meshRenderer.render(e.scene,{label:'portal:'+e.id,kind:'color',camera:cam,frameBlock:e.block,
     colorViews:[e.target.texture.view()],colorFormats:e.target.formats,clearColors:[[horizon.r??horizon.x,horizon.g??horizon.y,horizon.b??horizon.z,1]],
     depthView:e.target.depthTexture.view(),depthFormat:DEPTH_FORMAT,clearDepth:cam.reversedDepth===false?1:0,
+    betweenLists:this.background?(rp=>this.background.draw(rp,e.block,cam)):undefined,
     // Hard recursion depth 1: no portal aperture can appear in any destination view.
     filter:o=>!o.userData.portalAperture&&!o.material?.userData.portalAperture,defines:{PORTAL_CLIP:1}});
    e.hasImage=true;this._status(e,true);

@@ -2,7 +2,14 @@
 
 # ElseMesh
 
-An experimental WebGPU island exploration game. Walk, sail and fly between
+An experimental engine, editor and repository-world runtime. Each world is a
+separate data repository that can be imported, edited, saved and reopened through
+the same validated content pipeline. Each player runs a native local application
+that hosts their own world, with their own owner keys, authority and membership
+ledger. Connected portals let separately authorised players visit another owner's
+world.
+
+The original exploration game remains available: walk, sail and fly between
 islands, explore the underwater cave and monorail, and collect a sedan delivered
 to Bracken Quay by cargo ship. Fishing, trading and hunger are optional.
 
@@ -15,8 +22,10 @@ with beaches, sea, mountains and retro computers, loaded from its independent
 repository. The repository runtime supports WebGPU and a WebGL2 fallback.
 WASD walks, mouse drag/arrows look, Shift runs, Space jumps, E uses a nearby
 computer, V toggles the follow camera, K opens avatar design and H toggles
-controls. Public snapshot portals explicitly remain offline without an authorised
-multiplayer coordinator. The original exploration game remains available above.
+controls. This public single-player snapshot does not connect to private owner
+worlds. Connected private portals require the separately provisioned local owner
+applications and explicit permission from the destination owner. The original
+exploration game remains available above.
 See [opening-world deployment](docs/public-opening-world.md) for the pinning and
 publication boundary.
 
@@ -27,9 +36,30 @@ and long multiplayer sessions still need broader testing.
 
 ## Find the warehouse and repository worlds
 
-See the [step-by-step world quickstart](docs/repository-world-quickstart.md).
-Use `worlds.html` for repository worlds. Their content lives in separate repositories.
-The source root and legacy room server do not automatically select private worlds.
+Open **[Loz's warehouse island](https://lozknowles.github.io/ElseMesh/)** for the
+public snapshot, or **[the original game](https://lozknowles.github.io/ElseMesh/legacy.html)**
+for the legacy exploration scene. In a source checkout, open `worlds.html` for the
+repository-world player and editor.
+
+For connected private worlds, follow the [native owner setup](docs/owner-world-setup.md).
+Each player installs the prepared application and their own local world repository.
+Owner keys and the durable ledger stay outside the application and world repository.
+Public contacts are exchanged manually, fingerprints are explicitly pinned, and
+VIEW and ENTER permissions are enrolled separately by each owner. The current
+connection path uses an encrypted byte relay; that relay does not host the worlds
+or decide membership.
+
+See the [world quickstart](docs/repository-world-quickstart.md) and
+[current implementation evidence and limits](docs/owner-implementation-status.md).
+Actual held-key roundtrips have reached generation 2 on MSI/WebGPU and
+macomarchy/WebGL2, including reload restoration in the remote world. Both local
+owner worlds also restarted and accepted movement with the relay off. Fresh live
+views recovered after restarting the relay. MSI crossed again and safely recovered
+a paused visit after another outage, then returned home at generation 4. See the
+status page for the graphics, editing and test evidence.
+
+The old shared `RepositoryFederation` coordinator is a legacy prototype entrypoint;
+the per-owner native application is the recommended connected-world path.
 
 ## Run locally
 
@@ -42,9 +72,10 @@ npm run dev
 
 Open the local address printed by Vite. Build with `npm run build`; `npm run
 preview` serves the resulting static site. GitHub Pages hosts the single-player
-game and local two-window demo. Internet multiplayer needs a separately
-configured HTTPS/WebSocket room server; Pages does not host that server.
-See [deployment examples](deploy/README.md). The public client and server use
+snapshot and local two-window demo. It does not host private owner authorities.
+Use [native owner setup](docs/owner-world-setup.md) for connected repository worlds.
+The older exploration-game room server remains documented in
+[deployment examples](deploy/README.md). The public client and server use
 ElseMesh protocol identifiers and environment variables; older invitations and
 saved settings from the private prototype are not migrated.
 

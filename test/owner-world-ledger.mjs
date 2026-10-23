@@ -1,0 +1,15 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,rm,writeFile,readFile,unlink,access} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {spawn} from 'node:child_process';
+import {once} from 'node:events';
+import {DatabaseSync} from 'node:sqlite';
+import {OwnerWorldLedger} from '../network/owner-world-ledger.mjs';
+const binding={authority:'owner:a',world:'world:a',content:'sha256:a',epoch:1};
+async function fixture(fn){const dir=await mkdtemp(join(tmpdir(),'elsemesh-owner-ledger-'));try{await fn(join(dir,'ledger.sqlite'));}finally{await rm(dir,{recursive:true,force:true});}}
+test('FULL synchronous SQLite persists, rejects callback rollback and binding changes',()=>fixture(async path=>{let ledger=await OwnerWorldLedger.open(path,binding);await ledger.transact(s=>{s.members.a={status:'FROZEN'};return true;});await assert.rejects(ledger.transact(s=>{s.members.b={};throw Error('reject');}),/reject/);assert.equal(ledger.snapshot().members.b,undefined);await ledger.close();ledger=await OwnerWorldLedger.open(path,binding);assert.equal(ledger.snapshot().members.a.status,'FROZEN');await ledger.close();const before=await readFile(path);await assert.rejects(OwnerWorldLedger.open(path,{...binding,epoch:2}),/binding/);assert.deepEqual(await readFile(path),before);}));
+test('existing JSON is rejected without replacement',()=>fixture(async path=>{const bytes=Buffer.from(JSON.stringify({version:1,binding}));await writeFile(path,bytes);await assert.rejects(OwnerWorldLedger.open(path,binding),/Legacy JSON|Invalid existing/);assert.deepEqual(await readFile(path),bytes);}));
+test('SQLite write failure poisons ledger and keeps process lock',()=>fixture(async path=>{const ledger=await OwnerWorldLedger.open(path,binding),db=new DatabaseSync(path);db.exec("CREATE TRIGGER reject_write BEFORE UPDATE ON owner_ledger BEGIN SELECT RAISE(ABORT,'injected failure'); END");await assert.rejects(ledger.transact(s=>s.members.a={}),/persistence uncertain/);assert.throws(()=>ledger.snapshot(),/persistence uncertain/);await ledger.close();await access(path+'.lock');db.close();}));
+test('forced process death preserves committed fence and stale lock for explicit recovery',()=>fixture(async path=>{const module=new URL('../network/owner-world-ledger.mjs',import.meta.url).href;const code=`import {OwnerWorldLedger} from ${JSON.stringify(module)};const l=await OwnerWorldLedger.open(${JSON.stringify(path)},${JSON.stringify(binding)});await l.transact(s=>s.members.a={status:'FROZEN'});console.log('committed');setInterval(()=>{},1000);`;const child=spawn(process.execPath,['--input-type=module','-e',code],{stdio:['ignore','pipe','pipe']});await new Promise((ok,fail)=>{child.stdout.once('data',ok);child.once('error',fail);child.once('exit',c=>fail(Error('early exit '+c)));});child.kill('SIGKILL');await once(child,'exit');await assert.rejects(OwnerWorldLedger.open(path,binding),/EEXIST/);await unlink(path+'.lock');const ledger=await OwnerWorldLedger.open(path,binding);assert.equal(ledger.snapshot().members.a.status,'FROZEN');await ledger.close();}));

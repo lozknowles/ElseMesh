@@ -1,3 +1,4 @@
+import {RepositoryPortalSky} from './RepositoryPortalSky.js';
 import {readOpeningWorld,loadOpeningWorld} from './OpeningWorld.js';
 import {webGLRepositoryReadinessSignature} from './WebGLRepositoryReadiness.js';
 import {repositoryMediumWaterSettings} from './RepositoryWater.js';
@@ -54,7 +55,7 @@ async function init(){
   backendPortals={buildScene:buildWebGLRepositoryScene,disposeCandidate:disposeWebGLRepositoryScene,createPeerLayer:(scene,id)=>createWebGLRepositoryPeerLayer(scene,id,engine.prepareRepositoryResources),addPortalFrame:addWebGLPortalFrame,views:new WebGLPortalViews({engine,mainCamera:engine.camera,configureScene:configureWebGLRepositoryScene})};
   renderer=engine.renderer;
  }else{
-  atmosphere=new Atmosphere(engine);sky=new Sky(atmosphere);clouds=new SkyProClouds(engine,atmosphere);await clouds.ready;sky.clouds=clouds;
+  atmosphere=new Atmosphere(engine);sky=new Sky(atmosphere);clouds=new SkyProClouds(engine,atmosphere);await clouds.ready;sky.clouds=clouds;backendPortals.background=new RepositoryPortalSky({sky});
   environment=new Environment(engine,engine.scene,sky,128);shadows=new SunShadows({size:1024});weather=new NativeWeather();engine.scene.add(weather.group);
   renderer=new SceneRenderer(engine.meshRenderer,engine.scene,engine.camera);renderer.background=sky.background;renderer.waterMaterial={needsSSRDepth:false};
   medium=createDryWorldMedium(renderer.sceneRT.depthTexture);post=new PostFX(engine,{sceneRenderer:renderer,camera:engine.camera,underwater:medium,clouds});
@@ -116,7 +117,7 @@ async function init(){
  engine.start((dt,time)=>{
   try{
    if(!isWebGL){GPU.beginFrame();G.time.value=time;G.dt.value=dt;G.exposure.value=.55;}
-   if(!terminal.open&&!retro.active&&!portals.pending&&!app.freeCam){host.update(dt,time);const device=retro.nearest(engine.camera.position);if(device&&input.hit('KeyE'))retro.open(device);}
+   if(!terminal.open&&!retro.active&&!portals.pending&&!portals.authorityOffline&&!app.freeCam){host.update(dt,time);const device=retro.nearest(engine.camera.position);if(device&&input.hit('KeyE'))retro.open(device);}
    if(host.active&&!app.freeCam)followCamera.update(dt,host.active,{suspended:terminal.open||retro.active||portals.pending});
    if(host.active)avatar.update(dt,host.active.player,engine.camera,app.freeCam||followCamera.enabled);else avatar.group.visible=false;
    portals.update(dt,time);arrivals.update();portalEffects.update(dt,time);input.endFrame();
@@ -139,7 +140,7 @@ async function init(){
  document.querySelector('#panel-toggle').onclick=()=>{document.querySelector('#panel').hidden=true;engine.canvas.focus();};
  window.addEventListener('keydown',event=>{if(event.code==='KeyH'&&!retro.active&&!terminal.open)document.querySelector('#panel').hidden=!document.querySelector('#panel').hidden;});
  document.querySelector('#portal-connect').onclick=()=>void connectOpening().catch(error=>{document.querySelector('#portal-status').textContent=error.message;});
- async function connectOpening(){const response=await fetch('/runtime-config',{credentials:'same-origin',cache:'no-store'});if(response.status===404)return false;if(!response.ok)throw Error('World coordinator configuration unavailable ('+response.status+').');const config=await response.json();if(config.protocol!=='elsemesh.repository-runtime/1'||!Array.isArray(config.trustedOwners)||config.endpoint!=='/__worlds')throw Error('Unsupported runtime installation configuration');await portals.connect(config);return true;}
+ async function connectOpening(){const response=await fetch('/runtime-config',{credentials:'same-origin',cache:'no-store'});if(response.status===404)return false;if(!response.ok)throw Error('World runtime configuration unavailable ('+response.status+').');const config=await response.json();if(!['elsemesh.repository-runtime/1','elsemesh.owner-runtime/1'].includes(config.protocol)||!Array.isArray(config.trustedOwners)||config.endpoint!=='/__worlds')throw Error('Unsupported runtime installation configuration');await portals.connect(config);return true;}
  document.querySelector('#choose-world').onclick=()=>{const tools=document.querySelector('#repository-tools');tools.hidden=!tools.hidden;};
  const openingGeneration=host.generation;
  void (async()=>{

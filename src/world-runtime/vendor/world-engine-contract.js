@@ -44163,6 +44163,8 @@ function validateWorld(value) {
     if (object3 && typeof object3 === "object") ids.add(object3.id);
     if (!object3 || typeof object3.name !== "string" || !object3.name.trim() || !finiteVec3(object3.position) || !finiteVec3(object3.rotation) || !finiteVec3(object3.scale) || object3.scale.some((n) => n <= 0 || n > 1e3))
       errors.push(`Object ${index + 1} has invalid properties or transforms.`);
+    if (!object3 || typeof object3.visible !== "boolean")
+      errors.push(`Object ${index + 1} must declare boolean visibility.`);
     if (!object3 || !["box", "sphere", "cylinder", "cone", "tree", "building", "glb", "group", "neon-sign", "computer"].includes(object3.kind))
       errors.push(`Object ${index + 1} uses an unsupported type.`);
     if (object3?.kind === "glb" && (typeof object3.assetId !== "string" || !assetIds.has(object3.assetId)))
