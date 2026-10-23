@@ -1,0 +1,43 @@
+{
+  "schema": "elsemesh.world-software-provenance/1",
+  "repository": "https://github.com/lozknowles/elsemesh-worlds.git",
+  "commit": "7b308c8ad4c4df095d6e7cf28bb1d4e8ea5acf7e",
+  "sourceState": "clean",
+  "command": "node scripts/build-world-engine-contract.mjs --target=<engine>/src/world-runtime/vendor",
+  "bundleSha256": "ad9429cbb060cdab20d0cf49006a62204f36fdf0c1fb3ea2728d7fab4d1ab067",
+  "dependencies": {
+    "three": "0.180.0",
+    "esbuild": "0.28.2"
+  },
+  "inputs": {
+    "src/domain/asset-glb.ts": "8025b4a318e752b073e6586502faa34dd50777896c032b55b9f19318cfacfcfe",
+    "src/domain/authored-runtime.ts": "a6602a2367c54dc5730184944993c394099da4ace6de6daa6082a89626510ecc",
+    "src/domain/computer.ts": "45a0eb28b396789da140a6ca7f165138a2b9635e2fac4ebc8c97993bbbf877b8",
+    "src/domain/features.ts": "22b2ceeeb7aa424d0a6438277460ef539bedb6da3dfbd12025507550b9fc6ce3",
+    "src/domain/fonts/helvetiker_regular.typeface.json": "d5c5467690f74061179a292af83bd85c4c551e0f106b2af99714f11184c96981",
+    "src/domain/fonts/optimer_regular.typeface.json": "17e5e14d94d66e0e60eed3bfde403fcfa3e677f3c914e4cbed264c0c0ba95175",
+    "src/domain/geography.ts": "382f2f21ae22d5afb20ede1dde2aee5e6f80432c069b19c69d3e53adbdc12d62",
+    "src/domain/neon-geometry.ts": "9e5e9cea2d5010b0725f1a24ae398769160d6997ffeaf2fd7de165eb28b4b199",
+    "src/domain/neon-sign.ts": "546be274192c0424828f0fb0495170acb2834580c6bb78fdbbc479c930bfbb5b",
+    "src/domain/object-hierarchy.ts": "37d0cb5ded582139d77cce576e2fe48a3d6a91448d3f04ad74cde76055fe7ce5",
+    "src/domain/private-neon-client.ts": "05ca280c556705a2f46ee7c98541141a807b74cb478f973f435c49922a972eea",
+    "src/domain/runtime-admission.ts": "f45090129abd6228a31ddaaa148cc5f4f8e7a09d832ab7232331313107f8b6a5",
+    "src/domain/runtime-world.ts": "8f906c10db67093b1c541ba170e44c6c9f173a25b1a62c6cec77e235f2def9b3",
+    "src/domain/trees.ts": "d07d0d8ba05f257319b3501fcfb7419c33617bc4f3440ebec628f1230308581b",
+    "src/domain/weather.ts": "2b62e9c576ee81dfa4894028012c40167e6a7a8243aad2d756aeff84b19e4a8b",
+    "src/domain/world-repository.ts": "bc7bbececad26359b55e6b142674a799ead4ed9e51a8746ca69d14282f5004b8",
+    "src/domain/world-source.ts": "b1444a92b5ebba7f9a9e395d6846112c0f461186c076a4b270a9830d6c7fa5ac",
+    "src/domain/world.ts": "a04ea23aa79e8f22d81bf738ebf077a083c3addfdcc072fe4f7f27d54165f1a4",
+    "src/runtime/world-engine-contract.ts": "6ef9a80aced7a6b91f2fbc02c4b82eb01ab79738b4bdcd8af3d72395f0b068dc",
+    "src/ui/asset-admission.ts": "b68db5789f8212c4f8e70326d4a01e4a49034a39d37fc3067f4a6bd15ef73708",
+    "scripts/build-world-engine-contract.mjs": "eb0f40f3c748d07fb5a9b5432815fc1e1fbd36b50c144fb982dee77ff4c3eeed",
+    "package-lock.json": "f17ebf2fc3b3e51e507ff36fec69131deda4d0475de3bce8ab0012d2549a42c6"
+  },
+  "engineImplementationBundled": false,
+  "editorLicense": "UNSPECIFIED; source repository has no root LICENSE",
+  "thirdPartyLicenses": [
+    "THREE-LICENSE.txt",
+    "FONT-LICENSE.txt",
+    "ESBUILD-LICENSE.txt"
+  ]
+}

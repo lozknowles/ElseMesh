@@ -17,3 +17,6 @@ artifacts/network/
 !**/.env.example
 .publication-private-terms*
 artifacts/preview-site/
+
+# Local qualification evidence and client controllers
+.local-evidence/

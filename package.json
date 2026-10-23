@@ -20,7 +20,8 @@
     "test:renderer": "node --test test/bench-timestamps.mjs test/scene-transform-cache.mjs test/render-pass-scheduling.mjs test/scene-submission.mjs test/distant-forest.mjs test/water-optical-lod.mjs && node test/water-optical-lod-gpu.mjs",
     "test:terrain-quality": "node --test test/terrain-shading-quality.mjs && node test/terrain-shading-quality.mjs --gpu",
     "test:publication": "node --test test/publication-privacy.mjs && node tools/check-publication.mjs",
-    "test:architecture": "node --test test/frame-timing.mjs test/collider-spatial-queries.mjs test/collision-review.mjs test/animated-forest.mjs && node test/animated-forest-gpu.mjs"
+    "test:architecture": "node --test test/frame-timing.mjs test/collider-spatial-queries.mjs test/collision-review.mjs test/animated-forest.mjs && node test/animated-forest-gpu.mjs",
+    "test:worlds": "node --test test/repository-world-host.mjs test/repository-world-files.mjs test/repository-world-hosted.mjs test/repository-session.mjs"
   },
   "devDependencies": {
     "vite": "^8.3.0",
@@ -32,5 +33,5 @@
   "dependencies": {
     "ws": "^8.22.0"
   },
-  "description": "ElseMesh — an experimental WebGPU island exploration game"
+  "description": "ElseMesh \u2014 an experimental WebGPU island exploration game"
 }
