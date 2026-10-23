@@ -114,3 +114,81 @@ export function portIslandHeight(x, z) {
   const smooth = rise * rise * (3 - 2 * rise);
   return -3.5 + smooth * 8.5;
 }
+
+/** Installed graph algorithms over admitted repository data; legacy exports retain defaults. */
+export function createPortRoadGraph(config) {
+ const PORT={roadY:config.roadY};
+ const PORT_NODES=Object.fromEntries(config.graph.nodes.map(n=>[n.id,{...n}]));
+ const ROAD_CLASSES=config.graph.classes;
+ const PORT_EDGES=config.graph.edges.map(edge=>({...edge,width:ROAD_CLASSES[edge.roadClass].width,
+  length:Math.hypot(PORT_NODES[edge.to].x-PORT_NODES[edge.from].x,PORT_NODES[edge.to].z-PORT_NODES[edge.from].z)}));
+function roadPosition(edge, fraction, lane = 0) {
+  const a = PORT_NODES[edge.from], b = PORT_NODES[edge.to];
+  const t = Math.max(0, Math.min(1, fraction));
+  const dx = (b.x - a.x) / edge.length, dz = (b.z - a.z) / edge.length;
+  return { x: a.x + (b.x - a.x) * t - dz * lane,
+    y: PORT.roadY, z: a.z + (b.z - a.z) * t + dx * lane,
+    yaw: Math.atan2(dx, dz) };
+}
+
+function connectedEdges(nodeId) {
+  return PORT_EDGES.filter(edge => edge.from === nodeId || edge.to === nodeId);
+}
+
+function findRoadRoute(start, goal, avoidFirstEdgeId = null) {
+  if (!(start in PORT_NODES) || !(goal in PORT_NODES)) throw Error('unknown_port_node');
+  const queue = [{ node: start, cost: 0, path: [] }], best = new Map([[start, 0]]);
+  while (queue.length) {
+    queue.sort((a, b) => a.cost - b.cost);
+    const current = queue.shift();
+    if (current.node === goal) return current.path;
+    if (current.cost > best.get(current.node)) continue;
+    for (const edge of connectedEdges(current.node)) {
+      if (!current.path.length && edge.id === avoidFirstEdgeId) continue;
+      const next = edge.from === current.node ? edge.to : edge.from;
+      const cost = current.cost + edge.length / ROAD_CLASSES[edge.roadClass].speed;
+      if (cost >= (best.get(next) ?? Infinity)) continue;
+      best.set(next, cost);
+      queue.push({ node: next, cost, path: [...current.path, { edgeId: edge.id, from: current.node, to: next }] });
+    }
+  }
+  return null;
+}
+
+function routePose(step, fraction, laneOffset = 1.65) {
+  const edge = PORT_EDGES.find(candidate => candidate.id === step.edgeId);
+  if (!edge || (step.from !== edge.from && step.from !== edge.to)) throw Error('invalid_port_route_step');
+  const forward = step.from === edge.from;
+  const pose = roadPosition(edge, forward ? fraction : 1 - fraction, forward ? laneOffset : -laneOffset);
+  return { ...pose, yaw: pose.yaw + (forward ? 0 : Math.PI) };
+}
+
+// Incoming and outgoing edges share the same quadratic lane connector. Each
+// owns half, so crossing the logical node no longer teleports or snaps heading.
+function continuousRoutePose(step, fraction, previous, next, laneOffset = 1.65) {
+  const edge = PORT_EDGES.find(e => e.id === step.edgeId);
+  const distance = Math.max(0, Math.min(1, fraction)) * edge.length;
+  let incoming, outgoing, t;
+  if (previous && distance < JUNCTION_TRIM) {
+    incoming = previous; outgoing = step; t = .5 + distance / (2 * JUNCTION_TRIM);
+  } else if (next && distance > edge.length - JUNCTION_TRIM) {
+    incoming = step; outgoing = next; t = (distance - edge.length + JUNCTION_TRIM) / (2 * JUNCTION_TRIM);
+  } else return routePose(step, fraction, laneOffset);
+  if (incoming.to !== outgoing.from) throw Error('disconnected_junction_steps');
+  const e0 = PORT_EDGES.find(e => e.id === incoming.edgeId);
+  const e1 = PORT_EDGES.find(e => e.id === outgoing.edgeId);
+  const a = routePose(incoming, 1 - JUNCTION_TRIM / e0.length, laneOffset);
+  const b = routePose(outgoing, JUNCTION_TRIM / e1.length, laneOffset);
+  const da = { x: Math.sin(a.yaw), z: Math.cos(a.yaw) };
+  const db = { x: Math.sin(b.yaw), z: Math.cos(b.yaw) };
+  let control = lineIntersection(a, da, b, db);
+  // An authored acute junction must not send a vehicle outside its bounded turn.
+  const node=PORT_NODES[incoming.to];
+  if(!Number.isFinite(control.x)||!Number.isFinite(control.z)||Math.hypot(control.x-node.x,control.z-node.z)>JUNCTION_TRIM*3)
+    control={x:(a.x+b.x)/2,z:(a.z+b.z)/2};
+  return { ...quadraticPose(a, control, b, t), y: PORT.roadY };
+}
+
+
+ return {nodes:PORT_NODES,edges:PORT_EDGES,classes:ROAD_CLASSES,findRoadRoute,routePose,continuousRoutePose};
+}

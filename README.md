@@ -25,6 +25,12 @@ game. The original exploration game requires WebGPU and a capable desktop GPU. F
 vary substantially; port traffic, detailed collision recovery, mobile support
 and long multiplayer sessions still need broader testing.
 
+## Find the warehouse and repository worlds
+
+See the [step-by-step world quickstart](docs/repository-world-quickstart.md).
+Use `worlds.html` for repository worlds. Their content lives in separate repositories.
+The source root and legacy room server do not automatically select private worlds.
+
 ## Run locally
 
 Use Node.js 22.15 or newer (Node 24 recommended).

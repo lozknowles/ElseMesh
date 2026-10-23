@@ -124,7 +124,7 @@ export class RepositoryWorldHost {
   }return found;
  }
  update(dt,time){
-  if(!this.active)return;const {player,root,forest}=this.active;this.active.query?.setTime(time);player.update(dt);forest?.userData.updateTreeLOD(time,this.engine.camera.position);
+  if(!this.active)return;const {player,root,forest}=this.active;this.active.query?.setTime(time);player.update(dt);this.active.traffic?.update(dt,{x:player.position.x,z:player.position.z,yaw:player.yaw,kind:'pedestrian'});forest?.userData.updateTreeLOD(time,this.engine.camera.position);
   const configs=new Map((this.overlay?.signs??[]).map(s=>[s.id,s]));
   root.traverse(node=>{if(!node.userData.updateNeon)return;const state=configs.get(node.userData.neonObjectId);const elapsed=Number.isFinite(state?.effectStartMs)?Math.max(0,(Date.now()+(this.overlay?.offsetMs??0)-state.effectStartMs)/1000):time;node.userData.updateNeon(elapsed,this.environment().timeOfDay??14,state?.powered??state?.config?.powered);});
   if(this.input.pressed.has('KeyE')){const computer=this.nearestComputer();if(computer)this.onInteract(computer,this.active);}

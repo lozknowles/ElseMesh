@@ -118,7 +118,7 @@ async function init(){
    if(!isWebGL){GPU.beginFrame();G.time.value=time;G.dt.value=dt;G.exposure.value=.55;}
    if(!terminal.open&&!retro.active&&!portals.pending&&!app.freeCam){host.update(dt,time);const device=retro.nearest(engine.camera.position);if(device&&input.hit('KeyE'))retro.open(device);}
    if(host.active&&!app.freeCam)followCamera.update(dt,host.active,{suspended:terminal.open||retro.active||portals.pending});
-   if(host.active)avatar.update(dt,host.active.player,engine.camera,app.freeCam||followCamera.enabled);
+   if(host.active)avatar.update(dt,host.active.player,engine.camera,app.freeCam||followCamera.enabled);else avatar.group.visible=false;
    portals.update(dt,time);arrivals.update();portalEffects.update(dt,time);input.endFrame();
    const env=host.environment()??{timeOfDay:14,cloudCoverage:.49,windSpeed:6,sunAzimuth:0};let weatherState;const water=host.active?.project.water;
    if(isWebGL){weatherState=updateWebGLRepositoryEnvironment(engine,host.active,time);portals.render({width:engine.width,height:engine.height,time});renderer.render(engine.scene,engine.camera);}

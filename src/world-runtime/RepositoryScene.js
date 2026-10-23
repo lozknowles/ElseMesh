@@ -1,3 +1,4 @@
+import {buildRepositoryTraffic} from './RepositoryTraffic.js';
 import {buildRepositoryLandscape,addLandscapeCollisions,landscapeAssets} from './RepositoryLandscape.js';
 import * as N from '../engine/index.js';
 import { Material } from '../engine/render/Material.js';
@@ -44,7 +45,7 @@ export async function buildRepositoryScene(descriptor,camera) {
   const generatedAssets=landscapeAssets(project),allObjects=[...project.objects,...generatedAssets],matrices=resolveWorldMatrices(allObjects);
   const add=(item,geometry,color)=>{item.add(new N.Mesh(nativeGeometry(geometry),new Material({color,roughness:.85,side:'double'})));geometry.dispose();};
   for(const object of project.objects){
-   if(['group','tree','glb'].includes(object.kind)||!effectiveObjectState(project.objects,object.id).visible)continue;
+   if(object.collisionOnly||['group','tree','glb'].includes(object.kind)||!effectiveObjectState(project.objects,object.id).visible)continue;
    const item=new N.Group();item.userData.editorObjectId=object.id;item.matrixAutoUpdate=false;item.matrix.fromArray(matrices.get(object.id).elements);root.add(item);
    if(object.kind==='computer'){
     const computer=buildComputerGeometry();
@@ -59,6 +60,7 @@ export async function buildRepositoryScene(descriptor,camera) {
   const water=buildRepositoryWater(project);if(water)root.add(water);
   candidate.forest=buildNativeForest(project.objects,camera.position);root.add(candidate.forest);root.add(buildNativeFeatures(project,nativeGeometry));
   const landscape=buildRepositoryLandscape(project,{native:true,convertGeometry:nativeGeometry});root.add(landscape);candidate.landscape=landscape;candidate.landscapeCollisions=addLandscapeCollisions(project,candidate.colliders);const setTime=candidate.query.setTime.bind(candidate.query);candidate.query.setTime=t=>{setTime(t);landscape.userData.updateLandscape(t);};
+  candidate.traffic=await buildRepositoryTraffic(project,candidate,{native:true,convertGeometry:nativeGeometry});
   candidate.matrices=matrices;return candidate;
  }catch(error){disposeRepositoryScene(candidate);throw error;}
 }

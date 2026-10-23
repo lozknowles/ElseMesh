@@ -3,7 +3,6 @@ import { JUNCTION_TRIM } from './PortRoadJunction.js';
 
 const destinations = ['quay', 'depot', 'checkpoint', 'warehouse', 'north', 'yard'];
 const starts = ['gate', 'north', 'quay', 'yard', 'depot', 'east'];
-const edgeById = new Map(PORT_EDGES.map(edge => [edge.id, edge]));
 
 // Dimensions measured from the governed OpenX Blender collision manifests.
 // They remain provisional until the models and their licences are admitted.
@@ -11,6 +10,7 @@ export const PORT_VEHICLE_FOOTPRINTS = Object.freeze({
   // MMC AI68 bounds reach -2.49271/+2.51524 m along Z and are 2.10487 m wide.
   // Round the symmetric footprint outward to include both plate/body ends.
   player: Object.freeze({ length: 5.04, halfWidth: 1.055 }),
+  pedestrian: Object.freeze({ length: .6, halfWidth: .3 }),
   car: Object.freeze({ length: 4.6745, halfWidth: 1.0425 }),
   van: Object.freeze({ length: 4.9992, halfWidth: 1.2538 }),
   utility: Object.freeze({ length: 4.3075, halfWidth: .9878 }),
@@ -75,21 +75,54 @@ export function vehicleMotionBlocked(current, proposed, obstacle, kind = 'car', 
 
 // Fixed-step, deterministic traffic. No model calls or network state in the car loop.
 export class PortTraffic {
-  constructor(count = 6) {
+  constructor(count = 6, network = null, seed = 0) {
+    this.network=network??{nodes:PORT_NODES,edges:PORT_EDGES,classes:ROAD_CLASSES,findRoadRoute,routePose,continuousRoutePose};
+    const {nodes,edges,findRoadRoute:route,routePose:pose}=this.network;
+    this.edgeById=new Map(edges.map(edge=>[edge.id,edge]));
+    const edgeById=this.edgeById;
+    this.starts=network?Object.keys(nodes):starts;
+    this.destinations=network?Object.keys(nodes):destinations;
+    const routeSeed=network?(seed>>>0):0;
+    const startNodes=this.starts,goalNodes=this.destinations;
+
     this.junctionOwners = new Map();
     this.cars = Array.from({ length: Math.max(0, Math.min(12, count)) }, (_, id) => ({
       id, kind: id % 4 === 1 ? 'van' : id % 4 === 2 ? 'utility' : 'car',
-      route: findRoadRoute(starts[id % starts.length], destinations[id % destinations.length]),
+      route: route(startNodes[(id+routeSeed) % startNodes.length],
+        goalNodes[(id+routeSeed+(network?1:0)) % goalNodes.length]),
       step: 0, fraction: (id % 3) * .18, speed: 0, wait: 0, trips: 0,
     }));
-    for (const car of this.cars) {
+    if(network){
+      // Finite search over both directions and 33 interior positions per edge.
+      // Never admit overlapping initial bodies or silently reduce the requested count.
+      const placed=[],directions=edges.flatMap(e=>[
+        {edgeId:e.id,from:e.from,to:e.to},{edgeId:e.id,from:e.to,to:e.from}]);
+      for(const car of this.cars){
+        let accepted=false;
+        for(let attempt=0;attempt<directions.length&&!accepted;attempt++){
+          const step=directions[(attempt+routeSeed+car.id)%directions.length],edge=edgeById.get(step.edgeId);
+          const margin=JUNCTION_TRIM+3,span=edge.length-2*margin;
+          for(let sample=0;sample<33;sample++){
+            // Start centrally, then cover both ends in a stable seed-dependent order.
+            const slot=(sample+16+(routeSeed%33)+car.id*7)%33;
+            const fraction=(margin+span*slot/32)/edge.length;
+            const candidate=pose(step,fraction,car.kind==='van'?1.36:1.55);
+            if(placed.some(other=>portVehicleOverlap(candidate,other.pose,car.kind,other.kind)))continue;
+            car.route=[step];car.fraction=fraction;car.pose=candidate;placed.push(car);accepted=true;break;
+          }
+        }
+        if(!accepted)throw Error(`Traffic graph cannot safely place ${this.cars.length} vehicles; no collision-free position for vehicle ${car.id}.`);
+      }
+    }else for (const car of this.cars) {
       car.fraction = Math.max(car.fraction, (JUNCTION_TRIM + 3) / edgeById.get(car.route[0].edgeId).length);
-      car.pose = routePose(car.route[0], car.fraction, car.kind === 'van' ? 1.36 : 1.55);
+      car.pose = pose(car.route[0], car.fraction, car.kind === 'van' ? 1.36 : 1.55);
     }
   }
 
   update(dt, obstacle = null) {
-    const delta = Math.max(0, Math.min(dt, .1));
+    const {nodes:PORT_NODES,edges:PORT_EDGES,classes:ROAD_CLASSES,findRoadRoute,continuousRoutePose}=this.network;
+    const destinations=this.destinations,edgeById=this.edgeById;
+    const delta = Number.isFinite(dt)?Math.max(0, Math.min(dt, .1)):0;
     // Reserve the turning envelope before entering it. Collision rejection
     // alone can strand two opposing bodies halfway through a tight connector.
     for (const node of Object.values(PORT_NODES)) {
@@ -109,7 +142,8 @@ export class PortTraffic {
         const from = car.route.at(-1).to;
         const goal = destinations[(car.id + car.trips + 1) % destinations.length];
         const alternate = destinations.find(n => n !== from);
-        car.nextRoute = findRoadRoute(from, goal === from ? alternate : goal, car.route.at(-1).edgeId);
+        car.nextRoute = findRoadRoute(from, goal === from ? alternate : goal, car.route.at(-1).edgeId)
+          || findRoadRoute(from, goal === from ? alternate : goal);
       }
       const junction = car.fraction * edge.length < JUNCTION_TRIM ||
         (1 - car.fraction) * edge.length < JUNCTION_TRIM;
@@ -156,7 +190,7 @@ export class PortTraffic {
       const playerPose = obstacle && {...obstacle,yaw:obstacle.yaw??current.yaw};
       const collision = this.cars.some(other => other !== car &&
         vehicleMotionBlocked(current,car.pose,other.pose,car.kind,other.kind)) ||
-        (playerPose && vehicleMotionBlocked(current,car.pose,playerPose,car.kind,'player'));
+        (playerPose && vehicleMotionBlocked(current,car.pose,playerPose,car.kind,obstacle.kind??'player'));
       if (collision) { Object.assign(car,saved);car.pose=current;car.speed=0; }
     }
     return this.cars;

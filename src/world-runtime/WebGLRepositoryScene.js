@@ -1,3 +1,4 @@
+import {buildRepositoryTraffic} from './RepositoryTraffic.js';
 import {buildRepositoryLandscape,addLandscapeCollisions,landscapeAssets,installRepositoryLandscapeMaterial} from './RepositoryLandscape.js';
 import { T, resolveWorldMatrices,effectiveObjectState,buildComputerGeometry,disposeComputerGeometry,inspectAndLoadAsset,disposeAssetScene,acquireNeonGeometry,sampleNeonEffect,createTreeGeometry,buildFeatureGeometry } from './vendor/world-engine-contract.js';
 import { Vector3 } from '../engine/index.js';
@@ -107,7 +108,7 @@ export async function buildWebGLRepositoryScene(descriptor,camera){
   const generatedAssets=landscapeAssets(project),allObjects=[...project.objects,...generatedAssets],matrices=resolveWorldMatrices(allObjects);candidate.matrices=matrices;
   const add=(parent,geometry,color)=>parent.add(new T.Mesh(geometry,standard(color)));
   for(const object of project.objects){
-   if(['group','tree','glb'].includes(object.kind)||!effectiveObjectState(project.objects,object.id).visible)continue;
+   if(object.collisionOnly||['group','tree','glb'].includes(object.kind)||!effectiveObjectState(project.objects,object.id).visible)continue;
    const item=new T.Group();item.userData.editorObjectId=object.id;item.matrixAutoUpdate=false;item.matrix.copy(matrices.get(object.id));root.add(item);
    if(object.kind==='computer'){const computer=buildComputerGeometry();try{for(const p of computer.parts){const color=p.emissive?object.computer.screenColor:p.color;item.add(new T.Mesh(p.geometry.clone(),p.emissive?new T.MeshBasicMaterial({color,side:T.DoubleSide}):standard(color)));}}finally{disposeComputerGeometry(computer);}}
    else if(object.kind==='neon-sign'){const neon=buildWebGLNeon(object.neon);neon.userData.neonObjectId=object.id;item.add(neon);}
@@ -136,6 +137,7 @@ export async function buildWebGLRepositoryScene(descriptor,camera){
   const water=sea(project,time);if(water)root.add(water);
   for(const feature of project.features??[]){if(feature.visible===false)continue;for(const part of buildFeatureGeometry(feature,project)){const wet=['water','foam'].includes(part.semantic);root.add(new T.Mesh(part.geometry,standard(part.color,wet?{roughness:.22,transparent:true,opacity:.9,metalness:.1}:{})));}}
   const landscape=buildRepositoryLandscape(project);root.add(landscape);candidate.landscape=landscape;candidate.landscapeCollisions=addLandscapeCollisions(project,candidate.colliders);const update=root.userData.updateWebGL;root.userData.updateWebGL=t=>{update(t);landscape.userData.updateLandscape(t);};
+  candidate.traffic=await buildRepositoryTraffic(project,candidate);
   root.updateMatrixWorld(true);return candidate;
  }catch(error){disposeWebGLRepositoryScene(candidate);throw error;}
 }
