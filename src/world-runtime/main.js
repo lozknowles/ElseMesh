@@ -1,3 +1,4 @@
+import {readOpeningWorld,loadOpeningWorld} from './OpeningWorld.js';
 import {webGLRepositoryReadinessSignature} from './WebGLRepositoryReadiness.js';
 import {repositoryMediumWaterSettings} from './RepositoryWater.js';
 import {PortalArrivalController} from './PortalArrivalController.js';
@@ -71,7 +72,7 @@ async function init(){
   };
  }
 
- const host=new RepositoryWorldHost({engine,input,...backendHost,onChange:active=>{followCamera.reset(active);retro.setWorld(active);post?.taau.resetHistory();if(medium)medium.uniforms.fields.base.value=terrainMistBase(active.project.terrain);report(active.project.metadata.name+' · '+active.identity.location+' · '+active.identity.contentDigest.slice(0,12));},onInteract:(computer,active)=>{
+ const host=new RepositoryWorldHost({engine,input,...backendHost,onChange:active=>{document.querySelector('#panel h1').textContent=active.project.metadata.name;followCamera.reset(active);retro.setWorld(active);post?.taau.resetHistory();if(medium)medium.uniforms.fields.base.value=terrainMistBase(active.project.terrain);report(active.project.metadata.name+' · '+active.identity.location+' · '+active.identity.contentDigest.slice(0,12));},onInteract:(computer,active)=>{
   input._clearTransientInput();document.exitPointerLock?.();document.querySelector('#computer-info').textContent='Computer '+computer.id+' · sign '+(computer.computer.targetSignId??'not assigned');
   document.querySelector('#computer-controls').textContent='Connect an authorised world session for controls.';terminal.showModal();window.dispatchEvent(new CustomEvent('repository-computer',{detail:{computer,active}}));
  }});
@@ -138,8 +139,18 @@ async function init(){
  document.querySelector('#panel-toggle').onclick=()=>{document.querySelector('#panel').hidden=true;engine.canvas.focus();};
  window.addEventListener('keydown',event=>{if(event.code==='KeyH'&&!retro.active&&!terminal.open)document.querySelector('#panel').hidden=!document.querySelector('#panel').hidden;});
  document.querySelector('#portal-connect').onclick=()=>void connectOpening().catch(error=>{document.querySelector('#portal-status').textContent=error.message;});
- async function connectOpening(){const response=await fetch('/runtime-config',{credentials:'same-origin',cache:'no-store'});if(!response.ok)return false;const config=await response.json();if(config.protocol!=='elsemesh.repository-runtime/1'||!Array.isArray(config.trustedOwners)||config.endpoint!=='/__worlds')throw Error('Unsupported runtime installation configuration');await portals.connect(config);return true;}
- void connectOpening().catch(error=>{document.querySelector('#portal-status').textContent=error.message;});
+ async function connectOpening(){const response=await fetch('/runtime-config',{credentials:'same-origin',cache:'no-store'});if(response.status===404)return false;if(!response.ok)throw Error('World coordinator configuration unavailable ('+response.status+').');const config=await response.json();if(config.protocol!=='elsemesh.repository-runtime/1'||!Array.isArray(config.trustedOwners)||config.endpoint!=='/__worlds')throw Error('Unsupported runtime installation configuration');await portals.connect(config);return true;}
+ document.querySelector('#choose-world').onclick=()=>{const tools=document.querySelector('#repository-tools');tools.hidden=!tools.hidden;};
+ const openingGeneration=host.generation;
+ void (async()=>{
+  if(await connectOpening())return;
+  const config=await readOpeningWorld();if(!config||host.generation!==openingGeneration)return;
+  report('Loading published opening island…');
+  const active=await loadOpeningWorld(app,config);if(!active)return;
+  document.querySelector('#repository-tools').hidden=true;document.querySelector('#choose-world').hidden=false;document.querySelector('#coordinator-controls').hidden=true;
+  document.querySelector('#panel h1').textContent=active.project.metadata.name;
+  report('Published island · revision '+active.identity.resolvedCommit.slice(0,12)+' · '+selected.backend);
+ })().catch(error=>{report('Opening world could not load: '+error.message);document.querySelector('#portal-status').textContent='Opening world unavailable. Retry by reloading, or choose a repository.';});
  window.addEventListener('pagehide',()=>{portals.dispose();portalEffects.dispose();retro.dispose();avatar.dispose();host.dispose();engine.stop();if(isWebGL)engine.dispose();else GPU.device?.destroy();});report('ElseMesh '+selected.backend+' ready. Open a world repository folder or public GitHub source.');
  window.dispatchEvent(new CustomEvent('repository-world-ready',{detail:app}));
 }

@@ -17,7 +17,8 @@ export function hostedRepositorySource(input,options={}){
   try{
    const response=await fetcher(url,{signal:controller.signal,redirect:'error',credentials:'omit',referrerPolicy:'no-referrer'});
    if(!response.ok||response.redirected||(response.url&&response.url!==url))throw Error('Hosted repository request failed or redirected ('+response.status+').');
-   const length=response.headers.get('content-length');if(length!==null&&(!/^\d+$/.test(length)||Number(length)>maxBytes))throw Error('Hosted repository response exceeds its byte limit.');
+   const length=response.headers.get('content-length');// Transfer length may be compressed; enforce the decoded byte budget below.
+   if(length!==null&&!/^\d+$/.test(length))throw Error('Hosted repository response length is invalid.');
    if(!response.body)throw Error('Hosted repository response has no readable body.');reader=response.body.getReader();const chunks=[];let total=0;
    for(;;){const part=await reader.read();if(part.done)break;total+=part.value.byteLength;if(total>maxBytes)throw Error('Hosted repository stream exceeds its byte limit.');chunks.push(part.value);}
    const bytes=new Uint8Array(total);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}return bytes;

@@ -17,7 +17,8 @@
   <script type="module">
     import { DemoStatus } from './src/network/DemoStatus.js';
     const session = crypto.randomUUID().replaceAll('-', '');
-    for (const role of ['loz', 'ed']) document.getElementById(role).src = `./index.html?demo=network&role=${role}&session=${session}&scale=0.6&noAudio${role === 'loz' && new URLSearchParams(location.search).has('record') ? '&record&recordReceiver=42908' : ''}`;
+    const gameEntry = document.documentElement.dataset.gameEntry ?? './index.html';
+    for (const role of ['loz', 'ed']) document.getElementById(role).src = `${gameEntry}?demo=network&role=${role}&session=${session}&scale=0.6&noAudio${role === 'loz' && new URLSearchParams(location.search).has('record') ? '&record&recordReceiver=42908' : ''}`;
     const states = new DemoStatus(location.origin, Object.fromEntries(['loz','ed'].map(role => [role, document.getElementById(role).contentWindow])));
     const render = () => {
       const status = document.getElementById('status');

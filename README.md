@@ -6,10 +6,22 @@ An experimental WebGPU island exploration game. Walk, sail and fly between
 islands, explore the underwater cave and monorail, and collect a sedan delivered
 to Bracken Quay by cargo ship. Fishing, trading and hunger are optional.
 
-**[Play ElseMesh](https://lozknowles.github.io/ElseMesh/)**
+**[Play Loz’s warehouse island](https://lozknowles.github.io/ElseMesh/)** ·
+[Original exploration game](https://lozknowles.github.io/ElseMesh/legacy.html) ·
+[Public opening-world repository](https://github.com/lozknowles/elsemesh-world-loz-opening-island)
+
+The public opening world is an immutable snapshot of Loz’s warehouse island,
+with beaches, sea, mountains and retro computers, loaded from its independent
+repository. The repository runtime supports WebGPU and a WebGL2 fallback.
+WASD walks, mouse drag/arrows look, Shift runs, Space jumps, E uses a nearby
+computer, V toggles the follow camera, K opens avatar design and H toggles
+controls. Public snapshot portals explicitly remain offline without an authorised
+multiplayer coordinator. The original exploration game remains available above.
+See [opening-world deployment](docs/public-opening-world.md) for the pinning and
+publication boundary.
 
 This is a public experimental source release, not a finished or fully qualified
-game. WebGPU and a capable desktop GPU are required. Frame rate and memory use
+game. The original exploration game requires WebGPU and a capable desktop GPU. Frame rate and memory use
 vary substantially; port traffic, detailed collision recovery, mobile support
 and long multiplayer sessions still need broader testing.
 
@@ -30,10 +42,10 @@ See [deployment examples](deploy/README.md). The public client and server use
 ElseMesh protocol identifiers and environment variables; older invitations and
 saved settings from the private prototype are not migrated.
 
-## Controls
+## Original exploration game controls
 
 For reduced ground detail, choose **Settings → Performance → Terrain shading →
-Simple**, or open [Simple terrain mode](https://lozknowles.github.io/ElseMesh/?terrainShading=simple).
+Simple**, or open [Simple terrain mode](https://lozknowles.github.io/ElseMesh/legacy.html?terrainShading=simple).
 Full remains the default. The choice is independent of the quality profile and
 applies for the current session; the URL flag selects it again after a reload.
 Simple preserves terrain shape, collisions, the cave opening and lighting, while

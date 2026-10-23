@@ -12,7 +12,11 @@ export class RepositoryWorldHost {
  constructor({engine,input,buildCandidate=buildRepositoryScene,checkSourceUpdate=checkWorldSourceUpdate,disposeCandidate=disposeRepositoryScene,buildNeon=buildNativeNeon,convertGeometry=nativeGeometry,prepareResources=async()=>{},acquireResources=async()=>null,registerResources=async()=>null,retainResources=()=>false,beforeActivate=async()=>{},onChange=()=>{},onInteract=()=>{}}){
   Object.assign(this,{engine,input,buildCandidate,checkSourceUpdate,disposeCandidate,buildNeon,convertGeometry,prepareResources,acquireResources,registerResources,retainResources,beforeActivate,onChange,onInteract});this.generation=0;this.active=null;this.overlay=null;this.disposed=false;this.prepared=new Set();
  }
- async load(source,options){this.pendingUpdate=null;const token=++this.generation;const loaded=await loadWorldSource(source,options);return this.activate(loaded,token);}
+ async load(source,options={}){this.pendingUpdate=null;const token=++this.generation;const loaded=await loadWorldSource(source,options);
+  if(options.expectedWorldId!==undefined&&loaded.identity.worldId!==options.expectedWorldId)throw Error('World identity does not match the deployment pin.');
+  if(options.expectedContentDigest!==undefined&&loaded.identity.contentDigest!==options.expectedContentDigest)throw Error('World content does not match the deployment pin.');
+  return this.activate(loaded,token);
+ }
  async checkUpdate(options){
   if(!this.active)throw Error('Open a world first.');
   this.pendingUpdate=null;

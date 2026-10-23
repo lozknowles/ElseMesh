@@ -65,6 +65,21 @@ export class RepositoryPortalRuntime{
   if(this.host.active!==active)throw Error('World activation changed during native readiness');this.onChange(active);this.onActivated(active);
  }
 
+ // A public authored snapshot grants no VIEW/ENTER authority to other worlds.
+ async activateOffline(expectedActive=this.host.active){
+  if(this.pending||this.connected)throw Error('Disconnect the world session before opening an offline snapshot.');
+  const active=this.host.active,epoch=this.epoch;if(!active)throw Error('Open a world first.');if(active!==expectedActive)return false;
+  this.views.setActive(active);
+  for(const portal of (active.project.portals??[]).slice(0,2)){
+   if(!active.root.userData.repositoryPortalFramesReady)this.addPortalFrame(active.root,portal);
+   const aperture=this.views.setDestination(portal.id,{source:portal,authorizedView:false,state:'unavailable'});active.root.add(aperture);
+  }
+  active.root.userData.repositoryPortalFramesReady=true;
+  await Promise.all([...this.views.entries.keys()].map(id=>this.views.whenReady?.(id)));
+  if(this.epoch!==epoch||this.host.active!==active||this.connected)return false;
+  this.onStatus('Single-player snapshot · portals offline. An authorised world session is required to travel.');return true;
+ }
+
  async preview(portal){
   const token=this.epoch,owner=this.host.active.identity.worldId+':'+portal.id;this.previewRecords.set(portal.id,{worldId:portal.destination.worldId,loading:true});
   let candidate,record;
