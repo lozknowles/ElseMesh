@@ -43490,11 +43490,152 @@ function pointInLandscapeBoundary(x, z, points) {
   }
   return inside;
 }
+function createLandscapePondBoundary(center, radius, irregularity = 0.35) {
+  check(vector(center) && number(radius, 0.25, 100) && number(irregularity, 0, 1), "Invalid pond centre, radius or irregularity");
+  const count = Math.min(64, Math.max(16, Math.ceil(Math.PI * Math.sqrt(radius * (1 + 3 * irregularity) / (0.12 * 2)))));
+  const boundary = Array.from({ length: count }, (_, i) => {
+    const angle = i * Math.PI * 2 / count, r = radius * (1 + irregularity * (0.12 * Math.cos(2 * angle) + 0.08 * Math.sin(3 * angle) + 0.05 * Math.cos(5 * angle)));
+    return [center[0] + Math.cos(angle) * r, center[1], center[2] + Math.sin(angle) * r];
+  });
+  check(boundary.every(vector), "Pond boundary exceeds world coordinate limits");
+  return boundary;
+}
+var boundaryBounds = (boundary) => [Math.min(...boundary.map((p) => p[0])), Math.max(...boundary.map((p) => p[0])), Math.min(...boundary.map((p) => p[2])), Math.max(...boundary.map((p) => p[2]))];
+function cellIntersectsBoundary(x, z, boundary) {
+  if ([[x, z], [x + 1, z], [x, z + 1], [x + 1, z + 1]].some(([cx, cz]) => pointInLandscapeBoundary(cx, cz, boundary))) return true;
+  for (let i = 0; i < boundary.length; i++) {
+    const a = boundary[i], b = boundary[(i + 1) % boundary.length];
+    let lo = 0, hi = 1;
+    for (const [axis, min, max] of [[0, x, x + 1], [2, z, z + 1]]) {
+      const delta = b[axis] - a[axis];
+      if (Math.abs(delta) < 1e-12) {
+        if (a[axis] < min || a[axis] > max) {
+          hi = -1;
+          break;
+        }
+      } else {
+        const t0 = (min - a[axis]) / delta, t1 = (max - a[axis]) / delta;
+        lo = Math.max(lo, Math.min(t0, t1));
+        hi = Math.min(hi, Math.max(t0, t1));
+      }
+    }
+    if (lo <= hi) return true;
+  }
+  return false;
+}
+function landscapeWaterHasCompleteCoverage(project, layer) {
+  if (layer.kind !== "water" || !layer.visible || !layer.boundary || !layer.water) return false;
+  const bounds = boundaryBounds(layer.boundary), [minX, maxX, minZ, maxZ] = bounds;
+  for (const other of project.landscape?.layers ?? []) {
+    if (other.id === layer.id || !other.visible || other.kind !== "water" || !other.boundary || !other.water) continue;
+    const b = boundaryBounds(other.boundary);
+    if (minX <= b[1] && maxX >= b[0] && minZ <= b[3] && maxZ >= b[2]) return false;
+  }
+  const x0 = Math.max(-project.terrain.width / 2, Math.floor(minX + project.terrain.width / 2) - project.terrain.width / 2), x1 = Math.min(project.terrain.width / 2, Math.ceil(maxX + project.terrain.width / 2) - project.terrain.width / 2), z0 = Math.max(-project.terrain.depth / 2, Math.floor(minZ + project.terrain.depth / 2) - project.terrain.depth / 2), z1 = Math.min(project.terrain.depth / 2, Math.ceil(maxZ + project.terrain.depth / 2) - project.terrain.depth / 2);
+  const cells = (x1 - x0) * (z1 - z0);
+  if (cells > LANDSCAPE_LIMITS.maskBytes || cells * layer.boundary.length * 6 + layer.boundary.length ** 2 > LANDSCAPE_LIMITS.waterWork) return false;
+  for (let z = z0; z < z1; z++) for (let x = x0; x < x1; x++) if (landscapeMaskAt(project, layer.mask, x + 0.5, z + 0.5) !== 255 && cellIntersectsBoundary(x, z, layer.boundary)) return false;
+  return true;
+}
 function applyLandscapeArea(project, c) {
   validateBoundary(c.boundary, project);
   check(c.strength === void 0 || number(c.strength, 0, 1), "Invalid landscape area strength");
-  const xs = c.boundary.map((p) => p[0]), zs = c.boundary.map((p) => p[2]);
-  return editMask(project, c.layerId, c.mode, (x, z) => pointInLandscapeBoundary(x, z, c.boundary) ? c.strength ?? 1 : 0, [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)], c.boundary, c.boundary.length);
+  const bounds = boundaryBounds(c.boundary), water = c.mode !== "erase" && project.landscape?.layers.find((l) => l.id === c.layerId)?.kind === "water";
+  return editMask(project, c.layerId, c.mode, (x, z) => (water ? cellIntersectsBoundary(x - 0.5, z - 0.5, c.boundary) : pointInLandscapeBoundary(x, z, c.boundary)) ? c.strength ?? 1 : 0, bounds, c.boundary, c.boundary.length * (water ? 6 : 1));
+}
+function applyLandscapePond(project, c) {
+  const layer = project.landscape?.layers.find((l) => l.id === c.layerId);
+  check(layer?.kind === "water" && layer.water, "Choose a water layer for a graded pond");
+  check(!layer.locked, "Landscape layer is locked");
+  check(["paint", "replace", "erase"].includes(c.mode) && (c.strength === void 0 || number(c.strength, 0, 1)), "Invalid pond operation or strength");
+  const boundary = createLandscapePondBoundary(c.center, c.radius, c.irregularity);
+  validateBoundary(boundary, project);
+  const area2 = { layerId: c.layerId, boundary, strength: c.strength, mode: c.mode };
+  if (c.mode === "erase") return applyLandscapeArea(project, area2);
+  check(number(c.bankWidth, 0.25, 100) && number(c.bedDepth, 0.1, 100), "Pond bank width and bed depth are outside supported bounds");
+  const terrain = project.terrain, stepX = terrain.width / (terrain.resolution - 1), stepZ = terrain.depth / (terrain.resolution - 1), minimumRun = 2 * Math.max(stepX, stepZ), minRadius = Math.min(...boundary.map((p) => Math.hypot(p[0] - c.center[0], p[2] - c.center[2]))), innerRun = Math.min(c.bankWidth, minRadius * 0.75), level = layer.water.level, freeboard = level + 0.25, bed = level - c.bedDepth;
+  check(c.bankWidth >= minimumRun && innerRun >= minimumRun, "Terrain resolution is too coarse for this pond and bank width. Increase the pond radius and bank width or use a finer terrain grid.");
+  check(number(freeboard, -2e3, 2e3) && number(bed, -2e3, 2e3), "Pond bank or bed exceeds terrain height limits");
+  const b = boundaryBounds(boundary), affected = [b[0] - c.bankWidth, b[1] + c.bankWidth, b[2] - c.bankWidth, b[3] + c.bankWidth];
+  check(affected[0] >= -terrain.width / 2 && affected[1] <= terrain.width / 2 && affected[2] >= -terrain.depth / 2 && affected[3] <= terrain.depth / 2, "Pond and its bank extend beyond the terrain. Use a smaller radius or start farther from the edge.");
+  const support = [affected[0] - stepX, affected[1] + stepX, affected[2] - stepZ, affected[3] + stepZ];
+  const overlaps = (box) => support[0] <= box[1] && support[1] >= box[0] && support[2] <= box[3] && support[3] >= box[2];
+  for (const other of project.landscape?.layers ?? []) if (other.id !== layer.id && other.kind === "water" && other.boundary) check(!overlaps(boundaryBounds(other.boundary)), "Pond grading would alter another water body. Leave space between its bank and other water.");
+  for (const feature of project.features ?? []) if (feature.kind === "lake") check(!overlaps(boundaryBounds(feature.points)), "Pond grading would alter an existing lake. Leave space around its bank.");
+  const legacySea = project.water, overlapsLegacySea = !!legacySea && overlaps([-legacySea.extent / 2, legacySea.extent / 2, -legacySea.extent / 2, legacySea.extent / 2]);
+  const x0 = Math.max(0, Math.floor((affected[0] + terrain.width / 2) / stepX)), x1 = Math.min(terrain.resolution - 1, Math.ceil((affected[1] + terrain.width / 2) / stepX)), z0 = Math.max(0, Math.floor((affected[2] + terrain.depth / 2) / stepZ)), z1 = Math.min(terrain.resolution - 1, Math.ceil((affected[3] + terrain.depth / 2) / stepZ));
+  const maskCells = (Math.ceil(b[1] + terrain.width / 2) - Math.floor(b[0] + terrain.width / 2)) * (Math.ceil(b[3] + terrain.depth / 2) - Math.floor(b[2] + terrain.depth / 2));
+  check(((x1 - x0 + 1) * (z1 - z0 + 1) + boundary.length * 2) * boundary.length * 8 + maskCells * boundary.length * 6 + boundary.length * (6 * terrain.resolution + 6) * 32 + (overlapsLegacySea ? (x1 - x0 + 3) * (z1 - z0 + 3) * 4 : 0) <= LANDSCAPE_LIMITS.operationWork, "Pond grading is too complex for this terrain grid. Use a smaller pond or fewer terrain samples.");
+  const winding = boundary.reduce((sum, a, i) => {
+    const next = boundary[(i + 1) % boundary.length];
+    return sum + a[0] * next[2] - next[0] * a[2];
+  }, 0) >= 0 ? 1 : -1, smooth = (t) => {
+    const v = Math.max(0, Math.min(1, t));
+    return v * v * (3 - 2 * v);
+  };
+  const nearest = (x, z) => {
+    let distance = Infinity, qx = 0, qz = 0, nx = 0, nz = 0;
+    for (let i = 0; i < boundary.length; i++) {
+      const a = boundary[i], next = boundary[(i + 1) % boundary.length], dx = next[0] - a[0], dz = next[2] - a[2], length = Math.hypot(dx, dz), t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[2]) * dz) / (length * length))), px2 = a[0] + dx * t, pz2 = a[2] + dz * t, d = Math.hypot(x - px2, z - pz2);
+      if (d < distance) {
+        distance = d;
+        qx = px2;
+        qz = pz2;
+        nx = winding * dz / length;
+        nz = -winding * dx / length;
+      }
+    }
+    return { distance, qx, qz, nx, nz };
+  };
+  const anchorHeight = (qx, qz, nx, nz) => {
+    const h = sampleTerrain(terrain, qx + nx * c.bankWidth, qz + nz * c.bankWidth);
+    check(h > freeboard + 0.05, "Water level is too high for a dry sloping bank. Lower the water level or choose higher ground.");
+    return h;
+  };
+  for (let i = 0; i < boundary.length; i++) {
+    const a = boundary[i], next = boundary[(i + 1) % boundary.length];
+    for (const t of [0, 0.5]) {
+      const x = a[0] + (next[0] - a[0]) * t, z = a[2] + (next[2] - a[2]) * t, n = nearest(x, z);
+      anchorHeight(n.qx, n.qz, n.nx, n.nz);
+    }
+  }
+  const heights = [...terrain.heights];
+  for (let iz = z0; iz <= z1; iz++) for (let ix = x0; ix <= x1; ix++) {
+    const x = ix * stepX - terrain.width / 2, z = iz * stepZ - terrain.depth / 2, n = nearest(x, z), inside = pointInLandscapeBoundary(x, z, boundary);
+    if (!inside && n.distance >= c.bankWidth) continue;
+    let nx = n.nx, nz = n.nz;
+    if (n.distance > 1e-8) {
+      const sign2 = inside ? -1 : 1;
+      nx = (x - n.qx) / n.distance * sign2;
+      nz = (z - n.qz) / n.distance * sign2;
+    }
+    const outer = anchorHeight(n.qx, n.qz, nx, nz);
+    heights[iz * terrain.resolution + ix] = inside ? freeboard + (bed - freeboard) * smooth(n.distance / innerRun) : freeboard + (outer - freeboard) * smooth(n.distance / c.bankWidth);
+  }
+  const candidateTerrain = { ...terrain, heights };
+  let boundaryMinimum = Infinity;
+  for (let i = 0; i < boundary.length; i++) {
+    const a = boundary[i], next = boundary[(i + 1) % boundary.length], fx = (a[0] + terrain.width / 2) / stepX, fz = (a[2] + terrain.depth / 2) / stepZ, dx = (next[0] - a[0]) / stepX, dz = (next[2] - a[2]) / stepZ, times = [0, 1];
+    for (const [start, delta] of [[fx, dx], [fz, dz], [fx + fz, dx + dz]]) {
+      if (Math.abs(delta) < 1e-12) continue;
+      for (let k = Math.ceil(Math.min(start, start + delta)); k <= Math.floor(Math.max(start, start + delta)); k++) {
+        const t = (k - start) / delta;
+        if (t > 0 && t < 1) times.push(t);
+      }
+    }
+    for (const t of times) boundaryMinimum = Math.min(boundaryMinimum, sampleTerrain(candidateTerrain, a[0] + (next[0] - a[0]) * t, a[2] + (next[2] - a[2]) * t));
+  }
+  check(boundaryMinimum > level + 1e-5, "Terrain resolution, pond bed depth and bank width leave the outer shoreline underwater (minimum " + boundaryMinimum.toFixed(3) + "m). Reduce the bed depth, widen the bank, or use a finer terrain grid.");
+  if (overlapsLegacySea && legacySea) {
+    const seaMaximum = legacySea.level + legacySea.waveAmplitude;
+    for (let iz = Math.max(0, z0 - 1); iz <= Math.min(terrain.resolution - 1, z1 + 1); iz++) for (let ix = Math.max(0, x0 - 1); ix <= Math.min(terrain.resolution - 1, x1 + 1); ix++) {
+      const i = iz * terrain.resolution + ix;
+      check(terrain.heights[i] > seaMaximum && heights[i] > seaMaximum, "Pond grading could alter the existing sea bed or shoreline. Choose ground and a pond bed above the sea maximum.");
+    }
+  }
+  const result = applyLandscapeArea({ ...project, terrain: { ...terrain, heights } }, area2), admitted = admitLandscapeProject(result);
+  check(admitted.valid, admitted.errors[0] ?? "Graded pond admission failed");
+  return result;
 }
 function sampleLandscapeWater(project, x, z, time = 0) {
   if (![x, z, time].every(Number.isFinite)) return null;
@@ -43736,15 +43877,19 @@ function assertLandscapeDerivedBudget(project) {
   check(result.sceneryWork <= LANDSCAPE_LIMITS.sceneryWork, "Landscape scenery derived work limit exceeded; simplify water/lake/path boundaries, reduce coverage or increase spacing.");
   const terrain = project.terrain, stepX = terrain.width / (terrain.resolution - 1), stepZ = terrain.depth / (terrain.resolution - 1), cellVisits = (Math.ceil(stepX) + 1) * (Math.ceil(stepZ) + 1);
   for (const layer of waterLayers) {
-    const boundary = layer.boundary, triangles = ShapeUtils.triangulateShape(boundary.map((p) => new Vector2(p[0], p[2])), []);
+    const boundary = layer.boundary, b = boundaryBounds(boundary);
+    const classificationCells = Math.min(LANDSCAPE_LIMITS.maskBytes, (Math.ceil(b[1] + terrain.width / 2) - Math.floor(b[0] + terrain.width / 2)) * (Math.ceil(b[3] + terrain.depth / 2) - Math.floor(b[2] + terrain.depth / 2)));
+    result.waterWork += classificationCells * boundary.length * 6 + boundary.length ** 2;
+    check(result.waterWork <= LANDSCAPE_LIMITS.waterWork, "Landscape water derived work limit exceeded before coverage classification; simplify boundaries or reduce water area.");
+    const triangles = ShapeUtils.triangulateShape(boundary.map((p) => new Vector2(p[0], p[2])), []);
     let terrainTriangles = 0;
     for (const triangle of triangles) {
       const points = triangle.map((i) => boundary[i]), minX = Math.max(0, Math.floor((Math.min(...points.map((p) => p[0])) / terrain.width + 0.5) * (terrain.resolution - 1))), maxX = Math.min(terrain.resolution - 2, Math.ceil((Math.max(...points.map((p) => p[0])) / terrain.width + 0.5) * (terrain.resolution - 1))), minZ = Math.max(0, Math.floor((Math.min(...points.map((p) => p[2])) / terrain.depth + 0.5) * (terrain.resolution - 1))), maxZ = Math.min(terrain.resolution - 2, Math.ceil((Math.max(...points.map((p) => p[2])) / terrain.depth + 0.5) * (terrain.resolution - 1)));
       terrainTriangles += Math.max(0, maxX - minX + 1) * Math.max(0, maxZ - minZ + 1) * 2;
     }
-    const visits = terrainTriangles * 5 * cellVisits, vertices = visits * 15;
+    const complete = landscapeWaterHasCompleteCoverage(project, layer), visits = complete ? 0 : terrainTriangles * 5 * cellVisits, vertices = complete ? terrainTriangles * 15 : visits * 15;
     result.waterVertices += vertices;
-    result.waterWork += terrainTriangles * 32 + visits * (32 + waterEdges * 3) + vertices * waterEdges * 3;
+    result.waterWork += terrainTriangles * 32 + visits * (32 + waterEdges * 3) + vertices * ((complete ? 32 : 0) + waterEdges * 3);
     check(result.waterVertices <= LANDSCAPE_LIMITS.waterVertices, "Landscape water vertex limit exceeded by conservative derived-work estimate; reduce water boundary/area or use a coarser terrain grid.");
     check(result.waterWork <= LANDSCAPE_LIMITS.waterWork, "Landscape water derived work limit exceeded; simplify boundaries, reduce water area or use a coarser terrain grid.");
   }
@@ -47805,6 +47950,7 @@ function landscapeWaterGeometry(p) {
   };
   for (const layer of p.landscape?.layers ?? []) {
     if (!layer.visible || layer.kind !== "water" || !layer.boundary || !layer.water) continue;
+    const completeCoverage = landscapeWaterHasCompleteCoverage(p, layer);
     const parts = buildFeatureGeometry(
       {
         id: layer.id,
@@ -47820,6 +47966,13 @@ function landscapeWaterGeometry(p) {
       const a = part.geometry.getAttribute("position");
       for (let i = 0; i < a.count; i += 3) {
         const triangle = [0, 1, 2].map((n) => [a.getX(i + n), a.getY(i + n), a.getZ(i + n)]);
+        if (completeCoverage) {
+          for (const vertex3 of triangle) {
+            positions.push(vertex3[0], layer.water.level, vertex3[2]);
+            levels.push(layer.water.level);
+          }
+          continue;
+        }
         const minX = Math.floor(Math.min(...triangle.map((v) => v[0])) + p.terrain.width / 2), maxX = Math.floor(Math.max(...triangle.map((v) => v[0])) + p.terrain.width / 2), minZ = Math.floor(Math.min(...triangle.map((v) => v[2])) + p.terrain.depth / 2), maxZ = Math.floor(Math.max(...triangle.map((v) => v[2])) + p.terrain.depth / 2);
         for (let cz = minZ; cz <= maxZ; cz++)
           for (let cx = minX; cx <= maxX; cx++) {
@@ -47975,6 +48128,7 @@ export {
   adoptRuntimeSettings,
   applyLandscapeArea,
   applyLandscapeBrush,
+  applyLandscapePond,
   assertLandscapeDerivedBudget,
   assetPrimitiveGroups,
   bakeLandscapeAtlas,
@@ -47989,6 +48143,7 @@ export {
   createLandscapeCollisionIndex,
   createLandscapeImage,
   createLandscapeLayer,
+  createLandscapePondBoundary,
   createLandscapeSampler,
   createNeonPrefab,
   createPlayerWorldPackage,
@@ -48025,6 +48180,7 @@ export {
   landscapeMaskAt,
   landscapePartTint,
   landscapeWaterGeometry,
+  landscapeWaterHasCompleteCoverage,
   loadWorldSource,
   localMatrix,
   mapPortalDirection,
