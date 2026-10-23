@@ -1,7 +1,7 @@
 {
   "schema": "elsemesh.world-software-provenance/1",
   "repository": "https://github.com/lozknowles/elsemesh-worlds.git",
-  "commit": "f75d96793f2a268d4abe093065d4ea807b25ac1d",
+  "commit": "3ba3e13ed1611a2f7adb2f3f62d04cf07eac9d7d",
   "sourceState": "clean",
   "command": "node scripts/build-world-engine-contract.mjs --target=<engine>/src/world-runtime/vendor",
   "bundleSha256": "355ab40df9d069d53465c694dd95b159e743b06ea925edbb9732983967dfba47",
