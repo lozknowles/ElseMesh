@@ -3830,31 +3830,31 @@ function createColorManagement() {
      * - https://www.russellcottrell.com/photo/matrixCalculator.htm
      */
     spaces: {},
-    convert: function(color, sourceColorSpace, targetColorSpace) {
+    convert: function(color2, sourceColorSpace, targetColorSpace) {
       if (this.enabled === false || sourceColorSpace === targetColorSpace || !sourceColorSpace || !targetColorSpace) {
-        return color;
+        return color2;
       }
       if (this.spaces[sourceColorSpace].transfer === SRGBTransfer) {
-        color.r = SRGBToLinear(color.r);
-        color.g = SRGBToLinear(color.g);
-        color.b = SRGBToLinear(color.b);
+        color2.r = SRGBToLinear(color2.r);
+        color2.g = SRGBToLinear(color2.g);
+        color2.b = SRGBToLinear(color2.b);
       }
       if (this.spaces[sourceColorSpace].primaries !== this.spaces[targetColorSpace].primaries) {
-        color.applyMatrix3(this.spaces[sourceColorSpace].toXYZ);
-        color.applyMatrix3(this.spaces[targetColorSpace].fromXYZ);
+        color2.applyMatrix3(this.spaces[sourceColorSpace].toXYZ);
+        color2.applyMatrix3(this.spaces[targetColorSpace].fromXYZ);
       }
       if (this.spaces[targetColorSpace].transfer === SRGBTransfer) {
-        color.r = LinearToSRGB(color.r);
-        color.g = LinearToSRGB(color.g);
-        color.b = LinearToSRGB(color.b);
+        color2.r = LinearToSRGB(color2.r);
+        color2.g = LinearToSRGB(color2.g);
+        color2.b = LinearToSRGB(color2.b);
       }
-      return color;
+      return color2;
     },
-    workingToColorSpace: function(color, targetColorSpace) {
-      return this.convert(color, this.workingColorSpace, targetColorSpace);
+    workingToColorSpace: function(color2, targetColorSpace) {
+      return this.convert(color2, this.workingColorSpace, targetColorSpace);
     },
-    colorSpaceToWorking: function(color, sourceColorSpace) {
-      return this.convert(color, sourceColorSpace, this.workingColorSpace);
+    colorSpaceToWorking: function(color2, sourceColorSpace) {
+      return this.convert(color2, sourceColorSpace, this.workingColorSpace);
     },
     getPrimaries: function(colorSpace) {
       return this.spaces[colorSpace].primaries;
@@ -3883,13 +3883,13 @@ function createColorManagement() {
       return this.spaces[colorSpace].workingColorSpaceConfig.unpackColorSpace;
     },
     // Deprecated
-    fromWorkingColorSpace: function(color, targetColorSpace) {
+    fromWorkingColorSpace: function(color2, targetColorSpace) {
       warnOnce("THREE.ColorManagement: .fromWorkingColorSpace() has been renamed to .workingToColorSpace().");
-      return ColorManagement2.workingToColorSpace(color, targetColorSpace);
+      return ColorManagement2.workingToColorSpace(color2, targetColorSpace);
     },
-    toWorkingColorSpace: function(color, sourceColorSpace) {
+    toWorkingColorSpace: function(color2, sourceColorSpace) {
       warnOnce("THREE.ColorManagement: .toWorkingColorSpace() has been renamed to .colorSpaceToWorking().");
-      return ColorManagement2.colorSpaceToWorking(color, sourceColorSpace);
+      return ColorManagement2.colorSpaceToWorking(color2, sourceColorSpace);
     }
   };
   const REC709_PRIMARIES = [0.64, 0.33, 0.3, 0.6, 0.15, 0.06];
@@ -5543,9 +5543,9 @@ var Box3 = class {
    * world-axis-aligned bounding box at the expense of more computation.
    * @return {Box3} A reference to this bounding box.
    */
-  setFromObject(object2, precise = false) {
+  setFromObject(object3, precise = false) {
     this.makeEmpty();
-    return this.expandByObject(object2, precise);
+    return this.expandByObject(object3, precise);
   }
   /**
    * Returns a new box with copied values from this instance.
@@ -5625,9 +5625,9 @@ var Box3 = class {
    * @param {Vector3} vector - The vector that should expand the bounding box.
    * @return {Box3} A reference to this bounding box.
    */
-  expandByVector(vector) {
-    this.min.sub(vector);
-    this.max.add(vector);
+  expandByVector(vector2) {
+    this.min.sub(vector2);
+    this.max.add(vector2);
     return this;
   }
   /**
@@ -5653,38 +5653,38 @@ var Box3 = class {
    * as little as necessary at the expense of more computation.
    * @return {Box3} A reference to this bounding box.
    */
-  expandByObject(object2, precise = false) {
-    object2.updateWorldMatrix(false, false);
-    const geometry = object2.geometry;
+  expandByObject(object3, precise = false) {
+    object3.updateWorldMatrix(false, false);
+    const geometry = object3.geometry;
     if (geometry !== void 0) {
       const positionAttribute = geometry.getAttribute("position");
-      if (precise === true && positionAttribute !== void 0 && object2.isInstancedMesh !== true) {
+      if (precise === true && positionAttribute !== void 0 && object3.isInstancedMesh !== true) {
         for (let i = 0, l = positionAttribute.count; i < l; i++) {
-          if (object2.isMesh === true) {
-            object2.getVertexPosition(i, _vector$b);
+          if (object3.isMesh === true) {
+            object3.getVertexPosition(i, _vector$b);
           } else {
             _vector$b.fromBufferAttribute(positionAttribute, i);
           }
-          _vector$b.applyMatrix4(object2.matrixWorld);
+          _vector$b.applyMatrix4(object3.matrixWorld);
           this.expandByPoint(_vector$b);
         }
       } else {
-        if (object2.boundingBox !== void 0) {
-          if (object2.boundingBox === null) {
-            object2.computeBoundingBox();
+        if (object3.boundingBox !== void 0) {
+          if (object3.boundingBox === null) {
+            object3.computeBoundingBox();
           }
-          _box$4.copy(object2.boundingBox);
+          _box$4.copy(object3.boundingBox);
         } else {
           if (geometry.boundingBox === null) {
             geometry.computeBoundingBox();
           }
           _box$4.copy(geometry.boundingBox);
         }
-        _box$4.applyMatrix4(object2.matrixWorld);
+        _box$4.applyMatrix4(object3.matrixWorld);
         this.union(_box$4);
       }
     }
-    const children = object2.children;
+    const children = object3.children;
     for (let i = 0, l = children.length; i < l; i++) {
       this.expandByObject(children[i], precise);
     }
@@ -8426,9 +8426,9 @@ var Object3D = class _Object3D extends EventDispatcher {
    * @param {Vector3} vector - The vector to convert.
    * @return {Vector3} The converted vector.
    */
-  localToWorld(vector) {
+  localToWorld(vector2) {
     this.updateWorldMatrix(true, false);
-    return vector.applyMatrix4(this.matrixWorld);
+    return vector2.applyMatrix4(this.matrixWorld);
   }
   /**
    * Converts the given vector from this 3D object's word space to local space.
@@ -8436,9 +8436,9 @@ var Object3D = class _Object3D extends EventDispatcher {
    * @param {Vector3} vector - The vector to convert.
    * @return {Vector3} The converted vector.
    */
-  worldToLocal(vector) {
+  worldToLocal(vector2) {
     this.updateWorldMatrix(true, false);
-    return vector.applyMatrix4(_m1$1.copy(this.matrixWorld).invert());
+    return vector2.applyMatrix4(_m1$1.copy(this.matrixWorld).invert());
   }
   /**
    * Rotates the object to face a point in world space.
@@ -8480,27 +8480,27 @@ var Object3D = class _Object3D extends EventDispatcher {
    * @param {Object3D} object - The 3D object to add.
    * @return {Object3D} A reference to this instance.
    */
-  add(object2) {
+  add(object3) {
     if (arguments.length > 1) {
       for (let i = 0; i < arguments.length; i++) {
         this.add(arguments[i]);
       }
       return this;
     }
-    if (object2 === this) {
-      console.error("THREE.Object3D.add: object can't be added as a child of itself.", object2);
+    if (object3 === this) {
+      console.error("THREE.Object3D.add: object can't be added as a child of itself.", object3);
       return this;
     }
-    if (object2 && object2.isObject3D) {
-      object2.removeFromParent();
-      object2.parent = this;
-      this.children.push(object2);
-      object2.dispatchEvent(_addedEvent);
-      _childaddedEvent.child = object2;
+    if (object3 && object3.isObject3D) {
+      object3.removeFromParent();
+      object3.parent = this;
+      this.children.push(object3);
+      object3.dispatchEvent(_addedEvent);
+      _childaddedEvent.child = object3;
       this.dispatchEvent(_childaddedEvent);
       _childaddedEvent.child = null;
     } else {
-      console.error("THREE.Object3D.add: object not an instance of THREE.Object3D.", object2);
+      console.error("THREE.Object3D.add: object not an instance of THREE.Object3D.", object3);
     }
     return this;
   }
@@ -8513,19 +8513,19 @@ var Object3D = class _Object3D extends EventDispatcher {
    * @param {Object3D} object - The 3D object to remove.
    * @return {Object3D} A reference to this instance.
    */
-  remove(object2) {
+  remove(object3) {
     if (arguments.length > 1) {
       for (let i = 0; i < arguments.length; i++) {
         this.remove(arguments[i]);
       }
       return this;
     }
-    const index = this.children.indexOf(object2);
+    const index = this.children.indexOf(object3);
     if (index !== -1) {
-      object2.parent = null;
+      object3.parent = null;
       this.children.splice(index, 1);
-      object2.dispatchEvent(_removedEvent);
-      _childremovedEvent.child = object2;
+      object3.dispatchEvent(_removedEvent);
+      _childremovedEvent.child = object3;
       this.dispatchEvent(_childremovedEvent);
       _childremovedEvent.child = null;
     }
@@ -8564,20 +8564,20 @@ var Object3D = class _Object3D extends EventDispatcher {
    * @param {Object3D} object - The 3D object to attach.
    * @return {Object3D} A reference to this instance.
    */
-  attach(object2) {
+  attach(object3) {
     this.updateWorldMatrix(true, false);
     _m1$1.copy(this.matrixWorld).invert();
-    if (object2.parent !== null) {
-      object2.parent.updateWorldMatrix(true, false);
-      _m1$1.multiply(object2.parent.matrixWorld);
+    if (object3.parent !== null) {
+      object3.parent.updateWorldMatrix(true, false);
+      _m1$1.multiply(object3.parent.matrixWorld);
     }
-    object2.applyMatrix4(_m1$1);
-    object2.removeFromParent();
-    object2.parent = this;
-    this.children.push(object2);
-    object2.updateWorldMatrix(false, true);
-    object2.dispatchEvent(_addedEvent);
-    _childaddedEvent.child = object2;
+    object3.applyMatrix4(_m1$1);
+    object3.removeFromParent();
+    object3.parent = this;
+    this.children.push(object3);
+    object3.updateWorldMatrix(false, true);
+    object3.dispatchEvent(_addedEvent);
+    _childaddedEvent.child = object3;
     this.dispatchEvent(_childaddedEvent);
     _childaddedEvent.child = null;
     return this;
@@ -8589,8 +8589,8 @@ var Object3D = class _Object3D extends EventDispatcher {
    * @param {number} id - The id.
    * @return {Object3D|undefined} The found 3D object. Returns `undefined` if no 3D object has been found.
    */
-  getObjectById(id) {
-    return this.getObjectByProperty("id", id);
+  getObjectById(id2) {
+    return this.getObjectByProperty("id", id2);
   }
   /**
    * Searches through the 3D object and its children, starting with the 3D object
@@ -8614,9 +8614,9 @@ var Object3D = class _Object3D extends EventDispatcher {
     if (this[name] === value) return this;
     for (let i = 0, l = this.children.length; i < l; i++) {
       const child = this.children[i];
-      const object2 = child.getObjectByProperty(name, value);
-      if (object2 !== void 0) {
-        return object2;
+      const object3 = child.getObjectByProperty(name, value);
+      if (object3 !== void 0) {
+        return object3;
       }
     }
     return void 0;
@@ -8829,57 +8829,57 @@ var Object3D = class _Object3D extends EventDispatcher {
         generator: "Object3D.toJSON"
       };
     }
-    const object2 = {};
-    object2.uuid = this.uuid;
-    object2.type = this.type;
-    if (this.name !== "") object2.name = this.name;
-    if (this.castShadow === true) object2.castShadow = true;
-    if (this.receiveShadow === true) object2.receiveShadow = true;
-    if (this.visible === false) object2.visible = false;
-    if (this.frustumCulled === false) object2.frustumCulled = false;
-    if (this.renderOrder !== 0) object2.renderOrder = this.renderOrder;
-    if (Object.keys(this.userData).length > 0) object2.userData = this.userData;
-    object2.layers = this.layers.mask;
-    object2.matrix = this.matrix.toArray();
-    object2.up = this.up.toArray();
-    if (this.matrixAutoUpdate === false) object2.matrixAutoUpdate = false;
+    const object3 = {};
+    object3.uuid = this.uuid;
+    object3.type = this.type;
+    if (this.name !== "") object3.name = this.name;
+    if (this.castShadow === true) object3.castShadow = true;
+    if (this.receiveShadow === true) object3.receiveShadow = true;
+    if (this.visible === false) object3.visible = false;
+    if (this.frustumCulled === false) object3.frustumCulled = false;
+    if (this.renderOrder !== 0) object3.renderOrder = this.renderOrder;
+    if (Object.keys(this.userData).length > 0) object3.userData = this.userData;
+    object3.layers = this.layers.mask;
+    object3.matrix = this.matrix.toArray();
+    object3.up = this.up.toArray();
+    if (this.matrixAutoUpdate === false) object3.matrixAutoUpdate = false;
     if (this.isInstancedMesh) {
-      object2.type = "InstancedMesh";
-      object2.count = this.count;
-      object2.instanceMatrix = this.instanceMatrix.toJSON();
-      if (this.instanceColor !== null) object2.instanceColor = this.instanceColor.toJSON();
+      object3.type = "InstancedMesh";
+      object3.count = this.count;
+      object3.instanceMatrix = this.instanceMatrix.toJSON();
+      if (this.instanceColor !== null) object3.instanceColor = this.instanceColor.toJSON();
     }
     if (this.isBatchedMesh) {
-      object2.type = "BatchedMesh";
-      object2.perObjectFrustumCulled = this.perObjectFrustumCulled;
-      object2.sortObjects = this.sortObjects;
-      object2.drawRanges = this._drawRanges;
-      object2.reservedRanges = this._reservedRanges;
-      object2.geometryInfo = this._geometryInfo.map((info) => ({
+      object3.type = "BatchedMesh";
+      object3.perObjectFrustumCulled = this.perObjectFrustumCulled;
+      object3.sortObjects = this.sortObjects;
+      object3.drawRanges = this._drawRanges;
+      object3.reservedRanges = this._reservedRanges;
+      object3.geometryInfo = this._geometryInfo.map((info) => ({
         ...info,
         boundingBox: info.boundingBox ? info.boundingBox.toJSON() : void 0,
         boundingSphere: info.boundingSphere ? info.boundingSphere.toJSON() : void 0
       }));
-      object2.instanceInfo = this._instanceInfo.map((info) => ({ ...info }));
-      object2.availableInstanceIds = this._availableInstanceIds.slice();
-      object2.availableGeometryIds = this._availableGeometryIds.slice();
-      object2.nextIndexStart = this._nextIndexStart;
-      object2.nextVertexStart = this._nextVertexStart;
-      object2.geometryCount = this._geometryCount;
-      object2.maxInstanceCount = this._maxInstanceCount;
-      object2.maxVertexCount = this._maxVertexCount;
-      object2.maxIndexCount = this._maxIndexCount;
-      object2.geometryInitialized = this._geometryInitialized;
-      object2.matricesTexture = this._matricesTexture.toJSON(meta);
-      object2.indirectTexture = this._indirectTexture.toJSON(meta);
+      object3.instanceInfo = this._instanceInfo.map((info) => ({ ...info }));
+      object3.availableInstanceIds = this._availableInstanceIds.slice();
+      object3.availableGeometryIds = this._availableGeometryIds.slice();
+      object3.nextIndexStart = this._nextIndexStart;
+      object3.nextVertexStart = this._nextVertexStart;
+      object3.geometryCount = this._geometryCount;
+      object3.maxInstanceCount = this._maxInstanceCount;
+      object3.maxVertexCount = this._maxVertexCount;
+      object3.maxIndexCount = this._maxIndexCount;
+      object3.geometryInitialized = this._geometryInitialized;
+      object3.matricesTexture = this._matricesTexture.toJSON(meta);
+      object3.indirectTexture = this._indirectTexture.toJSON(meta);
       if (this._colorsTexture !== null) {
-        object2.colorsTexture = this._colorsTexture.toJSON(meta);
+        object3.colorsTexture = this._colorsTexture.toJSON(meta);
       }
       if (this.boundingSphere !== null) {
-        object2.boundingSphere = this.boundingSphere.toJSON();
+        object3.boundingSphere = this.boundingSphere.toJSON();
       }
       if (this.boundingBox !== null) {
-        object2.boundingBox = this.boundingBox.toJSON();
+        object3.boundingBox = this.boundingBox.toJSON();
       }
     }
     function serialize(library, element) {
@@ -8891,16 +8891,16 @@ var Object3D = class _Object3D extends EventDispatcher {
     if (this.isScene) {
       if (this.background) {
         if (this.background.isColor) {
-          object2.background = this.background.toJSON();
+          object3.background = this.background.toJSON();
         } else if (this.background.isTexture) {
-          object2.background = this.background.toJSON(meta).uuid;
+          object3.background = this.background.toJSON(meta).uuid;
         }
       }
       if (this.environment && this.environment.isTexture && this.environment.isRenderTargetTexture !== true) {
-        object2.environment = this.environment.toJSON(meta).uuid;
+        object3.environment = this.environment.toJSON(meta).uuid;
       }
     } else if (this.isMesh || this.isLine || this.isPoints) {
-      object2.geometry = serialize(meta.geometries, this.geometry);
+      object3.geometry = serialize(meta.geometries, this.geometry);
       const parameters = this.geometry.parameters;
       if (parameters !== void 0 && parameters.shapes !== void 0) {
         const shapes = parameters.shapes;
@@ -8915,11 +8915,11 @@ var Object3D = class _Object3D extends EventDispatcher {
       }
     }
     if (this.isSkinnedMesh) {
-      object2.bindMode = this.bindMode;
-      object2.bindMatrix = this.bindMatrix.toArray();
+      object3.bindMode = this.bindMode;
+      object3.bindMatrix = this.bindMatrix.toArray();
       if (this.skeleton !== void 0) {
         serialize(meta.skeletons, this.skeleton);
-        object2.skeleton = this.skeleton.uuid;
+        object3.skeleton = this.skeleton.uuid;
       }
     }
     if (this.material !== void 0) {
@@ -8928,22 +8928,22 @@ var Object3D = class _Object3D extends EventDispatcher {
         for (let i = 0, l = this.material.length; i < l; i++) {
           uuids.push(serialize(meta.materials, this.material[i]));
         }
-        object2.material = uuids;
+        object3.material = uuids;
       } else {
-        object2.material = serialize(meta.materials, this.material);
+        object3.material = serialize(meta.materials, this.material);
       }
     }
     if (this.children.length > 0) {
-      object2.children = [];
+      object3.children = [];
       for (let i = 0; i < this.children.length; i++) {
-        object2.children.push(this.children[i].toJSON(meta).object);
+        object3.children.push(this.children[i].toJSON(meta).object);
       }
     }
     if (this.animations.length > 0) {
-      object2.animations = [];
+      object3.animations = [];
       for (let i = 0; i < this.animations.length; i++) {
         const animation = this.animations[i];
-        object2.animations.push(serialize(meta.animations, animation));
+        object3.animations.push(serialize(meta.animations, animation));
       }
     }
     if (isRootObject) {
@@ -8964,7 +8964,7 @@ var Object3D = class _Object3D extends EventDispatcher {
       if (animations.length > 0) output.animations = animations;
       if (nodes.length > 0) output.nodes = nodes;
     }
-    output.object = object2;
+    output.object = object3;
     return output;
     function extractFromCache(cache2) {
       const values = [];
@@ -9688,39 +9688,39 @@ var Color = class {
     }
     let m;
     if (m = /^(\w+)\(([^\)]*)\)/.exec(style)) {
-      let color;
+      let color2;
       const name = m[1];
       const components = m[2];
       switch (name) {
         case "rgb":
         case "rgba":
-          if (color = /^\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*(\d*\.?\d+)\s*)?$/.exec(components)) {
-            handleAlpha(color[4]);
+          if (color2 = /^\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*(\d*\.?\d+)\s*)?$/.exec(components)) {
+            handleAlpha(color2[4]);
             return this.setRGB(
-              Math.min(255, parseInt(color[1], 10)) / 255,
-              Math.min(255, parseInt(color[2], 10)) / 255,
-              Math.min(255, parseInt(color[3], 10)) / 255,
+              Math.min(255, parseInt(color2[1], 10)) / 255,
+              Math.min(255, parseInt(color2[2], 10)) / 255,
+              Math.min(255, parseInt(color2[3], 10)) / 255,
               colorSpace
             );
           }
-          if (color = /^\s*(\d+)\%\s*,\s*(\d+)\%\s*,\s*(\d+)\%\s*(?:,\s*(\d*\.?\d+)\s*)?$/.exec(components)) {
-            handleAlpha(color[4]);
+          if (color2 = /^\s*(\d+)\%\s*,\s*(\d+)\%\s*,\s*(\d+)\%\s*(?:,\s*(\d*\.?\d+)\s*)?$/.exec(components)) {
+            handleAlpha(color2[4]);
             return this.setRGB(
-              Math.min(100, parseInt(color[1], 10)) / 100,
-              Math.min(100, parseInt(color[2], 10)) / 100,
-              Math.min(100, parseInt(color[3], 10)) / 100,
+              Math.min(100, parseInt(color2[1], 10)) / 100,
+              Math.min(100, parseInt(color2[2], 10)) / 100,
+              Math.min(100, parseInt(color2[3], 10)) / 100,
               colorSpace
             );
           }
           break;
         case "hsl":
         case "hsla":
-          if (color = /^\s*(\d*\.?\d+)\s*,\s*(\d*\.?\d+)\%\s*,\s*(\d*\.?\d+)\%\s*(?:,\s*(\d*\.?\d+)\s*)?$/.exec(components)) {
-            handleAlpha(color[4]);
+          if (color2 = /^\s*(\d*\.?\d+)\s*,\s*(\d*\.?\d+)\%\s*,\s*(\d*\.?\d+)\%\s*(?:,\s*(\d*\.?\d+)\s*)?$/.exec(components)) {
+            handleAlpha(color2[4]);
             return this.setHSL(
-              parseFloat(color[1]) / 360,
-              parseFloat(color[2]) / 100,
-              parseFloat(color[3]) / 100,
+              parseFloat(color2[1]) / 360,
+              parseFloat(color2[2]) / 100,
+              parseFloat(color2[3]) / 100,
               colorSpace
             );
           }
@@ -9784,10 +9784,10 @@ var Color = class {
    * @param {Color} color - The color to copy.
    * @return {Color} A reference to this color.
    */
-  copy(color) {
-    this.r = color.r;
-    this.g = color.g;
-    this.b = color.b;
+  copy(color2) {
+    this.r = color2.r;
+    this.g = color2.g;
+    this.b = color2.b;
     return this;
   }
   /**
@@ -9797,10 +9797,10 @@ var Color = class {
    * @param {Color} color - The color to copy/convert.
    * @return {Color} A reference to this color.
    */
-  copySRGBToLinear(color) {
-    this.r = SRGBToLinear(color.r);
-    this.g = SRGBToLinear(color.g);
-    this.b = SRGBToLinear(color.b);
+  copySRGBToLinear(color2) {
+    this.r = SRGBToLinear(color2.r);
+    this.g = SRGBToLinear(color2.g);
+    this.b = SRGBToLinear(color2.b);
     return this;
   }
   /**
@@ -9810,10 +9810,10 @@ var Color = class {
    * @param {Color} color - The color to copy/convert.
    * @return {Color} A reference to this color.
    */
-  copyLinearToSRGB(color) {
-    this.r = LinearToSRGB(color.r);
-    this.g = LinearToSRGB(color.g);
-    this.b = LinearToSRGB(color.b);
+  copyLinearToSRGB(color2) {
+    this.r = LinearToSRGB(color2.r);
+    this.g = LinearToSRGB(color2.g);
+    this.b = LinearToSRGB(color2.b);
     return this;
   }
   /**
@@ -9940,10 +9940,10 @@ var Color = class {
    * @param {Color} color - The color to add.
    * @return {Color} A reference to this color.
    */
-  add(color) {
-    this.r += color.r;
-    this.g += color.g;
-    this.b += color.b;
+  add(color2) {
+    this.r += color2.r;
+    this.g += color2.g;
+    this.b += color2.b;
     return this;
   }
   /**
@@ -9977,10 +9977,10 @@ var Color = class {
    * @param {Color} color - The color to subtract.
    * @return {Color} A reference to this color.
    */
-  sub(color) {
-    this.r = Math.max(0, this.r - color.r);
-    this.g = Math.max(0, this.g - color.g);
-    this.b = Math.max(0, this.b - color.b);
+  sub(color2) {
+    this.r = Math.max(0, this.r - color2.r);
+    this.g = Math.max(0, this.g - color2.g);
+    this.b = Math.max(0, this.b - color2.b);
     return this;
   }
   /**
@@ -9989,10 +9989,10 @@ var Color = class {
    * @param {Color} color - The color to multiply.
    * @return {Color} A reference to this color.
    */
-  multiply(color) {
-    this.r *= color.r;
-    this.g *= color.g;
-    this.b *= color.b;
+  multiply(color2) {
+    this.r *= color2.r;
+    this.g *= color2.g;
+    this.b *= color2.b;
     return this;
   }
   /**
@@ -10016,10 +10016,10 @@ var Color = class {
    * @param {number} alpha - The interpolation factor in the closed interval `[0,1]`.
    * @return {Color} A reference to this color.
    */
-  lerp(color, alpha) {
-    this.r += (color.r - this.r) * alpha;
-    this.g += (color.g - this.g) * alpha;
-    this.b += (color.b - this.b) * alpha;
+  lerp(color2, alpha) {
+    this.r += (color2.r - this.r) * alpha;
+    this.g += (color2.g - this.g) * alpha;
+    this.b += (color2.b - this.b) * alpha;
     return this;
   }
   /**
@@ -10049,9 +10049,9 @@ var Color = class {
    * @param {number} alpha - The interpolation factor in the closed interval `[0,1]`.
    * @return {Color} A reference to this color.
    */
-  lerpHSL(color, alpha) {
+  lerpHSL(color2, alpha) {
     this.getHSL(_hslA);
-    color.getHSL(_hslB);
+    color2.getHSL(_hslB);
     const h = lerp(_hslA.h, _hslB.h, alpha);
     const s = lerp(_hslA.s, _hslB.s, alpha);
     const l = lerp(_hslA.l, _hslB.l, alpha);
@@ -11592,8 +11592,8 @@ var BufferGeometry = class _BufferGeometry extends EventDispatcher {
    * @param {Vector3} vector - The target point.
    * @return {BufferGeometry} A reference to this instance.
    */
-  lookAt(vector) {
-    _obj.lookAt(vector);
+  lookAt(vector2) {
+    _obj.lookAt(vector2);
     _obj.updateMatrix();
     this.applyMatrix4(_obj.matrix);
     return this;
@@ -12148,9 +12148,9 @@ var Mesh = class extends Object3D {
   updateMorphTargets() {
     const geometry = this.geometry;
     const morphAttributes = geometry.morphAttributes;
-    const keys2 = Object.keys(morphAttributes);
-    if (keys2.length > 0) {
-      const morphAttribute = morphAttributes[keys2[0]];
+    const keys3 = Object.keys(morphAttributes);
+    if (keys3.length > 0) {
+      const morphAttribute = morphAttributes[keys3[0]];
       if (morphAttribute !== void 0) {
         this.morphTargetInfluences = [];
         this.morphTargetDictionary = {};
@@ -12300,7 +12300,7 @@ var Mesh = class extends Object3D {
     }
   }
 };
-function checkIntersection$1(object2, material, raycaster, ray, pA, pB, pC, point) {
+function checkIntersection$1(object3, material, raycaster, ray, pA, pB, pC, point) {
   let intersect2;
   if (material.side === BackSide) {
     intersect2 = ray.intersectTriangle(pC, pB, pA, true, point);
@@ -12309,20 +12309,20 @@ function checkIntersection$1(object2, material, raycaster, ray, pA, pB, pC, poin
   }
   if (intersect2 === null) return null;
   _intersectionPointWorld.copy(point);
-  _intersectionPointWorld.applyMatrix4(object2.matrixWorld);
+  _intersectionPointWorld.applyMatrix4(object3.matrixWorld);
   const distance = raycaster.ray.origin.distanceTo(_intersectionPointWorld);
   if (distance < raycaster.near || distance > raycaster.far) return null;
   return {
     distance,
     point: _intersectionPointWorld.clone(),
-    object: object2
+    object: object3
   };
 }
-function checkGeometryIntersection(object2, material, raycaster, ray, uv, uv1, normal, a, b, c) {
-  object2.getVertexPosition(a, _vA$1);
-  object2.getVertexPosition(b, _vB$1);
-  object2.getVertexPosition(c, _vC$1);
-  const intersection = checkIntersection$1(object2, material, raycaster, ray, _vA$1, _vB$1, _vC$1, _intersectionPoint);
+function checkGeometryIntersection(object3, material, raycaster, ray, uv, uv1, normal, a, b, c) {
+  object3.getVertexPosition(a, _vA$1);
+  object3.getVertexPosition(b, _vB$1);
+  object3.getVertexPosition(c, _vC$1);
+  const intersection = checkIntersection$1(object3, material, raycaster, ray, _vA$1, _vB$1, _vC$1, _intersectionPoint);
   if (intersection) {
     const barycoord = new Vector3();
     Triangle.getBarycoord(_intersectionPoint, _vA$1, _vB$1, _vC$1, barycoord);
@@ -12403,19 +12403,19 @@ var BoxGeometry = class _BoxGeometry extends BufferGeometry {
       const gridY1 = gridY + 1;
       let vertexCounter = 0;
       let groupCount = 0;
-      const vector = new Vector3();
+      const vector2 = new Vector3();
       for (let iy = 0; iy < gridY1; iy++) {
         const y = iy * segmentHeight - heightHalf;
         for (let ix = 0; ix < gridX1; ix++) {
           const x = ix * segmentWidth - widthHalf;
-          vector[u] = x * udir;
-          vector[v] = y * vdir;
-          vector[w] = depthHalf;
-          vertices.push(vector.x, vector.y, vector.z);
-          vector[u] = 0;
-          vector[v] = 0;
-          vector[w] = depth2 > 0 ? 1 : -1;
-          normals.push(vector.x, vector.y, vector.z);
+          vector2[u] = x * udir;
+          vector2[v] = y * vdir;
+          vector2[w] = depthHalf;
+          vertices.push(vector2.x, vector2.y, vector2.z);
+          vector2[u] = 0;
+          vector2[v] = 0;
+          vector2[w] = depth2 > 0 ? 1 : -1;
+          normals.push(vector2.x, vector2.y, vector2.z);
           uvs.push(ix / gridX);
           uvs.push(1 - iy / gridY);
           vertexCounter += 1;
@@ -13162,11 +13162,11 @@ var WebGLCubeRenderTarget = class extends WebGLRenderTarget {
    * @param {boolean} [depth=true] - Whether the depth buffer should be cleared or not.
    * @param {boolean} [stencil=true] - Whether the stencil buffer should be cleared or not.
    */
-  clear(renderer, color = true, depth = true, stencil = true) {
+  clear(renderer, color2 = true, depth = true, stencil = true) {
     const currentRenderTarget = renderer.getRenderTarget();
     for (let i = 0; i < 6; i++) {
       renderer.setRenderTarget(this, i);
-      renderer.clear(color, depth, stencil);
+      renderer.clear(color2, depth, stencil);
     }
     renderer.setRenderTarget(currentRenderTarget);
   }
@@ -13428,10 +13428,10 @@ var FogExp2 = class _FogExp2 {
    * @param {number|Color} color - The fog's color.
    * @param {number} [density=0.00025] - Defines how fast the fog will grow dense.
    */
-  constructor(color, density = 25e-5) {
+  constructor(color2, density = 25e-5) {
     this.isFogExp2 = true;
     this.name = "";
-    this.color = new Color(color);
+    this.color = new Color(color2);
     this.density = density;
   }
   /**
@@ -13465,10 +13465,10 @@ var Fog = class _Fog {
    * @param {number} [near=1] - The minimum distance to start applying fog.
    * @param {number} [far=1000] - The maximum distance at which fog stops being calculated and applied.
    */
-  constructor(color, near = 1, far = 1e3) {
+  constructor(color2, near = 1, far = 1e3) {
     this.isFog = true;
     this.name = "";
-    this.color = new Color(color);
+    this.color = new Color(color2);
     this.near = near;
     this.far = far;
   }
@@ -14245,7 +14245,7 @@ var LOD = class extends Object3D {
    * @param {number} [hysteresis=0] - Threshold used to avoid flickering at LOD boundaries, as a fraction of distance.
    * @return {LOD} A reference to this instance.
    */
-  addLevel(object2, distance = 0, hysteresis = 0) {
+  addLevel(object3, distance = 0, hysteresis = 0) {
     distance = Math.abs(distance);
     const levels = this.levels;
     let l;
@@ -14254,8 +14254,8 @@ var LOD = class extends Object3D {
         break;
       }
     }
-    levels.splice(l, 0, { distance, hysteresis, object: object2 });
-    this.add(object2);
+    levels.splice(l, 0, { distance, hysteresis, object: object3 });
+    this.add(object3);
     return this;
   }
   /**
@@ -14490,17 +14490,17 @@ var SkinnedMesh = class extends Mesh {
    * in the skinned mesh's geometry.
    */
   normalizeSkinWeights() {
-    const vector = new Vector4();
+    const vector2 = new Vector4();
     const skinWeight = this.geometry.attributes.skinWeight;
     for (let i = 0, l = skinWeight.count; i < l; i++) {
-      vector.fromBufferAttribute(skinWeight, i);
-      const scale = 1 / vector.manhattanLength();
+      vector2.fromBufferAttribute(skinWeight, i);
+      const scale = 1 / vector2.manhattanLength();
       if (scale !== Infinity) {
-        vector.multiplyScalar(scale);
+        vector2.multiplyScalar(scale);
       } else {
-        vector.set(1, 0, 0, 0);
+        vector2.set(1, 0, 0, 0);
       }
-      skinWeight.setXYZW(i, vector.x, vector.y, vector.z, vector.w);
+      skinWeight.setXYZW(i, vector2.x, vector2.y, vector2.z, vector2.w);
     }
   }
   updateMatrixWorld(force) {
@@ -14882,8 +14882,8 @@ var InstancedMesh = class extends Mesh {
    * @param {number} index - The instance index.
    * @param {Color} color - The target object that is used to store the method's result.
    */
-  getColorAt(index, color) {
-    color.fromArray(this.instanceColor.array, index * 3);
+  getColorAt(index, color2) {
+    color2.fromArray(this.instanceColor.array, index * 3);
   }
   /**
    * Gets the local transformation matrix of the defined instance.
@@ -14900,8 +14900,8 @@ var InstancedMesh = class extends Mesh {
    * @param {number} index - The instance index.
    * @param {Mesh} object - The target object that is used to store the method's result.
    */
-  getMorphAt(index, object2) {
-    const objectInfluences = object2.morphTargetInfluences;
+  getMorphAt(index, object3) {
+    const objectInfluences = object3.morphTargetInfluences;
     const array = this.morphTexture.source.data.data;
     const len = objectInfluences.length + 1;
     const dataIndex = index * len + 1;
@@ -14940,11 +14940,11 @@ var InstancedMesh = class extends Mesh {
    * @param {number} index - The instance index.
    * @param {Color} color - The instance color.
    */
-  setColorAt(index, color) {
+  setColorAt(index, color2) {
     if (this.instanceColor === null) {
       this.instanceColor = new InstancedBufferAttribute(new Float32Array(this.instanceMatrix.count * 3).fill(1), 3);
     }
-    color.toArray(this.instanceColor.array, index * 3);
+    color2.toArray(this.instanceColor.array, index * 3);
   }
   /**
    * Sets the given local transformation matrix to the defined instance. Make sure you set the `needsUpdate` flag of
@@ -14964,8 +14964,8 @@ var InstancedMesh = class extends Mesh {
    * @param {Mesh} object -  A mesh which `morphTargetInfluences` property containing the morph target weights
    * of a single instance.
    */
-  setMorphAt(index, object2) {
-    const objectInfluences = object2.morphTargetInfluences;
+  setMorphAt(index, object3) {
+    const objectInfluences = object3.morphTargetInfluences;
     const len = objectInfluences.length + 1;
     if (this.morphTexture === null) {
       this.morphTexture = new DataTexture(new Float32Array(len * this.count), len, this.count, RedFormat, FloatType);
@@ -15328,14 +15328,14 @@ var Frustum = class {
    * @param {Object3D} object - The 3D object to test.
    * @return {boolean} Whether the 3D object's bounding sphere is intersecting this frustum or not.
    */
-  intersectsObject(object2) {
-    if (object2.boundingSphere !== void 0) {
-      if (object2.boundingSphere === null) object2.computeBoundingSphere();
-      _sphere$3.copy(object2.boundingSphere).applyMatrix4(object2.matrixWorld);
+  intersectsObject(object3) {
+    if (object3.boundingSphere !== void 0) {
+      if (object3.boundingSphere === null) object3.computeBoundingSphere();
+      _sphere$3.copy(object3.boundingSphere).applyMatrix4(object3.matrixWorld);
     } else {
-      const geometry = object2.geometry;
+      const geometry = object3.geometry;
       if (geometry.boundingSphere === null) geometry.computeBoundingSphere();
-      _sphere$3.copy(geometry.boundingSphere).applyMatrix4(object2.matrixWorld);
+      _sphere$3.copy(geometry.boundingSphere).applyMatrix4(object3.matrixWorld);
     }
     return this.intersectsSphere(_sphere$3);
   }
@@ -15431,7 +15431,7 @@ var FrustumArray = class _FrustumArray {
    * @param {Object} cameraArray - An object with a cameras property containing an array of cameras.
    * @return {boolean} Whether the 3D object is visible in any camera.
    */
-  intersectsObject(object2, cameraArray) {
+  intersectsObject(object3, cameraArray) {
     if (!cameraArray.isArrayCamera || cameraArray.cameras.length === 0) {
       return false;
     }
@@ -15446,7 +15446,7 @@ var FrustumArray = class _FrustumArray {
         camera.coordinateSystem,
         camera.reversedDepth
       );
-      if (_frustum$1.intersectsObject(object2)) {
+      if (_frustum$1.intersectsObject(object3)) {
         return true;
       }
     }
@@ -16210,12 +16210,12 @@ var BatchedMesh = class extends Mesh {
    * @param {Color} color - The color to set the instance to.
    * @return {BatchedMesh} A reference to this batched mesh.
    */
-  setColorAt(instanceId, color) {
+  setColorAt(instanceId, color2) {
     this.validateInstanceId(instanceId);
     if (this._colorsTexture === null) {
       this._initColorsTexture();
     }
-    color.toArray(this._colorsTexture.image.data, instanceId * 4);
+    color2.toArray(this._colorsTexture.image.data, instanceId * 4);
     this._colorsTexture.needsUpdate = true;
     return this;
   }
@@ -16226,9 +16226,9 @@ var BatchedMesh = class extends Mesh {
    * @param {Color} color - The target object that is used to store the method's result.
    * @return {Color} The instance's color.
    */
-  getColorAt(instanceId, color) {
+  getColorAt(instanceId, color2) {
     this.validateInstanceId(instanceId);
-    return color.fromArray(this._colorsTexture.image.data, instanceId * 4);
+    return color2.fromArray(this._colorsTexture.image.data, instanceId * 4);
   }
   /**
    * Sets the visibility of the instance.
@@ -16550,7 +16550,7 @@ var BatchedMesh = class extends Mesh {
     this._multiDrawCount = multiDrawCount;
     this._visibilityChanged = false;
   }
-  onBeforeShadow(renderer, object2, camera, shadowCamera, geometry, depthMaterial) {
+  onBeforeShadow(renderer, object3, camera, shadowCamera, geometry, depthMaterial) {
     this.onBeforeRender(renderer, null, shadowCamera, geometry, depthMaterial);
   }
 };
@@ -16708,9 +16708,9 @@ var Line = class extends Object3D {
   updateMorphTargets() {
     const geometry = this.geometry;
     const morphAttributes = geometry.morphAttributes;
-    const keys2 = Object.keys(morphAttributes);
-    if (keys2.length > 0) {
-      const morphAttribute = morphAttributes[keys2[0]];
+    const keys3 = Object.keys(morphAttributes);
+    if (keys3.length > 0) {
+      const morphAttribute = morphAttributes[keys3[0]];
       if (morphAttribute !== void 0) {
         this.morphTargetInfluences = [];
         this.morphTargetDictionary = {};
@@ -16723,25 +16723,25 @@ var Line = class extends Object3D {
     }
   }
 };
-function checkIntersection(object2, raycaster, ray, thresholdSq, a, b, i) {
-  const positionAttribute = object2.geometry.attributes.position;
+function checkIntersection(object3, raycaster, ray, thresholdSq, a, b, i) {
+  const positionAttribute = object3.geometry.attributes.position;
   _vStart.fromBufferAttribute(positionAttribute, a);
   _vEnd.fromBufferAttribute(positionAttribute, b);
   const distSq = ray.distanceSqToSegment(_vStart, _vEnd, _intersectPointOnRay, _intersectPointOnSegment);
   if (distSq > thresholdSq) return;
-  _intersectPointOnRay.applyMatrix4(object2.matrixWorld);
+  _intersectPointOnRay.applyMatrix4(object3.matrixWorld);
   const distance = raycaster.ray.origin.distanceTo(_intersectPointOnRay);
   if (distance < raycaster.near || distance > raycaster.far) return;
   return {
     distance,
     // What do we want? intersection point on the ray or on the segment??
     // point: raycaster.ray.at( distance ),
-    point: _intersectPointOnSegment.clone().applyMatrix4(object2.matrixWorld),
+    point: _intersectPointOnSegment.clone().applyMatrix4(object3.matrixWorld),
     index: i,
     face: null,
     faceIndex: null,
     barycoord: null,
-    object: object2
+    object: object3
   };
 }
 var _start = /* @__PURE__ */ new Vector3();
@@ -16896,9 +16896,9 @@ var Points = class extends Object3D {
   updateMorphTargets() {
     const geometry = this.geometry;
     const morphAttributes = geometry.morphAttributes;
-    const keys2 = Object.keys(morphAttributes);
-    if (keys2.length > 0) {
-      const morphAttribute = morphAttributes[keys2[0]];
+    const keys3 = Object.keys(morphAttributes);
+    if (keys3.length > 0) {
+      const morphAttribute = morphAttributes[keys3[0]];
       if (morphAttribute !== void 0) {
         this.morphTargetInfluences = [];
         this.morphTargetDictionary = {};
@@ -16911,7 +16911,7 @@ var Points = class extends Object3D {
     }
   }
 };
-function testPoint(point, index, localThresholdSq, matrixWorld, raycaster, intersects2, object2) {
+function testPoint(point, index, localThresholdSq, matrixWorld, raycaster, intersects2, object3) {
   const rayPointDistanceSq = _ray.distanceSqToPoint(point);
   if (rayPointDistanceSq < localThresholdSq) {
     const intersectPoint = new Vector3();
@@ -16927,7 +16927,7 @@ function testPoint(point, index, localThresholdSq, matrixWorld, raycaster, inter
       face: null,
       faceIndex: null,
       barycoord: null,
-      object: object2
+      object: object3
     });
   }
 }
@@ -17704,19 +17704,19 @@ var PolyhedronGeometry = class _PolyhedronGeometry extends BufferGeometry {
         correctUV(uvC, j + 4, c, azi);
       }
     }
-    function correctUV(uv, stride, vector, azimuth2) {
+    function correctUV(uv, stride, vector2, azimuth2) {
       if (azimuth2 < 0 && uv.x === 1) {
         uvBuffer[stride] = uv.x - 1;
       }
-      if (vector.x === 0 && vector.z === 0) {
+      if (vector2.x === 0 && vector2.z === 0) {
         uvBuffer[stride] = azimuth2 / 2 / Math.PI + 0.5;
       }
     }
-    function azimuth(vector) {
-      return Math.atan2(vector.z, -vector.x);
+    function azimuth(vector2) {
+      return Math.atan2(vector2.z, -vector2.x);
     }
-    function inclination(vector) {
-      return Math.atan2(-vector.y, Math.sqrt(vector.x * vector.x + vector.z * vector.z));
+    function inclination(vector2) {
+      return Math.atan2(-vector2.y, Math.sqrt(vector2.x * vector2.x + vector2.z * vector2.z));
     }
   }
   copy(source) {
@@ -17997,7 +17997,7 @@ var EdgesGeometry = class extends BufferGeometry {
           const vecHash1 = hashes[jNext];
           const v0 = _triangle[vertKeys[j]];
           const v1 = _triangle[vertKeys[jNext]];
-          const hash = `${vecHash0}_${vecHash1}`;
+          const hash2 = `${vecHash0}_${vecHash1}`;
           const reverseHash = `${vecHash1}_${vecHash0}`;
           if (reverseHash in edgeData && edgeData[reverseHash]) {
             if (_normal.dot(edgeData[reverseHash].normal) <= thresholdDot) {
@@ -18005,8 +18005,8 @@ var EdgesGeometry = class extends BufferGeometry {
               vertices.push(v1.x, v1.y, v1.z);
             }
             edgeData[reverseHash] = null;
-          } else if (!(hash in edgeData)) {
-            edgeData[hash] = {
+          } else if (!(hash2 in edgeData)) {
+            edgeData[hash2] = {
               index0: indexArr[j],
               index1: indexArr[jNext],
               normal: _normal.clone()
@@ -22275,8 +22275,8 @@ function convertArray(array, type) {
   }
   return Array.prototype.slice.call(array);
 }
-function isTypedArray(object2) {
-  return ArrayBuffer.isView(object2) && !(object2 instanceof DataView);
+function isTypedArray(object3) {
+  return ArrayBuffer.isView(object3) && !(object3 instanceof DataView);
 }
 function getKeyframeOrder(times) {
   function compareTime(i, j) {
@@ -22456,8 +22456,8 @@ var AnimationUtils = class {
    * @param {any} object - The object to check.
    * @return {boolean} Whether the given object is a typed array.
    */
-  static isTypedArray(object2) {
-    return isTypedArray(object2);
+  static isTypedArray(object3) {
+    return isTypedArray(object3);
   }
   /**
    * Returns an array by which times and values can be sorted.
@@ -23942,9 +23942,9 @@ var FileLoader = class extends Loader {
         case "blob":
           return response.blob();
         case "document":
-          return response.text().then((text2) => {
+          return response.text().then((text3) => {
             const parser = new DOMParser();
-            return parser.parseFromString(text2, mimeType);
+            return parser.parseFromString(text3, mimeType);
           });
         case "json":
           return response.json();
@@ -24039,9 +24039,9 @@ var AnimationLoader = class extends Loader {
     loader.setPath(this.path);
     loader.setRequestHeader(this.requestHeader);
     loader.setWithCredentials(this.withCredentials);
-    loader.load(url, function(text2) {
+    loader.load(url, function(text3) {
       try {
-        onLoad(scope.parse(JSON.parse(text2)));
+        onLoad(scope.parse(JSON.parse(text3)));
       } catch (e) {
         if (onError) {
           onError(e);
@@ -24406,11 +24406,11 @@ var Light = class extends Object3D {
    * @param {(number|Color|string)} [color=0xffffff] - The light's color.
    * @param {number} [intensity=1] - The light's strength/intensity.
    */
-  constructor(color, intensity = 1) {
+  constructor(color2, intensity = 1) {
     super();
     this.isLight = true;
     this.type = "Light";
-    this.color = new Color(color);
+    this.color = new Color(color2);
     this.intensity = intensity;
   }
   /**
@@ -24626,15 +24626,15 @@ var LightShadow = class {
    * @see {@link ObjectLoader#parse}
    */
   toJSON() {
-    const object2 = {};
-    if (this.intensity !== 1) object2.intensity = this.intensity;
-    if (this.bias !== 0) object2.bias = this.bias;
-    if (this.normalBias !== 0) object2.normalBias = this.normalBias;
-    if (this.radius !== 1) object2.radius = this.radius;
-    if (this.mapSize.x !== 512 || this.mapSize.y !== 512) object2.mapSize = this.mapSize.toArray();
-    object2.camera = this.camera.toJSON(false).object;
-    delete object2.camera.matrix;
-    return object2;
+    const object3 = {};
+    if (this.intensity !== 1) object3.intensity = this.intensity;
+    if (this.bias !== 0) object3.bias = this.bias;
+    if (this.normalBias !== 0) object3.normalBias = this.normalBias;
+    if (this.radius !== 1) object3.radius = this.radius;
+    if (this.mapSize.x !== 512 || this.mapSize.y !== 512) object3.mapSize = this.mapSize.toArray();
+    object3.camera = this.camera.toJSON(false).object;
+    delete object3.camera.matrix;
+    return object3;
   }
 };
 var SpotLightShadow = class extends LightShadow {
@@ -24677,8 +24677,8 @@ var SpotLight = class extends Light {
    * @param {number} [penumbra=0] - Percent of the spotlight cone that is attenuated due to penumbra. Value range is `[0,1]`.
    * @param {number} [decay=2] - The amount the light dims along the distance of the light.
    */
-  constructor(color, intensity, distance = 0, angle = Math.PI / 3, penumbra = 0, decay = 2) {
-    super(color, intensity);
+  constructor(color2, intensity, distance = 0, angle = Math.PI / 3, penumbra = 0, decay = 2) {
+    super(color2, intensity);
     this.isSpotLight = true;
     this.type = "SpotLight";
     this.position.copy(Object3D.DEFAULT_UP);
@@ -24807,8 +24807,8 @@ var PointLight = class extends Light {
    * @param {number} [distance=0] - Maximum range of the light. `0` means no limit.
    * @param {number} [decay=2] - The amount the light dims along the distance of the light.
    */
-  constructor(color, intensity, distance = 0, decay = 2) {
-    super(color, intensity);
+  constructor(color2, intensity, distance = 0, decay = 2) {
+    super(color2, intensity);
     this.isPointLight = true;
     this.type = "PointLight";
     this.distance = distance;
@@ -24970,8 +24970,8 @@ var DirectionalLight = class extends Light {
    * @param {(number|Color|string)} [color=0xffffff] - The light's color.
    * @param {number} [intensity=1] - The light's strength/intensity.
    */
-  constructor(color, intensity) {
-    super(color, intensity);
+  constructor(color2, intensity) {
+    super(color2, intensity);
     this.isDirectionalLight = true;
     this.type = "DirectionalLight";
     this.position.copy(Object3D.DEFAULT_UP);
@@ -24996,8 +24996,8 @@ var AmbientLight = class extends Light {
    * @param {(number|Color|string)} [color=0xffffff] - The light's color.
    * @param {number} [intensity=1] - The light's strength/intensity.
    */
-  constructor(color, intensity) {
-    super(color, intensity);
+  constructor(color2, intensity) {
+    super(color2, intensity);
     this.isAmbientLight = true;
     this.type = "AmbientLight";
   }
@@ -25011,8 +25011,8 @@ var RectAreaLight = class extends Light {
    * @param {number} [width=10] - The width of the light.
    * @param {number} [height=10] - The height of the light.
    */
-  constructor(color, intensity, width = 10, height = 10) {
-    super(color, intensity);
+  constructor(color2, intensity, width = 10, height = 10) {
+    super(color2, intensity);
     this.isRectAreaLight = true;
     this.type = "RectAreaLight";
     this.width = width;
@@ -25310,9 +25310,9 @@ var MaterialLoader = class _MaterialLoader extends Loader {
     loader.setPath(scope.path);
     loader.setRequestHeader(scope.requestHeader);
     loader.setWithCredentials(scope.withCredentials);
-    loader.load(url, function(text2) {
+    loader.load(url, function(text3) {
       try {
-        onLoad(scope.parse(JSON.parse(text2)));
+        onLoad(scope.parse(JSON.parse(text3)));
       } catch (e) {
         if (onError) {
           onError(e);
@@ -25638,9 +25638,9 @@ var BufferGeometryLoader = class extends Loader {
     loader.setPath(scope.path);
     loader.setRequestHeader(scope.requestHeader);
     loader.setWithCredentials(scope.withCredentials);
-    loader.load(url, function(text2) {
+    loader.load(url, function(text3) {
       try {
-        onLoad(scope.parse(JSON.parse(text2)));
+        onLoad(scope.parse(JSON.parse(text3)));
       } catch (e) {
         if (onError) {
           onError(e);
@@ -25767,10 +25767,10 @@ var ObjectLoader = class extends Loader {
     loader.setPath(this.path);
     loader.setRequestHeader(this.requestHeader);
     loader.setWithCredentials(this.withCredentials);
-    loader.load(url, function(text2) {
+    loader.load(url, function(text3) {
       let json2 = null;
       try {
-        json2 = JSON.parse(text2);
+        json2 = JSON.parse(text3);
       } catch (error) {
         if (onError !== void 0) onError(error);
         console.error("THREE:ObjectLoader: Can't parse " + url + ".", error.message);
@@ -25801,8 +25801,8 @@ var ObjectLoader = class extends Loader {
     loader.setPath(this.path);
     loader.setRequestHeader(this.requestHeader);
     loader.setWithCredentials(this.withCredentials);
-    const text2 = await loader.loadAsync(url, onProgress);
-    const json2 = JSON.parse(text2);
+    const text3 = await loader.loadAsync(url, onProgress);
+    const json2 = JSON.parse(text3);
     const metadata = json2.metadata;
     if (metadata === void 0 || metadata.type === void 0 || metadata.type.toLowerCase() === "geometry") {
       throw new Error("THREE.ObjectLoader: Can't load " + url);
@@ -25822,14 +25822,14 @@ var ObjectLoader = class extends Loader {
     const shapes = this.parseShapes(json2.shapes);
     const geometries = this.parseGeometries(json2.geometries, shapes);
     const images = this.parseImages(json2.images, function() {
-      if (onLoad !== void 0) onLoad(object2);
+      if (onLoad !== void 0) onLoad(object3);
     });
     const textures = this.parseTextures(json2.textures, images);
     const materials = this.parseMaterials(json2.materials, textures);
-    const object2 = this.parseObject(json2.object, geometries, materials, textures, animations);
-    const skeletons = this.parseSkeletons(json2.skeletons, object2);
-    this.bindSkeletons(object2, skeletons);
-    this.bindLightTargets(object2);
+    const object3 = this.parseObject(json2.object, geometries, materials, textures, animations);
+    const skeletons = this.parseSkeletons(json2.skeletons, object3);
+    this.bindSkeletons(object3, skeletons);
+    this.bindLightTargets(object3);
     if (onLoad !== void 0) {
       let hasImages = false;
       for (const uuid in images) {
@@ -25838,9 +25838,9 @@ var ObjectLoader = class extends Loader {
           break;
         }
       }
-      if (hasImages === false) onLoad(object2);
+      if (hasImages === false) onLoad(object3);
     }
-    return object2;
+    return object3;
   }
   /**
    * Async version of {@link ObjectLoader#parse}.
@@ -25855,11 +25855,11 @@ var ObjectLoader = class extends Loader {
     const images = await this.parseImagesAsync(json2.images);
     const textures = this.parseTextures(json2.textures, images);
     const materials = this.parseMaterials(json2.materials, textures);
-    const object2 = this.parseObject(json2.object, geometries, materials, textures, animations);
-    const skeletons = this.parseSkeletons(json2.skeletons, object2);
-    this.bindSkeletons(object2, skeletons);
-    this.bindLightTargets(object2);
-    return object2;
+    const object3 = this.parseObject(json2.object, geometries, materials, textures, animations);
+    const skeletons = this.parseSkeletons(json2.skeletons, object3);
+    this.bindSkeletons(object3, skeletons);
+    this.bindLightTargets(object3);
+    return object3;
   }
   // internals
   parseShapes(json2) {
@@ -25872,10 +25872,10 @@ var ObjectLoader = class extends Loader {
     }
     return shapes;
   }
-  parseSkeletons(json2, object2) {
+  parseSkeletons(json2, object3) {
     const skeletons = {};
     const bones = {};
-    object2.traverse(function(child) {
+    object3.traverse(function(child) {
       if (child.isBone) bones[child.uuid] = child;
     });
     if (json2 !== void 0) {
@@ -26110,7 +26110,7 @@ var ObjectLoader = class extends Loader {
     return textures;
   }
   parseObject(data, geometries, materials, textures, animations) {
-    let object2;
+    let object3;
     function getGeometry(name) {
       if (geometries[name] === void 0) {
         console.warn("THREE.ObjectLoader: Undefined geometry", name);
@@ -26144,81 +26144,81 @@ var ObjectLoader = class extends Loader {
     let geometry, material;
     switch (data.type) {
       case "Scene":
-        object2 = new Scene();
+        object3 = new Scene();
         if (data.background !== void 0) {
           if (Number.isInteger(data.background)) {
-            object2.background = new Color(data.background);
+            object3.background = new Color(data.background);
           } else {
-            object2.background = getTexture(data.background);
+            object3.background = getTexture(data.background);
           }
         }
         if (data.environment !== void 0) {
-          object2.environment = getTexture(data.environment);
+          object3.environment = getTexture(data.environment);
         }
         if (data.fog !== void 0) {
           if (data.fog.type === "Fog") {
-            object2.fog = new Fog(data.fog.color, data.fog.near, data.fog.far);
+            object3.fog = new Fog(data.fog.color, data.fog.near, data.fog.far);
           } else if (data.fog.type === "FogExp2") {
-            object2.fog = new FogExp2(data.fog.color, data.fog.density);
+            object3.fog = new FogExp2(data.fog.color, data.fog.density);
           }
           if (data.fog.name !== "") {
-            object2.fog.name = data.fog.name;
+            object3.fog.name = data.fog.name;
           }
         }
-        if (data.backgroundBlurriness !== void 0) object2.backgroundBlurriness = data.backgroundBlurriness;
-        if (data.backgroundIntensity !== void 0) object2.backgroundIntensity = data.backgroundIntensity;
-        if (data.backgroundRotation !== void 0) object2.backgroundRotation.fromArray(data.backgroundRotation);
-        if (data.environmentIntensity !== void 0) object2.environmentIntensity = data.environmentIntensity;
-        if (data.environmentRotation !== void 0) object2.environmentRotation.fromArray(data.environmentRotation);
+        if (data.backgroundBlurriness !== void 0) object3.backgroundBlurriness = data.backgroundBlurriness;
+        if (data.backgroundIntensity !== void 0) object3.backgroundIntensity = data.backgroundIntensity;
+        if (data.backgroundRotation !== void 0) object3.backgroundRotation.fromArray(data.backgroundRotation);
+        if (data.environmentIntensity !== void 0) object3.environmentIntensity = data.environmentIntensity;
+        if (data.environmentRotation !== void 0) object3.environmentRotation.fromArray(data.environmentRotation);
         break;
       case "PerspectiveCamera":
-        object2 = new PerspectiveCamera(data.fov, data.aspect, data.near, data.far);
-        if (data.focus !== void 0) object2.focus = data.focus;
-        if (data.zoom !== void 0) object2.zoom = data.zoom;
-        if (data.filmGauge !== void 0) object2.filmGauge = data.filmGauge;
-        if (data.filmOffset !== void 0) object2.filmOffset = data.filmOffset;
-        if (data.view !== void 0) object2.view = Object.assign({}, data.view);
+        object3 = new PerspectiveCamera(data.fov, data.aspect, data.near, data.far);
+        if (data.focus !== void 0) object3.focus = data.focus;
+        if (data.zoom !== void 0) object3.zoom = data.zoom;
+        if (data.filmGauge !== void 0) object3.filmGauge = data.filmGauge;
+        if (data.filmOffset !== void 0) object3.filmOffset = data.filmOffset;
+        if (data.view !== void 0) object3.view = Object.assign({}, data.view);
         break;
       case "OrthographicCamera":
-        object2 = new OrthographicCamera(data.left, data.right, data.top, data.bottom, data.near, data.far);
-        if (data.zoom !== void 0) object2.zoom = data.zoom;
-        if (data.view !== void 0) object2.view = Object.assign({}, data.view);
+        object3 = new OrthographicCamera(data.left, data.right, data.top, data.bottom, data.near, data.far);
+        if (data.zoom !== void 0) object3.zoom = data.zoom;
+        if (data.view !== void 0) object3.view = Object.assign({}, data.view);
         break;
       case "AmbientLight":
-        object2 = new AmbientLight(data.color, data.intensity);
+        object3 = new AmbientLight(data.color, data.intensity);
         break;
       case "DirectionalLight":
-        object2 = new DirectionalLight(data.color, data.intensity);
-        object2.target = data.target || "";
+        object3 = new DirectionalLight(data.color, data.intensity);
+        object3.target = data.target || "";
         break;
       case "PointLight":
-        object2 = new PointLight(data.color, data.intensity, data.distance, data.decay);
+        object3 = new PointLight(data.color, data.intensity, data.distance, data.decay);
         break;
       case "RectAreaLight":
-        object2 = new RectAreaLight(data.color, data.intensity, data.width, data.height);
+        object3 = new RectAreaLight(data.color, data.intensity, data.width, data.height);
         break;
       case "SpotLight":
-        object2 = new SpotLight(data.color, data.intensity, data.distance, data.angle, data.penumbra, data.decay);
-        object2.target = data.target || "";
+        object3 = new SpotLight(data.color, data.intensity, data.distance, data.angle, data.penumbra, data.decay);
+        object3.target = data.target || "";
         break;
       case "HemisphereLight":
-        object2 = new HemisphereLight(data.color, data.groundColor, data.intensity);
+        object3 = new HemisphereLight(data.color, data.groundColor, data.intensity);
         break;
       case "LightProbe":
-        object2 = new LightProbe().fromJSON(data);
+        object3 = new LightProbe().fromJSON(data);
         break;
       case "SkinnedMesh":
         geometry = getGeometry(data.geometry);
         material = getMaterial(data.material);
-        object2 = new SkinnedMesh(geometry, material);
-        if (data.bindMode !== void 0) object2.bindMode = data.bindMode;
-        if (data.bindMatrix !== void 0) object2.bindMatrix.fromArray(data.bindMatrix);
-        if (data.skeleton !== void 0) object2.skeleton = data.skeleton;
+        object3 = new SkinnedMesh(geometry, material);
+        if (data.bindMode !== void 0) object3.bindMode = data.bindMode;
+        if (data.bindMatrix !== void 0) object3.bindMatrix.fromArray(data.bindMatrix);
+        if (data.skeleton !== void 0) object3.skeleton = data.skeleton;
         break;
       case "Mesh":
         geometry = getGeometry(data.geometry);
         material = getMaterial(data.material);
-        object2 = new Mesh(geometry, material);
+        object3 = new Mesh(geometry, material);
         break;
       case "InstancedMesh":
         geometry = getGeometry(data.geometry);
@@ -26226,20 +26226,20 @@ var ObjectLoader = class extends Loader {
         const count = data.count;
         const instanceMatrix = data.instanceMatrix;
         const instanceColor = data.instanceColor;
-        object2 = new InstancedMesh(geometry, material, count);
-        object2.instanceMatrix = new InstancedBufferAttribute(new Float32Array(instanceMatrix.array), 16);
-        if (instanceColor !== void 0) object2.instanceColor = new InstancedBufferAttribute(new Float32Array(instanceColor.array), instanceColor.itemSize);
+        object3 = new InstancedMesh(geometry, material, count);
+        object3.instanceMatrix = new InstancedBufferAttribute(new Float32Array(instanceMatrix.array), 16);
+        if (instanceColor !== void 0) object3.instanceColor = new InstancedBufferAttribute(new Float32Array(instanceColor.array), instanceColor.itemSize);
         break;
       case "BatchedMesh":
         geometry = getGeometry(data.geometry);
         material = getMaterial(data.material);
-        object2 = new BatchedMesh(data.maxInstanceCount, data.maxVertexCount, data.maxIndexCount, material);
-        object2.geometry = geometry;
-        object2.perObjectFrustumCulled = data.perObjectFrustumCulled;
-        object2.sortObjects = data.sortObjects;
-        object2._drawRanges = data.drawRanges;
-        object2._reservedRanges = data.reservedRanges;
-        object2._geometryInfo = data.geometryInfo.map((info) => {
+        object3 = new BatchedMesh(data.maxInstanceCount, data.maxVertexCount, data.maxIndexCount, material);
+        object3.geometry = geometry;
+        object3.perObjectFrustumCulled = data.perObjectFrustumCulled;
+        object3.sortObjects = data.sortObjects;
+        object3._drawRanges = data.drawRanges;
+        object3._reservedRanges = data.reservedRanges;
+        object3._geometryInfo = data.geometryInfo.map((info) => {
           let box = null;
           let sphere = null;
           if (info.boundingBox !== void 0) {
@@ -26254,113 +26254,113 @@ var ObjectLoader = class extends Loader {
             boundingSphere: sphere
           };
         });
-        object2._instanceInfo = data.instanceInfo;
-        object2._availableInstanceIds = data._availableInstanceIds;
-        object2._availableGeometryIds = data._availableGeometryIds;
-        object2._nextIndexStart = data.nextIndexStart;
-        object2._nextVertexStart = data.nextVertexStart;
-        object2._geometryCount = data.geometryCount;
-        object2._maxInstanceCount = data.maxInstanceCount;
-        object2._maxVertexCount = data.maxVertexCount;
-        object2._maxIndexCount = data.maxIndexCount;
-        object2._geometryInitialized = data.geometryInitialized;
-        object2._matricesTexture = getTexture(data.matricesTexture.uuid);
-        object2._indirectTexture = getTexture(data.indirectTexture.uuid);
+        object3._instanceInfo = data.instanceInfo;
+        object3._availableInstanceIds = data._availableInstanceIds;
+        object3._availableGeometryIds = data._availableGeometryIds;
+        object3._nextIndexStart = data.nextIndexStart;
+        object3._nextVertexStart = data.nextVertexStart;
+        object3._geometryCount = data.geometryCount;
+        object3._maxInstanceCount = data.maxInstanceCount;
+        object3._maxVertexCount = data.maxVertexCount;
+        object3._maxIndexCount = data.maxIndexCount;
+        object3._geometryInitialized = data.geometryInitialized;
+        object3._matricesTexture = getTexture(data.matricesTexture.uuid);
+        object3._indirectTexture = getTexture(data.indirectTexture.uuid);
         if (data.colorsTexture !== void 0) {
-          object2._colorsTexture = getTexture(data.colorsTexture.uuid);
+          object3._colorsTexture = getTexture(data.colorsTexture.uuid);
         }
         if (data.boundingSphere !== void 0) {
-          object2.boundingSphere = new Sphere().fromJSON(data.boundingSphere);
+          object3.boundingSphere = new Sphere().fromJSON(data.boundingSphere);
         }
         if (data.boundingBox !== void 0) {
-          object2.boundingBox = new Box3().fromJSON(data.boundingBox);
+          object3.boundingBox = new Box3().fromJSON(data.boundingBox);
         }
         break;
       case "LOD":
-        object2 = new LOD();
+        object3 = new LOD();
         break;
       case "Line":
-        object2 = new Line(getGeometry(data.geometry), getMaterial(data.material));
+        object3 = new Line(getGeometry(data.geometry), getMaterial(data.material));
         break;
       case "LineLoop":
-        object2 = new LineLoop(getGeometry(data.geometry), getMaterial(data.material));
+        object3 = new LineLoop(getGeometry(data.geometry), getMaterial(data.material));
         break;
       case "LineSegments":
-        object2 = new LineSegments(getGeometry(data.geometry), getMaterial(data.material));
+        object3 = new LineSegments(getGeometry(data.geometry), getMaterial(data.material));
         break;
       case "PointCloud":
       case "Points":
-        object2 = new Points(getGeometry(data.geometry), getMaterial(data.material));
+        object3 = new Points(getGeometry(data.geometry), getMaterial(data.material));
         break;
       case "Sprite":
-        object2 = new Sprite(getMaterial(data.material));
+        object3 = new Sprite(getMaterial(data.material));
         break;
       case "Group":
-        object2 = new Group();
+        object3 = new Group();
         break;
       case "Bone":
-        object2 = new Bone();
+        object3 = new Bone();
         break;
       default:
-        object2 = new Object3D();
+        object3 = new Object3D();
     }
-    object2.uuid = data.uuid;
-    if (data.name !== void 0) object2.name = data.name;
+    object3.uuid = data.uuid;
+    if (data.name !== void 0) object3.name = data.name;
     if (data.matrix !== void 0) {
-      object2.matrix.fromArray(data.matrix);
-      if (data.matrixAutoUpdate !== void 0) object2.matrixAutoUpdate = data.matrixAutoUpdate;
-      if (object2.matrixAutoUpdate) object2.matrix.decompose(object2.position, object2.quaternion, object2.scale);
+      object3.matrix.fromArray(data.matrix);
+      if (data.matrixAutoUpdate !== void 0) object3.matrixAutoUpdate = data.matrixAutoUpdate;
+      if (object3.matrixAutoUpdate) object3.matrix.decompose(object3.position, object3.quaternion, object3.scale);
     } else {
-      if (data.position !== void 0) object2.position.fromArray(data.position);
-      if (data.rotation !== void 0) object2.rotation.fromArray(data.rotation);
-      if (data.quaternion !== void 0) object2.quaternion.fromArray(data.quaternion);
-      if (data.scale !== void 0) object2.scale.fromArray(data.scale);
+      if (data.position !== void 0) object3.position.fromArray(data.position);
+      if (data.rotation !== void 0) object3.rotation.fromArray(data.rotation);
+      if (data.quaternion !== void 0) object3.quaternion.fromArray(data.quaternion);
+      if (data.scale !== void 0) object3.scale.fromArray(data.scale);
     }
-    if (data.up !== void 0) object2.up.fromArray(data.up);
-    if (data.castShadow !== void 0) object2.castShadow = data.castShadow;
-    if (data.receiveShadow !== void 0) object2.receiveShadow = data.receiveShadow;
+    if (data.up !== void 0) object3.up.fromArray(data.up);
+    if (data.castShadow !== void 0) object3.castShadow = data.castShadow;
+    if (data.receiveShadow !== void 0) object3.receiveShadow = data.receiveShadow;
     if (data.shadow) {
-      if (data.shadow.intensity !== void 0) object2.shadow.intensity = data.shadow.intensity;
-      if (data.shadow.bias !== void 0) object2.shadow.bias = data.shadow.bias;
-      if (data.shadow.normalBias !== void 0) object2.shadow.normalBias = data.shadow.normalBias;
-      if (data.shadow.radius !== void 0) object2.shadow.radius = data.shadow.radius;
-      if (data.shadow.mapSize !== void 0) object2.shadow.mapSize.fromArray(data.shadow.mapSize);
-      if (data.shadow.camera !== void 0) object2.shadow.camera = this.parseObject(data.shadow.camera);
+      if (data.shadow.intensity !== void 0) object3.shadow.intensity = data.shadow.intensity;
+      if (data.shadow.bias !== void 0) object3.shadow.bias = data.shadow.bias;
+      if (data.shadow.normalBias !== void 0) object3.shadow.normalBias = data.shadow.normalBias;
+      if (data.shadow.radius !== void 0) object3.shadow.radius = data.shadow.radius;
+      if (data.shadow.mapSize !== void 0) object3.shadow.mapSize.fromArray(data.shadow.mapSize);
+      if (data.shadow.camera !== void 0) object3.shadow.camera = this.parseObject(data.shadow.camera);
     }
-    if (data.visible !== void 0) object2.visible = data.visible;
-    if (data.frustumCulled !== void 0) object2.frustumCulled = data.frustumCulled;
-    if (data.renderOrder !== void 0) object2.renderOrder = data.renderOrder;
-    if (data.userData !== void 0) object2.userData = data.userData;
-    if (data.layers !== void 0) object2.layers.mask = data.layers;
+    if (data.visible !== void 0) object3.visible = data.visible;
+    if (data.frustumCulled !== void 0) object3.frustumCulled = data.frustumCulled;
+    if (data.renderOrder !== void 0) object3.renderOrder = data.renderOrder;
+    if (data.userData !== void 0) object3.userData = data.userData;
+    if (data.layers !== void 0) object3.layers.mask = data.layers;
     if (data.children !== void 0) {
       const children = data.children;
       for (let i = 0; i < children.length; i++) {
-        object2.add(this.parseObject(children[i], geometries, materials, textures, animations));
+        object3.add(this.parseObject(children[i], geometries, materials, textures, animations));
       }
     }
     if (data.animations !== void 0) {
       const objectAnimations = data.animations;
       for (let i = 0; i < objectAnimations.length; i++) {
         const uuid = objectAnimations[i];
-        object2.animations.push(animations[uuid]);
+        object3.animations.push(animations[uuid]);
       }
     }
     if (data.type === "LOD") {
-      if (data.autoUpdate !== void 0) object2.autoUpdate = data.autoUpdate;
+      if (data.autoUpdate !== void 0) object3.autoUpdate = data.autoUpdate;
       const levels = data.levels;
       for (let l = 0; l < levels.length; l++) {
         const level = levels[l];
-        const child = object2.getObjectByProperty("uuid", level.object);
+        const child = object3.getObjectByProperty("uuid", level.object);
         if (child !== void 0) {
-          object2.addLevel(child, level.distance, level.hysteresis);
+          object3.addLevel(child, level.distance, level.hysteresis);
         }
       }
     }
-    return object2;
+    return object3;
   }
-  bindSkeletons(object2, skeletons) {
+  bindSkeletons(object3, skeletons) {
     if (Object.keys(skeletons).length === 0) return;
-    object2.traverse(function(child) {
+    object3.traverse(function(child) {
       if (child.isSkinnedMesh === true && child.skeleton !== void 0) {
         const skeleton = skeletons[child.skeleton];
         if (skeleton === void 0) {
@@ -26371,11 +26371,11 @@ var ObjectLoader = class extends Loader {
       }
     });
   }
-  bindLightTargets(object2) {
-    object2.traverse(function(child) {
+  bindLightTargets(object3) {
+    object3.traverse(function(child) {
       if (child.isDirectionalLight || child.isSpotLight) {
         const uuid = child.target;
-        const target = object2.getObjectByProperty("uuid", uuid);
+        const target = object3.getObjectByProperty("uuid", uuid);
         if (target !== void 0) {
           child.target = target;
         } else {
@@ -28064,14 +28064,14 @@ var AnimationObjectGroup = class {
     const objects = this._objects, indicesByUUID = this._indicesByUUID, paths = this._paths, parsedPaths = this._parsedPaths, bindings = this._bindings, nBindings = bindings.length;
     let knownObject = void 0, nObjects = objects.length, nCachedObjects = this.nCachedObjects_;
     for (let i = 0, n = arguments.length; i !== n; ++i) {
-      const object2 = arguments[i], uuid = object2.uuid;
+      const object3 = arguments[i], uuid = object3.uuid;
       let index = indicesByUUID[uuid];
       if (index === void 0) {
         index = nObjects++;
         indicesByUUID[uuid] = index;
-        objects.push(object2);
+        objects.push(object3);
         for (let j = 0, m = nBindings; j !== m; ++j) {
-          bindings[j].push(new PropertyBinding(object2, paths[j], parsedPaths[j]));
+          bindings[j].push(new PropertyBinding(object3, paths[j], parsedPaths[j]));
         }
       } else if (index < nCachedObjects) {
         knownObject = objects[index];
@@ -28079,13 +28079,13 @@ var AnimationObjectGroup = class {
         indicesByUUID[lastCachedObject.uuid] = index;
         objects[index] = lastCachedObject;
         indicesByUUID[uuid] = firstActiveIndex;
-        objects[firstActiveIndex] = object2;
+        objects[firstActiveIndex] = object3;
         for (let j = 0, m = nBindings; j !== m; ++j) {
           const bindingsForPath = bindings[j], lastCached = bindingsForPath[firstActiveIndex];
           let binding = bindingsForPath[index];
           bindingsForPath[index] = lastCached;
           if (binding === void 0) {
-            binding = new PropertyBinding(object2, paths[j], parsedPaths[j]);
+            binding = new PropertyBinding(object3, paths[j], parsedPaths[j]);
           }
           bindingsForPath[firstActiveIndex] = binding;
         }
@@ -28104,13 +28104,13 @@ var AnimationObjectGroup = class {
     const objects = this._objects, indicesByUUID = this._indicesByUUID, bindings = this._bindings, nBindings = bindings.length;
     let nCachedObjects = this.nCachedObjects_;
     for (let i = 0, n = arguments.length; i !== n; ++i) {
-      const object2 = arguments[i], uuid = object2.uuid, index = indicesByUUID[uuid];
+      const object3 = arguments[i], uuid = object3.uuid, index = indicesByUUID[uuid];
       if (index !== void 0 && index >= nCachedObjects) {
         const lastCachedIndex = nCachedObjects++, firstActiveObject = objects[lastCachedIndex];
         indicesByUUID[firstActiveObject.uuid] = index;
         objects[index] = firstActiveObject;
         indicesByUUID[uuid] = lastCachedIndex;
-        objects[lastCachedIndex] = object2;
+        objects[lastCachedIndex] = object3;
         for (let j = 0, m = nBindings; j !== m; ++j) {
           const bindingsForPath = bindings[j], firstActive = bindingsForPath[lastCachedIndex], binding = bindingsForPath[index];
           bindingsForPath[index] = firstActive;
@@ -28129,7 +28129,7 @@ var AnimationObjectGroup = class {
     const objects = this._objects, indicesByUUID = this._indicesByUUID, bindings = this._bindings, nBindings = bindings.length;
     let nCachedObjects = this.nCachedObjects_, nObjects = objects.length;
     for (let i = 0, n = arguments.length; i !== n; ++i) {
-      const object2 = arguments[i], uuid = object2.uuid, index = indicesByUUID[uuid];
+      const object3 = arguments[i], uuid = object3.uuid, index = indicesByUUID[uuid];
       if (index !== void 0) {
         delete indicesByUUID[uuid];
         if (index < nCachedObjects) {
@@ -28175,8 +28175,8 @@ var AnimationObjectGroup = class {
     parsedPaths.push(parsedPath);
     bindings.push(bindingsForPath);
     for (let i = nCachedObjects, n = objects.length; i !== n; ++i) {
-      const object2 = objects[i];
-      bindingsForPath[i] = new PropertyBinding(object2, path, parsedPath);
+      const object3 = objects[i];
+      bindingsForPath[i] = new PropertyBinding(object3, path, parsedPath);
     }
     return bindingsForPath;
   }
@@ -29458,8 +29458,8 @@ var Raycaster = class {
    * @param {Array<Raycaster~Intersection>} [intersects=[]] The target array that holds the result of the method.
    * @return {Array<Raycaster~Intersection>} An array holding the intersection points.
    */
-  intersectObject(object2, recursive = true, intersects2 = []) {
-    intersect(object2, this, intersects2, recursive);
+  intersectObject(object3, recursive = true, intersects2 = []) {
+    intersect(object3, this, intersects2, recursive);
     intersects2.sort(ascSort);
     return intersects2;
   }
@@ -29484,14 +29484,14 @@ var Raycaster = class {
 function ascSort(a, b) {
   return a.distance - b.distance;
 }
-function intersect(object2, raycaster, intersects2, recursive) {
+function intersect(object3, raycaster, intersects2, recursive) {
   let propagate = true;
-  if (object2.layers.test(raycaster.layers)) {
-    const result = object2.raycast(raycaster, intersects2);
+  if (object3.layers.test(raycaster.layers)) {
+    const result = object3.raycast(raycaster, intersects2);
     if (result === false) propagate = false;
   }
   if (propagate === true && recursive === true) {
-    const children = object2.children;
+    const children = object3.children;
     for (let i = 0, l = children.length; i < l; i++) {
       intersect(children[i], raycaster, intersects2, true);
     }
@@ -29971,9 +29971,9 @@ var Box2 = class {
    * @param {Vector2} vector - The vector that should expand the bounding box.
    * @return {Box2} A reference to this bounding box.
    */
-  expandByVector(vector) {
-    this.min.sub(vector);
-    this.max.add(vector);
+  expandByVector(vector2) {
+    this.min.sub(vector2);
+    this.max.add(vector2);
     return this;
   }
   /**
@@ -30311,11 +30311,11 @@ var SpotLightHelper = class extends Object3D {
    * @param {number|Color|string} [color] - The helper's color. If not set, the helper will take
    * the color of the light.
    */
-  constructor(light, color) {
+  constructor(light, color2) {
     super();
     this.light = light;
     this.matrixAutoUpdate = false;
-    this.color = color;
+    this.color = color2;
     this.type = "SpotLightHelper";
     const geometry = new BufferGeometry();
     const positions = [
@@ -30412,8 +30412,8 @@ var SkeletonHelper = class extends LineSegments {
    * @param {Object3D} object -  Usually an instance of {@link SkinnedMesh}. However, any 3D object
    * can be used if it represents a hierarchy of bones (see {@link Bone}).
    */
-  constructor(object2) {
-    const bones = getBoneList(object2);
+  constructor(object3) {
+    const bones = getBoneList(object3);
     const geometry = new BufferGeometry();
     const vertices = [];
     const colors = [];
@@ -30432,9 +30432,9 @@ var SkeletonHelper = class extends LineSegments {
     super(geometry, material);
     this.isSkeletonHelper = true;
     this.type = "SkeletonHelper";
-    this.root = object2;
+    this.root = object3;
     this.bones = bones;
-    this.matrix = object2.matrixWorld;
+    this.matrix = object3.matrixWorld;
     this.matrixAutoUpdate = false;
     const color1 = new Color(255);
     const color2 = new Color(65280);
@@ -30486,13 +30486,13 @@ var SkeletonHelper = class extends LineSegments {
     this.material.dispose();
   }
 };
-function getBoneList(object2) {
+function getBoneList(object3) {
   const boneList = [];
-  if (object2.isBone === true) {
-    boneList.push(object2);
+  if (object3.isBone === true) {
+    boneList.push(object3);
   }
-  for (let i = 0; i < object2.children.length; i++) {
-    boneList.push(...getBoneList(object2.children[i]));
+  for (let i = 0; i < object3.children.length; i++) {
+    boneList.push(...getBoneList(object3.children[i]));
   }
   return boneList;
 }
@@ -30505,12 +30505,12 @@ var PointLightHelper = class extends Mesh {
    * @param {number|Color|string} [color] - The helper's color. If not set, the helper will take
    * the color of the light.
    */
-  constructor(light, sphereSize, color) {
+  constructor(light, sphereSize, color2) {
     const geometry = new SphereGeometry(sphereSize, 4, 2);
     const material = new MeshBasicMaterial({ wireframe: true, fog: false, toneMapped: false });
     super(geometry, material);
     this.light = light;
-    this.color = color;
+    this.color = color2;
     this.type = "PointLightHelper";
     this.matrix = this.light.matrixWorld;
     this.matrixAutoUpdate = false;
@@ -30549,12 +30549,12 @@ var HemisphereLightHelper = class extends Object3D {
    * @param {number|Color|string} [color] - The helper's color. If not set, the helper will take
    * the color of the light.
    */
-  constructor(light, size, color) {
+  constructor(light, size, color2) {
     super();
     this.light = light;
     this.matrix = light.matrixWorld;
     this.matrixAutoUpdate = false;
-    this.color = color;
+    this.color = color2;
     this.type = "HemisphereLightHelper";
     const geometry = new OctahedronGeometry(size);
     geometry.rotateY(Math.PI * 0.5);
@@ -30587,8 +30587,8 @@ var HemisphereLightHelper = class extends Object3D {
       _color1.copy(this.light.color);
       _color2.copy(this.light.groundColor);
       for (let i = 0, l = colors.count; i < l; i++) {
-        const color = i < l / 2 ? _color1 : _color2;
-        colors.setXYZ(i, color.r, color.g, color.b);
+        const color2 = i < l / 2 ? _color1 : _color2;
+        colors.setXYZ(i, color2.r, color2.g, color2.b);
       }
       colors.needsUpdate = true;
     }
@@ -30615,14 +30615,14 @@ var GridHelper = class extends LineSegments {
     for (let i = 0, j = 0, k = -halfSize; i <= divisions; i++, k += step) {
       vertices.push(-halfSize, 0, k, halfSize, 0, k);
       vertices.push(k, 0, -halfSize, k, 0, halfSize);
-      const color = i === center ? color1 : color2;
-      color.toArray(colors, j);
+      const color3 = i === center ? color1 : color2;
+      color3.toArray(colors, j);
       j += 3;
-      color.toArray(colors, j);
+      color3.toArray(colors, j);
       j += 3;
-      color.toArray(colors, j);
+      color3.toArray(colors, j);
       j += 3;
-      color.toArray(colors, j);
+      color3.toArray(colors, j);
       j += 3;
     }
     const geometry = new BufferGeometry();
@@ -30664,25 +30664,25 @@ var PolarGridHelper = class extends LineSegments {
         const z = Math.cos(v) * radius;
         vertices.push(0, 0, 0);
         vertices.push(x, 0, z);
-        const color = i & 1 ? color1 : color2;
-        colors.push(color.r, color.g, color.b);
-        colors.push(color.r, color.g, color.b);
+        const color3 = i & 1 ? color1 : color2;
+        colors.push(color3.r, color3.g, color3.b);
+        colors.push(color3.r, color3.g, color3.b);
       }
     }
     for (let i = 0; i < rings; i++) {
-      const color = i & 1 ? color1 : color2;
+      const color3 = i & 1 ? color1 : color2;
       const r = radius - radius / rings * i;
       for (let j = 0; j < divisions; j++) {
         let v = j / divisions * (Math.PI * 2);
         let x = Math.sin(v) * r;
         let z = Math.cos(v) * r;
         vertices.push(x, 0, z);
-        colors.push(color.r, color.g, color.b);
+        colors.push(color3.r, color3.g, color3.b);
         v = (j + 1) / divisions * (Math.PI * 2);
         x = Math.sin(v) * r;
         z = Math.cos(v) * r;
         vertices.push(x, 0, z);
-        colors.push(color.r, color.g, color.b);
+        colors.push(color3.r, color3.g, color3.b);
       }
     }
     const geometry = new BufferGeometry();
@@ -30713,12 +30713,12 @@ var DirectionalLightHelper = class extends Object3D {
    * @param {number|Color|string} [color] - The helper's color. If not set, the helper will take
    * the color of the light.
    */
-  constructor(light, size, color) {
+  constructor(light, size, color2) {
     super();
     this.light = light;
     this.matrix = light.matrixWorld;
     this.matrixAutoUpdate = false;
-    this.color = color;
+    this.color = color2;
     this.type = "DirectionalLightHelper";
     if (size === void 0) size = 1;
     let geometry = new BufferGeometry();
@@ -30823,13 +30823,13 @@ var CameraHelper = class extends LineSegments {
       addPoint(a);
       addPoint(b);
     }
-    function addPoint(id) {
+    function addPoint(id2) {
       vertices.push(0, 0, 0);
       colors.push(0, 0, 0);
-      if (pointMap[id] === void 0) {
-        pointMap[id] = [];
+      if (pointMap[id2] === void 0) {
+        pointMap[id2] = [];
       }
-      pointMap[id].push(vertices.length / 3 - 1);
+      pointMap[id2].push(vertices.length / 3 - 1);
     }
     geometry.setAttribute("position", new Float32BufferAttribute(vertices, 3));
     geometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
@@ -30987,14 +30987,14 @@ var BoxHelper = class extends LineSegments {
    * @param {Object3D} [object] - The 3D object to show the world-axis-aligned bounding box.
    * @param {number|Color|string} [color=0xffff00] - The box's color.
    */
-  constructor(object2, color = 16776960) {
+  constructor(object3, color2 = 16776960) {
     const indices = new Uint16Array([0, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 0, 4, 1, 5, 2, 6, 3, 7]);
     const positions = new Float32Array(8 * 3);
     const geometry = new BufferGeometry();
     geometry.setIndex(new BufferAttribute(indices, 1));
     geometry.setAttribute("position", new BufferAttribute(positions, 3));
-    super(geometry, new LineBasicMaterial({ color, toneMapped: false }));
-    this.object = object2;
+    super(geometry, new LineBasicMaterial({ color: color2, toneMapped: false }));
+    this.object = object3;
     this.type = "BoxHelper";
     this.matrixAutoUpdate = false;
     this.update();
@@ -31045,8 +31045,8 @@ var BoxHelper = class extends LineSegments {
    * @param {Object3D} object - The 3D object to create the helper for.
    * @return {BoxHelper} A reference to this instance.
    */
-  setFromObject(object2) {
-    this.object = object2;
+  setFromObject(object3) {
+    this.object = object3;
     this.update();
     return this;
   }
@@ -31071,13 +31071,13 @@ var Box3Helper = class extends LineSegments {
    * @param {Box3} box - The box to visualize.
    * @param {number|Color|string} [color=0xffff00] - The box's color.
    */
-  constructor(box, color = 16776960) {
+  constructor(box, color2 = 16776960) {
     const indices = new Uint16Array([0, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 0, 4, 1, 5, 2, 6, 3, 7]);
     const positions = [1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1, 1, 1, -1, -1, 1, -1, -1, -1, -1, 1, -1, -1];
     const geometry = new BufferGeometry();
     geometry.setIndex(new BufferAttribute(indices, 1));
     geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
-    super(geometry, new LineBasicMaterial({ color, toneMapped: false }));
+    super(geometry, new LineBasicMaterial({ color: color2, toneMapped: false }));
     this.box = box;
     this.type = "Box3Helper";
     this.geometry.computeBoundingSphere();
@@ -31108,12 +31108,12 @@ var PlaneHelper = class extends Line {
    * @param {number|Color|string} [hex=0xffff00] - The helper's color.
    */
   constructor(plane, size = 1, hex = 16776960) {
-    const color = hex;
+    const color2 = hex;
     const positions = [1, -1, 0, -1, 1, 0, -1, -1, 0, 1, 1, 0, -1, 1, 0, -1, -1, 0, 1, -1, 0, 1, 1, 0];
     const geometry = new BufferGeometry();
     geometry.setAttribute("position", new Float32BufferAttribute(positions, 3));
     geometry.computeBoundingSphere();
-    super(geometry, new LineBasicMaterial({ color, toneMapped: false }));
+    super(geometry, new LineBasicMaterial({ color: color2, toneMapped: false }));
     this.type = "PlaneHelper";
     this.plane = plane;
     this.size = size;
@@ -31121,7 +31121,7 @@ var PlaneHelper = class extends Line {
     const geometry2 = new BufferGeometry();
     geometry2.setAttribute("position", new Float32BufferAttribute(positions2, 3));
     geometry2.computeBoundingSphere();
-    this.add(new Mesh(geometry2, new MeshBasicMaterial({ color, opacity: 0.2, transparent: true, depthWrite: false, toneMapped: false })));
+    this.add(new Mesh(geometry2, new MeshBasicMaterial({ color: color2, opacity: 0.2, transparent: true, depthWrite: false, toneMapped: false })));
   }
   updateMatrixWorld(force) {
     this.position.set(0, 0, 0);
@@ -31155,7 +31155,7 @@ var ArrowHelper = class extends Object3D {
    * @param {number} [headLength=length*0.2] - The length of the head of the arrow.
    * @param {number} [headWidth=headLength*0.2] - The width of the head of the arrow.
    */
-  constructor(dir = new Vector3(0, 0, 1), origin = new Vector3(0, 0, 0), length = 1, color = 16776960, headLength = length * 0.2, headWidth = headLength * 0.2) {
+  constructor(dir = new Vector3(0, 0, 1), origin = new Vector3(0, 0, 0), length = 1, color2 = 16776960, headLength = length * 0.2, headWidth = headLength * 0.2) {
     super();
     this.type = "ArrowHelper";
     if (_lineGeometry === void 0) {
@@ -31165,10 +31165,10 @@ var ArrowHelper = class extends Object3D {
       _coneGeometry.translate(0, -0.5, 0);
     }
     this.position.copy(origin);
-    this.line = new Line(_lineGeometry, new LineBasicMaterial({ color, toneMapped: false }));
+    this.line = new Line(_lineGeometry, new LineBasicMaterial({ color: color2, toneMapped: false }));
     this.line.matrixAutoUpdate = false;
     this.add(this.line);
-    this.cone = new Mesh(_coneGeometry, new MeshBasicMaterial({ color, toneMapped: false }));
+    this.cone = new Mesh(_coneGeometry, new MeshBasicMaterial({ color: color2, toneMapped: false }));
     this.cone.matrixAutoUpdate = false;
     this.add(this.cone);
     this.setDirection(dir);
@@ -31209,9 +31209,9 @@ var ArrowHelper = class extends Object3D {
    *
    * @param {number|Color|string} color - The color to set.
    */
-  setColor(color) {
-    this.line.material.color.set(color);
-    this.cone.material.color.set(color);
+  setColor(color2) {
+    this.line.material.color.set(color2);
+    this.cone.material.color.set(color2);
   }
   copy(source) {
     super.copy(source, false);
@@ -31293,17 +31293,17 @@ var AxesHelper = class extends LineSegments {
    * @return {AxesHelper} A reference to this axes helper.
    */
   setColors(xAxisColor, yAxisColor, zAxisColor) {
-    const color = new Color();
+    const color2 = new Color();
     const array = this.geometry.attributes.color.array;
-    color.set(xAxisColor);
-    color.toArray(array, 0);
-    color.toArray(array, 3);
-    color.set(yAxisColor);
-    color.toArray(array, 6);
-    color.toArray(array, 9);
-    color.set(zAxisColor);
-    color.toArray(array, 12);
-    color.toArray(array, 15);
+    color2.set(xAxisColor);
+    color2.toArray(array, 0);
+    color2.toArray(array, 3);
+    color2.set(yAxisColor);
+    color2.toArray(array, 6);
+    color2.toArray(array, 9);
+    color2.set(zAxisColor);
+    color2.toArray(array, 12);
+    color2.toArray(array, 15);
     this.geometry.attributes.color.needsUpdate = true;
     return this;
   }
@@ -31528,9 +31528,9 @@ var Controls = class extends EventDispatcher {
    * @param {Object3D} object - The object that is managed by the controls.
    * @param {?HTMLDOMElement} domElement - The HTML element used for event listeners.
    */
-  constructor(object2, domElement = null) {
+  constructor(object3, domElement = null) {
     super();
-    this.object = object2;
+    this.object = object3;
     this.domElement = domElement;
     this.enabled = true;
     this.state = -1;
@@ -32787,8 +32787,8 @@ function WebGLBackground(renderer, cubemaps, cubeuvmaps, state, objects, alpha, 
       renderList.unshift(planeMesh, planeMesh.geometry, planeMesh.material, 0, 0, null);
     }
   }
-  function setClear(color, alpha2) {
-    color.getRGB(_rgb, getUnlitUniformColorSpace(renderer));
+  function setClear(color2, alpha2) {
+    color2.getRGB(_rgb, getUnlitUniformColorSpace(renderer));
     state.buffers.color.setClear(_rgb.r, _rgb.g, _rgb.b, alpha2, premultipliedAlpha);
   }
   function dispose() {
@@ -32807,8 +32807,8 @@ function WebGLBackground(renderer, cubemaps, cubeuvmaps, state, objects, alpha, 
     getClearColor: function() {
       return clearColor;
     },
-    setClearColor: function(color, alpha2 = 1) {
-      clearColor.set(color);
+    setClearColor: function(color2, alpha2 = 1) {
+      clearColor.set(color2);
       clearAlpha = alpha2;
       setClear(clearColor, clearAlpha);
     },
@@ -32830,21 +32830,21 @@ function WebGLBindingStates(gl, attributes) {
   const defaultState = createBindingState(null);
   let currentState = defaultState;
   let forceUpdate = false;
-  function setup(object2, material, program, geometry, index) {
+  function setup(object3, material, program, geometry, index) {
     let updateBuffers = false;
     const state = getBindingState(geometry, program, material);
     if (currentState !== state) {
       currentState = state;
       bindVertexArrayObject(currentState.object);
     }
-    updateBuffers = needsUpdate(object2, geometry, program, index);
-    if (updateBuffers) saveCache(object2, geometry, program, index);
+    updateBuffers = needsUpdate(object3, geometry, program, index);
+    if (updateBuffers) saveCache(object3, geometry, program, index);
     if (index !== null) {
       attributes.update(index, gl.ELEMENT_ARRAY_BUFFER);
     }
     if (updateBuffers || forceUpdate) {
       forceUpdate = false;
-      setupVertexAttributes(object2, material, program, geometry);
+      setupVertexAttributes(object3, material, program, geometry);
       if (index !== null) {
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, attributes.get(index).buffer);
       }
@@ -32900,7 +32900,7 @@ function WebGLBindingStates(gl, attributes) {
       index: null
     };
   }
-  function needsUpdate(object2, geometry, program, index) {
+  function needsUpdate(object3, geometry, program, index) {
     const cachedAttributes = currentState.attributes;
     const geometryAttributes = geometry.attributes;
     let attributesNum = 0;
@@ -32911,8 +32911,8 @@ function WebGLBindingStates(gl, attributes) {
         const cachedAttribute = cachedAttributes[name];
         let geometryAttribute = geometryAttributes[name];
         if (geometryAttribute === void 0) {
-          if (name === "instanceMatrix" && object2.instanceMatrix) geometryAttribute = object2.instanceMatrix;
-          if (name === "instanceColor" && object2.instanceColor) geometryAttribute = object2.instanceColor;
+          if (name === "instanceMatrix" && object3.instanceMatrix) geometryAttribute = object3.instanceMatrix;
+          if (name === "instanceColor" && object3.instanceColor) geometryAttribute = object3.instanceColor;
         }
         if (cachedAttribute === void 0) return true;
         if (cachedAttribute.attribute !== geometryAttribute) return true;
@@ -32924,7 +32924,7 @@ function WebGLBindingStates(gl, attributes) {
     if (currentState.index !== index) return true;
     return false;
   }
-  function saveCache(object2, geometry, program, index) {
+  function saveCache(object3, geometry, program, index) {
     const cache2 = {};
     const attributes2 = geometry.attributes;
     let attributesNum = 0;
@@ -32934,8 +32934,8 @@ function WebGLBindingStates(gl, attributes) {
       if (programAttribute.location >= 0) {
         let attribute = attributes2[name];
         if (attribute === void 0) {
-          if (name === "instanceMatrix" && object2.instanceMatrix) attribute = object2.instanceMatrix;
-          if (name === "instanceColor" && object2.instanceColor) attribute = object2.instanceColor;
+          if (name === "instanceMatrix" && object3.instanceMatrix) attribute = object3.instanceMatrix;
+          if (name === "instanceColor" && object3.instanceColor) attribute = object3.instanceColor;
         }
         const data = {};
         data.attribute = attribute;
@@ -32983,14 +32983,14 @@ function WebGLBindingStates(gl, attributes) {
       }
     }
   }
-  function vertexAttribPointer(index, size, type, normalized, stride, offset, integer2) {
-    if (integer2 === true) {
+  function vertexAttribPointer(index, size, type, normalized, stride, offset, integer3) {
+    if (integer3 === true) {
       gl.vertexAttribIPointer(index, size, type, stride, offset);
     } else {
       gl.vertexAttribPointer(index, size, type, normalized, stride, offset);
     }
   }
-  function setupVertexAttributes(object2, material, program, geometry) {
+  function setupVertexAttributes(object3, material, program, geometry) {
     initAttributes();
     const geometryAttributes = geometry.attributes;
     const programAttributes = program.getAttributes();
@@ -33000,8 +33000,8 @@ function WebGLBindingStates(gl, attributes) {
       if (programAttribute.location >= 0) {
         let geometryAttribute = geometryAttributes[name];
         if (geometryAttribute === void 0) {
-          if (name === "instanceMatrix" && object2.instanceMatrix) geometryAttribute = object2.instanceMatrix;
-          if (name === "instanceColor" && object2.instanceColor) geometryAttribute = object2.instanceColor;
+          if (name === "instanceMatrix" && object3.instanceMatrix) geometryAttribute = object3.instanceMatrix;
+          if (name === "instanceColor" && object3.instanceColor) geometryAttribute = object3.instanceColor;
         }
         if (geometryAttribute !== void 0) {
           const normalized = geometryAttribute.normalized;
@@ -33011,7 +33011,7 @@ function WebGLBindingStates(gl, attributes) {
           const buffer = attribute.buffer;
           const type = attribute.type;
           const bytesPerElement = attribute.bytesPerElement;
-          const integer2 = type === gl.INT || type === gl.UNSIGNED_INT || geometryAttribute.gpuType === IntType;
+          const integer3 = type === gl.INT || type === gl.UNSIGNED_INT || geometryAttribute.gpuType === IntType;
           if (geometryAttribute.isInterleavedBufferAttribute) {
             const data = geometryAttribute.data;
             const stride = data.stride;
@@ -33020,7 +33020,7 @@ function WebGLBindingStates(gl, attributes) {
               for (let i = 0; i < programAttribute.locationSize; i++) {
                 enableAttributeAndDivisor(programAttribute.location + i, data.meshPerAttribute);
               }
-              if (object2.isInstancedMesh !== true && geometry._maxInstanceCount === void 0) {
+              if (object3.isInstancedMesh !== true && geometry._maxInstanceCount === void 0) {
                 geometry._maxInstanceCount = data.meshPerAttribute * data.count;
               }
             } else {
@@ -33037,7 +33037,7 @@ function WebGLBindingStates(gl, attributes) {
                 normalized,
                 stride * bytesPerElement,
                 (offset + size / programAttribute.locationSize * i) * bytesPerElement,
-                integer2
+                integer3
               );
             }
           } else {
@@ -33045,7 +33045,7 @@ function WebGLBindingStates(gl, attributes) {
               for (let i = 0; i < programAttribute.locationSize; i++) {
                 enableAttributeAndDivisor(programAttribute.location + i, geometryAttribute.meshPerAttribute);
               }
-              if (object2.isInstancedMesh !== true && geometry._maxInstanceCount === void 0) {
+              if (object3.isInstancedMesh !== true && geometry._maxInstanceCount === void 0) {
                 geometry._maxInstanceCount = geometryAttribute.meshPerAttribute * geometryAttribute.count;
               }
             } else {
@@ -33062,7 +33062,7 @@ function WebGLBindingStates(gl, attributes) {
                 normalized,
                 size * bytesPerElement,
                 size / programAttribute.locationSize * i * bytesPerElement,
-                integer2
+                integer3
               );
             }
           }
@@ -34226,7 +34226,7 @@ function WebGLGeometries(gl, attributes, info, bindingStates) {
     }
     info.memory.geometries--;
   }
-  function get(object2, geometry) {
+  function get(object3, geometry) {
     if (geometries[geometry.id] === true) return geometry;
     geometry.addEventListener("dispose", onGeometryDispose);
     geometries[geometry.id] = true;
@@ -34396,8 +34396,8 @@ function WebGLInfo(gl) {
 function WebGLMorphtargets(gl, capabilities, textures) {
   const morphTextures = /* @__PURE__ */ new WeakMap();
   const morph = new Vector4();
-  function update(object2, geometry, program) {
-    const objectInfluences = object2.morphTargetInfluences;
+  function update(object3, geometry, program) {
+    const objectInfluences = object3.morphTargetInfluences;
     const morphAttribute = geometry.morphAttributes.position || geometry.morphAttributes.normal || geometry.morphAttributes.color;
     const morphTargetsCount = morphAttribute !== void 0 ? morphAttribute.length : 0;
     let entry = morphTextures.get(geometry);
@@ -34467,8 +34467,8 @@ function WebGLMorphtargets(gl, capabilities, textures) {
       morphTextures.set(geometry, entry);
       geometry.addEventListener("dispose", disposeTexture);
     }
-    if (object2.isInstancedMesh === true && object2.morphTexture !== null) {
-      program.getUniforms().setValue(gl, "morphTexture", object2.morphTexture, textures);
+    if (object3.isInstancedMesh === true && object3.morphTexture !== null) {
+      program.getUniforms().setValue(gl, "morphTexture", object3.morphTexture, textures);
     } else {
       let morphInfluencesSum = 0;
       for (let i = 0; i < objectInfluences.length; i++) {
@@ -34487,28 +34487,28 @@ function WebGLMorphtargets(gl, capabilities, textures) {
 }
 function WebGLObjects(gl, geometries, attributes, info) {
   let updateMap = /* @__PURE__ */ new WeakMap();
-  function update(object2) {
+  function update(object3) {
     const frame = info.render.frame;
-    const geometry = object2.geometry;
-    const buffergeometry = geometries.get(object2, geometry);
+    const geometry = object3.geometry;
+    const buffergeometry = geometries.get(object3, geometry);
     if (updateMap.get(buffergeometry) !== frame) {
       geometries.update(buffergeometry);
       updateMap.set(buffergeometry, frame);
     }
-    if (object2.isInstancedMesh) {
-      if (object2.hasEventListener("dispose", onInstancedMeshDispose) === false) {
-        object2.addEventListener("dispose", onInstancedMeshDispose);
+    if (object3.isInstancedMesh) {
+      if (object3.hasEventListener("dispose", onInstancedMeshDispose) === false) {
+        object3.addEventListener("dispose", onInstancedMeshDispose);
       }
-      if (updateMap.get(object2) !== frame) {
-        attributes.update(object2.instanceMatrix, gl.ARRAY_BUFFER);
-        if (object2.instanceColor !== null) {
-          attributes.update(object2.instanceColor, gl.ARRAY_BUFFER);
+      if (updateMap.get(object3) !== frame) {
+        attributes.update(object3.instanceMatrix, gl.ARRAY_BUFFER);
+        if (object3.instanceColor !== null) {
+          attributes.update(object3.instanceColor, gl.ARRAY_BUFFER);
         }
-        updateMap.set(object2, frame);
+        updateMap.set(object3, frame);
       }
     }
-    if (object2.isSkinnedMesh) {
-      const skeleton = object2.skeleton;
+    if (object3.isSkinnedMesh) {
+      const skeleton = object3.skeleton;
       if (updateMap.get(skeleton) !== frame) {
         skeleton.update();
         updateMap.set(skeleton, frame);
@@ -35096,8 +35096,8 @@ function getPureArraySetter(type) {
   }
 }
 var SingleUniform = class {
-  constructor(id, activeInfo, addr) {
-    this.id = id;
+  constructor(id2, activeInfo, addr) {
+    this.id = id2;
     this.addr = addr;
     this.cache = [];
     this.type = activeInfo.type;
@@ -35105,8 +35105,8 @@ var SingleUniform = class {
   }
 };
 var PureArrayUniform = class {
-  constructor(id, activeInfo, addr) {
-    this.id = id;
+  constructor(id2, activeInfo, addr) {
+    this.id = id2;
     this.addr = addr;
     this.cache = [];
     this.type = activeInfo.type;
@@ -35115,8 +35115,8 @@ var PureArrayUniform = class {
   }
 };
 var StructuredUniform = class {
-  constructor(id) {
-    this.id = id;
+  constructor(id2) {
+    this.id = id2;
     this.seq = [];
     this.map = {};
   }
@@ -35138,17 +35138,17 @@ function parseUniform(activeInfo, addr, container) {
   RePathPart.lastIndex = 0;
   while (true) {
     const match = RePathPart.exec(path), matchEnd = RePathPart.lastIndex;
-    let id = match[1];
+    let id2 = match[1];
     const idIsIndex = match[2] === "]", subscript = match[3];
-    if (idIsIndex) id = id | 0;
+    if (idIsIndex) id2 = id2 | 0;
     if (subscript === void 0 || subscript === "[" && matchEnd + 2 === pathLength) {
-      addUniform(container, subscript === void 0 ? new SingleUniform(id, activeInfo, addr) : new PureArrayUniform(id, activeInfo, addr));
+      addUniform(container, subscript === void 0 ? new SingleUniform(id2, activeInfo, addr) : new PureArrayUniform(id2, activeInfo, addr));
       break;
     } else {
       const map = container.map;
-      let next = map[id];
+      let next = map[id2];
       if (next === void 0) {
-        next = new StructuredUniform(id);
+        next = new StructuredUniform(id2);
         addUniform(container, next);
       }
       container = next;
@@ -35169,8 +35169,8 @@ var WebGLUniforms = class {
     const u = this.map[name];
     if (u !== void 0) u.setValue(gl, value, textures);
   }
-  setOptional(gl, object2, name) {
-    const v = object2[name];
+  setOptional(gl, object3, name) {
+    const v = object3[name];
     if (v !== void 0) this.setValue(gl, name, v);
   }
   static upload(gl, seq, values, textures) {
@@ -35922,9 +35922,9 @@ function WebGLPrograms(renderer, cubemaps, cubeuvmaps, extensions, capabilities,
     if (value === 0) return "uv";
     return `uv${value}`;
   }
-  function getParameters(material, lights, shadows, scene, object2) {
+  function getParameters(material, lights, shadows, scene, object3) {
     const fog = scene.fog;
-    const geometry = object2.geometry;
+    const geometry = object3.geometry;
     const environment = material.isMeshStandardMaterial ? scene.environment : null;
     const envMap = (material.isMeshStandardMaterial ? cubeuvmaps : cubemaps).get(material.envMap || environment);
     const envMapCubeUVHeight = !!envMap && envMap.mapping === CubeUVReflectionMapping ? envMap.image.height : null;
@@ -35956,8 +35956,8 @@ function WebGLPrograms(renderer, cubemaps, cubeuvmaps, extensions, capabilities,
     }
     const currentRenderTarget = renderer.getRenderTarget();
     const reversedDepthBuffer = renderer.state.buffers.depth.getReversed();
-    const IS_INSTANCEDMESH = object2.isInstancedMesh === true;
-    const IS_BATCHEDMESH = object2.isBatchedMesh === true;
+    const IS_INSTANCEDMESH = object3.isInstancedMesh === true;
+    const IS_BATCHEDMESH = object3.isBatchedMesh === true;
     const HAS_MAP = !!material.map;
     const HAS_MATCAP = !!material.matcap;
     const HAS_ENVMAP = !!envMap;
@@ -36012,10 +36012,10 @@ function WebGLPrograms(renderer, cubemaps, cubeuvmaps, extensions, capabilities,
       glslVersion: material.glslVersion,
       precision,
       batching: IS_BATCHEDMESH,
-      batchingColor: IS_BATCHEDMESH && object2._colorsTexture !== null,
+      batchingColor: IS_BATCHEDMESH && object3._colorsTexture !== null,
       instancing: IS_INSTANCEDMESH,
-      instancingColor: IS_INSTANCEDMESH && object2.instanceColor !== null,
-      instancingMorph: IS_INSTANCEDMESH && object2.morphTexture !== null,
+      instancingColor: IS_INSTANCEDMESH && object3.instanceColor !== null,
+      instancingMorph: IS_INSTANCEDMESH && object3.morphTexture !== null,
       supportsVertexTextures: SUPPORTS_VERTEX_TEXTURES,
       outputColorSpace: currentRenderTarget === null ? renderer.outputColorSpace : currentRenderTarget.isXRRenderTarget === true ? currentRenderTarget.texture.colorSpace : LinearSRGBColorSpace,
       alphaToCoverage: !!material.alphaToCoverage,
@@ -36087,7 +36087,7 @@ function WebGLPrograms(renderer, cubemaps, cubeuvmaps, extensions, capabilities,
       vertexTangents: !!geometry.attributes.tangent && (HAS_NORMALMAP || HAS_ANISOTROPY),
       vertexColors: material.vertexColors,
       vertexAlphas: material.vertexColors === true && !!geometry.attributes.color && geometry.attributes.color.itemSize === 4,
-      pointsUvs: object2.isPoints === true && !!geometry.attributes.uv && (HAS_MAP || HAS_ALPHAMAP),
+      pointsUvs: object3.isPoints === true && !!geometry.attributes.uv && (HAS_MAP || HAS_ALPHAMAP),
       fog: !!fog,
       useFog: material.fog === true,
       fogExp2: !!fog && fog.isFogExp2,
@@ -36095,7 +36095,7 @@ function WebGLPrograms(renderer, cubemaps, cubeuvmaps, extensions, capabilities,
       sizeAttenuation: material.sizeAttenuation === true,
       logarithmicDepthBuffer,
       reversedDepthBuffer,
-      skinning: object2.isSkinnedMesh === true,
+      skinning: object3.isSkinnedMesh === true,
       morphTargets: geometry.morphAttributes.position !== void 0,
       morphNormals: geometry.morphAttributes.normal !== void 0,
       morphColors: geometry.morphAttributes.color !== void 0,
@@ -36360,22 +36360,22 @@ function WebGLPrograms(renderer, cubemaps, cubeuvmaps, extensions, capabilities,
 }
 function WebGLProperties() {
   let properties = /* @__PURE__ */ new WeakMap();
-  function has(object2) {
-    return properties.has(object2);
+  function has(object3) {
+    return properties.has(object3);
   }
-  function get(object2) {
-    let map = properties.get(object2);
+  function get(object3) {
+    let map = properties.get(object3);
     if (map === void 0) {
       map = {};
-      properties.set(object2, map);
+      properties.set(object3, map);
     }
     return map;
   }
-  function remove(object2) {
-    properties.delete(object2);
+  function remove(object3) {
+    properties.delete(object3);
   }
-  function update(object2, key, value) {
-    properties.get(object2)[key] = value;
+  function update(object3, key, value) {
+    properties.get(object3)[key] = value;
   }
   function dispose() {
     properties = /* @__PURE__ */ new WeakMap();
@@ -36424,35 +36424,35 @@ function WebGLRenderList() {
     transmissive.length = 0;
     transparent.length = 0;
   }
-  function getNextRenderItem(object2, geometry, material, groupOrder, z, group) {
+  function getNextRenderItem(object3, geometry, material, groupOrder, z, group) {
     let renderItem = renderItems[renderItemsIndex];
     if (renderItem === void 0) {
       renderItem = {
-        id: object2.id,
-        object: object2,
+        id: object3.id,
+        object: object3,
         geometry,
         material,
         groupOrder,
-        renderOrder: object2.renderOrder,
+        renderOrder: object3.renderOrder,
         z,
         group
       };
       renderItems[renderItemsIndex] = renderItem;
     } else {
-      renderItem.id = object2.id;
-      renderItem.object = object2;
+      renderItem.id = object3.id;
+      renderItem.object = object3;
       renderItem.geometry = geometry;
       renderItem.material = material;
       renderItem.groupOrder = groupOrder;
-      renderItem.renderOrder = object2.renderOrder;
+      renderItem.renderOrder = object3.renderOrder;
       renderItem.z = z;
       renderItem.group = group;
     }
     renderItemsIndex++;
     return renderItem;
   }
-  function push(object2, geometry, material, groupOrder, z, group) {
-    const renderItem = getNextRenderItem(object2, geometry, material, groupOrder, z, group);
+  function push(object3, geometry, material, groupOrder, z, group) {
+    const renderItem = getNextRenderItem(object3, geometry, material, groupOrder, z, group);
     if (material.transmission > 0) {
       transmissive.push(renderItem);
     } else if (material.transparent === true) {
@@ -36461,8 +36461,8 @@ function WebGLRenderList() {
       opaque.push(renderItem);
     }
   }
-  function unshift(object2, geometry, material, groupOrder, z, group) {
-    const renderItem = getNextRenderItem(object2, geometry, material, groupOrder, z, group);
+  function unshift(object3, geometry, material, groupOrder, z, group) {
+    const renderItem = getNextRenderItem(object3, geometry, material, groupOrder, z, group);
     if (material.transmission > 0) {
       transmissive.unshift(renderItem);
     } else if (material.transparent === true) {
@@ -36687,14 +36687,14 @@ function WebGLLights(extensions) {
     lights.sort(shadowCastingAndTexturingLightsFirst);
     for (let i = 0, l = lights.length; i < l; i++) {
       const light = lights[i];
-      const color = light.color;
+      const color2 = light.color;
       const intensity = light.intensity;
       const distance = light.distance;
       const shadowMap = light.shadow && light.shadow.map ? light.shadow.map.texture : null;
       if (light.isAmbientLight) {
-        r += color.r * intensity;
-        g += color.g * intensity;
-        b += color.b * intensity;
+        r += color2.r * intensity;
+        g += color2.g * intensity;
+        b += color2.b * intensity;
       } else if (light.isLightProbe) {
         for (let j = 0; j < 9; j++) {
           state.probe[j].addScaledVector(light.sh.coefficients[j], intensity);
@@ -36721,7 +36721,7 @@ function WebGLLights(extensions) {
       } else if (light.isSpotLight) {
         const uniforms = cache2.get(light);
         uniforms.position.setFromMatrixPosition(light.matrixWorld);
-        uniforms.color.copy(color).multiplyScalar(intensity);
+        uniforms.color.copy(color2).multiplyScalar(intensity);
         uniforms.distance = distance;
         uniforms.coneCos = Math.cos(light.angle);
         uniforms.penumbraCos = Math.cos(light.angle * (1 - light.penumbra));
@@ -36749,7 +36749,7 @@ function WebGLLights(extensions) {
         spotLength++;
       } else if (light.isRectAreaLight) {
         const uniforms = cache2.get(light);
-        uniforms.color.copy(color).multiplyScalar(intensity);
+        uniforms.color.copy(color2).multiplyScalar(intensity);
         uniforms.halfWidth.set(light.width * 0.5, 0, 0);
         uniforms.halfHeight.set(0, light.height * 0.5, 0);
         state.rectArea[rectAreaLength] = uniforms;
@@ -36796,8 +36796,8 @@ function WebGLLights(extensions) {
     state.ambient[0] = r;
     state.ambient[1] = g;
     state.ambient[2] = b;
-    const hash = state.hash;
-    if (hash.directionalLength !== directionalLength || hash.pointLength !== pointLength || hash.spotLength !== spotLength || hash.rectAreaLength !== rectAreaLength || hash.hemiLength !== hemiLength || hash.numDirectionalShadows !== numDirectionalShadows || hash.numPointShadows !== numPointShadows || hash.numSpotShadows !== numSpotShadows || hash.numSpotMaps !== numSpotMaps || hash.numLightProbes !== numLightProbes) {
+    const hash2 = state.hash;
+    if (hash2.directionalLength !== directionalLength || hash2.pointLength !== pointLength || hash2.spotLength !== spotLength || hash2.rectAreaLength !== rectAreaLength || hash2.hemiLength !== hemiLength || hash2.numDirectionalShadows !== numDirectionalShadows || hash2.numPointShadows !== numPointShadows || hash2.numSpotShadows !== numSpotShadows || hash2.numSpotMaps !== numSpotMaps || hash2.numLightProbes !== numLightProbes) {
       state.directional.length = directionalLength;
       state.spot.length = spotLength;
       state.rectArea.length = rectAreaLength;
@@ -36815,16 +36815,16 @@ function WebGLLights(extensions) {
       state.spotLightMap.length = numSpotMaps;
       state.numSpotLightShadowsWithMaps = numSpotShadowsWithMaps;
       state.numLightProbes = numLightProbes;
-      hash.directionalLength = directionalLength;
-      hash.pointLength = pointLength;
-      hash.spotLength = spotLength;
-      hash.rectAreaLength = rectAreaLength;
-      hash.hemiLength = hemiLength;
-      hash.numDirectionalShadows = numDirectionalShadows;
-      hash.numPointShadows = numPointShadows;
-      hash.numSpotShadows = numSpotShadows;
-      hash.numSpotMaps = numSpotMaps;
-      hash.numLightProbes = numLightProbes;
+      hash2.directionalLength = directionalLength;
+      hash2.pointLength = pointLength;
+      hash2.spotLength = spotLength;
+      hash2.rectAreaLength = rectAreaLength;
+      hash2.hemiLength = hemiLength;
+      hash2.numDirectionalShadows = numDirectionalShadows;
+      hash2.numPointShadows = numPointShadows;
+      hash2.numSpotShadows = numSpotShadows;
+      hash2.numSpotMaps = numSpotMaps;
+      hash2.numLightProbes = numLightProbes;
       state.version = nextVersion++;
     }
   }
@@ -37083,9 +37083,9 @@ function WebGLShadowMap(renderer, objects, capabilities) {
     renderer.clear();
     renderer.renderBufferDirect(camera, null, geometry, shadowMaterialHorizontal, fullScreenMesh, null);
   }
-  function getDepthMaterial(object2, material, light, type) {
+  function getDepthMaterial(object3, material, light, type) {
     let result = null;
-    const customMaterial = light.isPointLight === true ? object2.customDistanceMaterial : object2.customDepthMaterial;
+    const customMaterial = light.isPointLight === true ? object3.customDistanceMaterial : object3.customDepthMaterial;
     if (customMaterial !== void 0) {
       result = customMaterial;
     } else {
@@ -37130,35 +37130,35 @@ function WebGLShadowMap(renderer, objects, capabilities) {
     }
     return result;
   }
-  function renderObject(object2, camera, shadowCamera, light, type) {
-    if (object2.visible === false) return;
-    const visible = object2.layers.test(camera.layers);
-    if (visible && (object2.isMesh || object2.isLine || object2.isPoints)) {
-      if ((object2.castShadow || object2.receiveShadow && type === VSMShadowMap) && (!object2.frustumCulled || _frustum2.intersectsObject(object2))) {
-        object2.modelViewMatrix.multiplyMatrices(shadowCamera.matrixWorldInverse, object2.matrixWorld);
-        const geometry = objects.update(object2);
-        const material = object2.material;
+  function renderObject(object3, camera, shadowCamera, light, type) {
+    if (object3.visible === false) return;
+    const visible = object3.layers.test(camera.layers);
+    if (visible && (object3.isMesh || object3.isLine || object3.isPoints)) {
+      if ((object3.castShadow || object3.receiveShadow && type === VSMShadowMap) && (!object3.frustumCulled || _frustum2.intersectsObject(object3))) {
+        object3.modelViewMatrix.multiplyMatrices(shadowCamera.matrixWorldInverse, object3.matrixWorld);
+        const geometry = objects.update(object3);
+        const material = object3.material;
         if (Array.isArray(material)) {
           const groups = geometry.groups;
           for (let k = 0, kl = groups.length; k < kl; k++) {
             const group = groups[k];
             const groupMaterial = material[group.materialIndex];
             if (groupMaterial && groupMaterial.visible) {
-              const depthMaterial = getDepthMaterial(object2, groupMaterial, light, type);
-              object2.onBeforeShadow(renderer, object2, camera, shadowCamera, geometry, depthMaterial, group);
-              renderer.renderBufferDirect(shadowCamera, null, geometry, depthMaterial, object2, group);
-              object2.onAfterShadow(renderer, object2, camera, shadowCamera, geometry, depthMaterial, group);
+              const depthMaterial = getDepthMaterial(object3, groupMaterial, light, type);
+              object3.onBeforeShadow(renderer, object3, camera, shadowCamera, geometry, depthMaterial, group);
+              renderer.renderBufferDirect(shadowCamera, null, geometry, depthMaterial, object3, group);
+              object3.onAfterShadow(renderer, object3, camera, shadowCamera, geometry, depthMaterial, group);
             }
           }
         } else if (material.visible) {
-          const depthMaterial = getDepthMaterial(object2, material, light, type);
-          object2.onBeforeShadow(renderer, object2, camera, shadowCamera, geometry, depthMaterial, null);
-          renderer.renderBufferDirect(shadowCamera, null, geometry, depthMaterial, object2, null);
-          object2.onAfterShadow(renderer, object2, camera, shadowCamera, geometry, depthMaterial, null);
+          const depthMaterial = getDepthMaterial(object3, material, light, type);
+          object3.onBeforeShadow(renderer, object3, camera, shadowCamera, geometry, depthMaterial, null);
+          renderer.renderBufferDirect(shadowCamera, null, geometry, depthMaterial, object3, null);
+          object3.onAfterShadow(renderer, object3, camera, shadowCamera, geometry, depthMaterial, null);
         }
       }
     }
-    const children = object2.children;
+    const children = object3.children;
     for (let i = 0, l = children.length; i < l; i++) {
       renderObject(children[i], camera, shadowCamera, light, type);
     }
@@ -37166,8 +37166,8 @@ function WebGLShadowMap(renderer, objects, capabilities) {
   function onMaterialDispose(event) {
     const material = event.target;
     material.removeEventListener("dispose", onMaterialDispose);
-    for (const id in _materialCache) {
-      const cache2 = _materialCache[id];
+    for (const id2 in _materialCache) {
+      const cache2 = _materialCache[id2];
       const uuid = event.target.uuid;
       if (uuid in cache2) {
         const shadowMaterial = cache2[uuid];
@@ -37190,7 +37190,7 @@ var reversedFuncs = {
 function WebGLState(gl, extensions) {
   function ColorBuffer() {
     let locked = false;
-    const color = new Vector4();
+    const color2 = new Vector4();
     let currentColorMask = null;
     const currentColorClear = new Vector4(0, 0, 0, 0);
     return {
@@ -37209,10 +37209,10 @@ function WebGLState(gl, extensions) {
           g *= a;
           b *= a;
         }
-        color.set(r, g, b, a);
-        if (currentColorClear.equals(color) === false) {
+        color2.set(r, g, b, a);
+        if (currentColorClear.equals(color2) === false) {
           gl.clearColor(r, g, b, a);
-          currentColorClear.copy(color);
+          currentColorClear.copy(color2);
         }
       },
       reset: function() {
@@ -37450,16 +37450,16 @@ function WebGLState(gl, extensions) {
   setCullFace(CullFaceBack);
   enable(gl.CULL_FACE);
   setBlending(NoBlending);
-  function enable(id) {
-    if (enabledCapabilities[id] !== true) {
-      gl.enable(id);
-      enabledCapabilities[id] = true;
+  function enable(id2) {
+    if (enabledCapabilities[id2] !== true) {
+      gl.enable(id2);
+      enabledCapabilities[id2] = true;
     }
   }
-  function disable(id) {
-    if (enabledCapabilities[id] !== false) {
-      gl.disable(id);
-      enabledCapabilities[id] = false;
+  function disable(id2) {
+    if (enabledCapabilities[id2] !== false) {
+      gl.disable(id2);
+      enabledCapabilities[id2] = false;
     }
   }
   function bindFramebuffer(target, framebuffer) {
@@ -40347,8 +40347,8 @@ function WebGLUniformsGroups(gl, info, capabilities, state) {
     delete updateList[uniformsGroup.id];
   }
   function dispose() {
-    for (const id in buffers) {
-      gl.deleteBuffer(buffers[id]);
+    for (const id2 in buffers) {
+      gl.deleteBuffer(buffers[id2]);
     }
     allocatedBindingPoints = [];
     buffers = {};
@@ -40631,9 +40631,9 @@ var WebGLRenderer = class {
     this.setClearAlpha = function() {
       background.setClearAlpha(...arguments);
     };
-    this.clear = function(color = true, depth2 = true, stencil2 = true) {
+    this.clear = function(color2 = true, depth2 = true, stencil2 = true) {
       let bits = 0;
-      if (color) {
+      if (color2) {
         let isIntegerFormat = false;
         if (_currentRenderTarget !== null) {
           const targetFormat = _currentRenderTarget.texture.format;
@@ -40744,10 +40744,10 @@ var WebGLRenderer = class {
         }
       }
     }
-    this.renderBufferDirect = function(camera, scene, geometry, material, object2, group) {
+    this.renderBufferDirect = function(camera, scene, geometry, material, object3, group) {
       if (scene === null) scene = _emptyScene;
-      const frontFaceCW = object2.isMesh && object2.matrixWorld.determinant() < 0;
-      const program = setProgram(camera, scene, geometry, material, object2);
+      const frontFaceCW = object3.isMesh && object3.matrixWorld.determinant() < 0;
+      const program = setProgram(camera, scene, geometry, material, object3);
       state.setMaterial(material, frontFaceCW);
       let index = geometry.index;
       let rangeFactor = 1;
@@ -40773,7 +40773,7 @@ var WebGLRenderer = class {
       }
       const drawCount = drawEnd - drawStart;
       if (drawCount < 0 || drawCount === Infinity) return;
-      bindingStates.setup(object2, material, program, geometry, index);
+      bindingStates.setup(object3, material, program, geometry, index);
       let attribute;
       let renderer = bufferRenderer;
       if (index !== null) {
@@ -40781,38 +40781,38 @@ var WebGLRenderer = class {
         renderer = indexedBufferRenderer;
         renderer.setIndex(attribute);
       }
-      if (object2.isMesh) {
+      if (object3.isMesh) {
         if (material.wireframe === true) {
           state.setLineWidth(material.wireframeLinewidth * getTargetPixelRatio());
           renderer.setMode(_gl.LINES);
         } else {
           renderer.setMode(_gl.TRIANGLES);
         }
-      } else if (object2.isLine) {
+      } else if (object3.isLine) {
         let lineWidth = material.linewidth;
         if (lineWidth === void 0) lineWidth = 1;
         state.setLineWidth(lineWidth * getTargetPixelRatio());
-        if (object2.isLineSegments) {
+        if (object3.isLineSegments) {
           renderer.setMode(_gl.LINES);
-        } else if (object2.isLineLoop) {
+        } else if (object3.isLineLoop) {
           renderer.setMode(_gl.LINE_LOOP);
         } else {
           renderer.setMode(_gl.LINE_STRIP);
         }
-      } else if (object2.isPoints) {
+      } else if (object3.isPoints) {
         renderer.setMode(_gl.POINTS);
-      } else if (object2.isSprite) {
+      } else if (object3.isSprite) {
         renderer.setMode(_gl.TRIANGLES);
       }
-      if (object2.isBatchedMesh) {
-        if (object2._multiDrawInstances !== null) {
+      if (object3.isBatchedMesh) {
+        if (object3._multiDrawInstances !== null) {
           warnOnce("THREE.WebGLRenderer: renderMultiDrawInstances has been deprecated and will be removed in r184. Append to renderMultiDraw arguments and use indirection.");
-          renderer.renderMultiDrawInstances(object2._multiDrawStarts, object2._multiDrawCounts, object2._multiDrawCount, object2._multiDrawInstances);
+          renderer.renderMultiDrawInstances(object3._multiDrawStarts, object3._multiDrawCounts, object3._multiDrawCount, object3._multiDrawInstances);
         } else {
           if (!extensions.get("WEBGL_multi_draw")) {
-            const starts = object2._multiDrawStarts;
-            const counts = object2._multiDrawCounts;
-            const drawCount2 = object2._multiDrawCount;
+            const starts = object3._multiDrawStarts;
+            const counts = object3._multiDrawCounts;
+            const drawCount2 = object3._multiDrawCount;
             const bytesPerElement = index ? attributes.get(index).bytesPerElement : 1;
             const uniforms = properties.get(material).currentProgram.getUniforms();
             for (let i = 0; i < drawCount2; i++) {
@@ -40820,11 +40820,11 @@ var WebGLRenderer = class {
               renderer.render(starts[i] / bytesPerElement, counts[i]);
             }
           } else {
-            renderer.renderMultiDraw(object2._multiDrawStarts, object2._multiDrawCounts, object2._multiDrawCount);
+            renderer.renderMultiDraw(object3._multiDrawStarts, object3._multiDrawCounts, object3._multiDrawCount);
           }
         }
-      } else if (object2.isInstancedMesh) {
-        renderer.renderInstances(drawStart, drawCount, object2.count);
+      } else if (object3.isInstancedMesh) {
+        renderer.renderInstances(drawStart, drawCount, object3.count);
       } else if (geometry.isInstancedBufferGeometry) {
         const maxInstanceCount = geometry._maxInstanceCount !== void 0 ? geometry._maxInstanceCount : Infinity;
         const instanceCount = Math.min(geometry.instanceCount, maxInstanceCount);
@@ -40833,17 +40833,17 @@ var WebGLRenderer = class {
         renderer.render(drawStart, drawCount);
       }
     };
-    function prepareMaterial(material, scene, object2) {
+    function prepareMaterial(material, scene, object3) {
       if (material.transparent === true && material.side === DoubleSide && material.forceSinglePass === false) {
         material.side = BackSide;
         material.needsUpdate = true;
-        getProgram(material, scene, object2);
+        getProgram(material, scene, object3);
         material.side = FrontSide;
         material.needsUpdate = true;
-        getProgram(material, scene, object2);
+        getProgram(material, scene, object3);
         material.side = DoubleSide;
       } else {
-        getProgram(material, scene, object2);
+        getProgram(material, scene, object3);
       }
     }
     this.compile = function(scene, camera, targetScene = null) {
@@ -40851,40 +40851,40 @@ var WebGLRenderer = class {
       currentRenderState = renderStates.get(targetScene);
       currentRenderState.init(camera);
       renderStateStack.push(currentRenderState);
-      targetScene.traverseVisible(function(object2) {
-        if (object2.isLight && object2.layers.test(camera.layers)) {
-          currentRenderState.pushLight(object2);
-          if (object2.castShadow) {
-            currentRenderState.pushShadow(object2);
+      targetScene.traverseVisible(function(object3) {
+        if (object3.isLight && object3.layers.test(camera.layers)) {
+          currentRenderState.pushLight(object3);
+          if (object3.castShadow) {
+            currentRenderState.pushShadow(object3);
           }
         }
       });
       if (scene !== targetScene) {
-        scene.traverseVisible(function(object2) {
-          if (object2.isLight && object2.layers.test(camera.layers)) {
-            currentRenderState.pushLight(object2);
-            if (object2.castShadow) {
-              currentRenderState.pushShadow(object2);
+        scene.traverseVisible(function(object3) {
+          if (object3.isLight && object3.layers.test(camera.layers)) {
+            currentRenderState.pushLight(object3);
+            if (object3.castShadow) {
+              currentRenderState.pushShadow(object3);
             }
           }
         });
       }
       currentRenderState.setupLights();
       const materials2 = /* @__PURE__ */ new Set();
-      scene.traverse(function(object2) {
-        if (!(object2.isMesh || object2.isPoints || object2.isLine || object2.isSprite)) {
+      scene.traverse(function(object3) {
+        if (!(object3.isMesh || object3.isPoints || object3.isLine || object3.isSprite)) {
           return;
         }
-        const material = object2.material;
+        const material = object3.material;
         if (material) {
           if (Array.isArray(material)) {
             for (let i = 0; i < material.length; i++) {
               const material2 = material[i];
-              prepareMaterial(material2, targetScene, object2);
+              prepareMaterial(material2, targetScene, object3);
               materials2.add(material2);
             }
           } else {
-            prepareMaterial(material, targetScene, object2);
+            prepareMaterial(material, targetScene, object3);
             materials2.add(material);
           }
         }
@@ -41023,43 +41023,43 @@ var WebGLRenderer = class {
         currentRenderList = null;
       }
     };
-    function projectObject(object2, camera, groupOrder, sortObjects) {
-      if (object2.visible === false) return;
-      const visible = object2.layers.test(camera.layers);
+    function projectObject(object3, camera, groupOrder, sortObjects) {
+      if (object3.visible === false) return;
+      const visible = object3.layers.test(camera.layers);
       if (visible) {
-        if (object2.isGroup) {
-          groupOrder = object2.renderOrder;
-        } else if (object2.isLOD) {
-          if (object2.autoUpdate === true) object2.update(camera);
-        } else if (object2.isLight) {
-          currentRenderState.pushLight(object2);
-          if (object2.castShadow) {
-            currentRenderState.pushShadow(object2);
+        if (object3.isGroup) {
+          groupOrder = object3.renderOrder;
+        } else if (object3.isLOD) {
+          if (object3.autoUpdate === true) object3.update(camera);
+        } else if (object3.isLight) {
+          currentRenderState.pushLight(object3);
+          if (object3.castShadow) {
+            currentRenderState.pushShadow(object3);
           }
-        } else if (object2.isSprite) {
-          if (!object2.frustumCulled || _frustum2.intersectsSprite(object2)) {
+        } else if (object3.isSprite) {
+          if (!object3.frustumCulled || _frustum2.intersectsSprite(object3)) {
             if (sortObjects) {
-              _vector4.setFromMatrixPosition(object2.matrixWorld).applyMatrix4(_projScreenMatrix2);
+              _vector4.setFromMatrixPosition(object3.matrixWorld).applyMatrix4(_projScreenMatrix2);
             }
-            const geometry = objects.update(object2);
-            const material = object2.material;
+            const geometry = objects.update(object3);
+            const material = object3.material;
             if (material.visible) {
-              currentRenderList.push(object2, geometry, material, groupOrder, _vector4.z, null);
+              currentRenderList.push(object3, geometry, material, groupOrder, _vector4.z, null);
             }
           }
-        } else if (object2.isMesh || object2.isLine || object2.isPoints) {
-          if (!object2.frustumCulled || _frustum2.intersectsObject(object2)) {
-            const geometry = objects.update(object2);
-            const material = object2.material;
+        } else if (object3.isMesh || object3.isLine || object3.isPoints) {
+          if (!object3.frustumCulled || _frustum2.intersectsObject(object3)) {
+            const geometry = objects.update(object3);
+            const material = object3.material;
             if (sortObjects) {
-              if (object2.boundingSphere !== void 0) {
-                if (object2.boundingSphere === null) object2.computeBoundingSphere();
-                _vector4.copy(object2.boundingSphere.center);
+              if (object3.boundingSphere !== void 0) {
+                if (object3.boundingSphere === null) object3.computeBoundingSphere();
+                _vector4.copy(object3.boundingSphere.center);
               } else {
                 if (geometry.boundingSphere === null) geometry.computeBoundingSphere();
                 _vector4.copy(geometry.boundingSphere.center);
               }
-              _vector4.applyMatrix4(object2.matrixWorld).applyMatrix4(_projScreenMatrix2);
+              _vector4.applyMatrix4(object3.matrixWorld).applyMatrix4(_projScreenMatrix2);
             }
             if (Array.isArray(material)) {
               const groups = geometry.groups;
@@ -41067,16 +41067,16 @@ var WebGLRenderer = class {
                 const group = groups[i];
                 const groupMaterial = material[group.materialIndex];
                 if (groupMaterial && groupMaterial.visible) {
-                  currentRenderList.push(object2, geometry, groupMaterial, groupOrder, _vector4.z, group);
+                  currentRenderList.push(object3, geometry, groupMaterial, groupOrder, _vector4.z, group);
                 }
               }
             } else if (material.visible) {
-              currentRenderList.push(object2, geometry, material, groupOrder, _vector4.z, null);
+              currentRenderList.push(object3, geometry, material, groupOrder, _vector4.z, null);
             }
           }
         }
       }
-      const children = object2.children;
+      const children = object3.children;
       for (let i = 0, l = children.length; i < l; i++) {
         projectObject(children[i], camera, groupOrder, sortObjects);
       }
@@ -41138,15 +41138,15 @@ var WebGLRenderer = class {
         let renderTargetNeedsUpdate = false;
         for (let i = 0, l = transmissiveObjects.length; i < l; i++) {
           const renderItem = transmissiveObjects[i];
-          const object2 = renderItem.object;
+          const object3 = renderItem.object;
           const geometry = renderItem.geometry;
           const material = renderItem.material;
           const group = renderItem.group;
-          if (material.side === DoubleSide && object2.layers.test(camera.layers)) {
+          if (material.side === DoubleSide && object3.layers.test(camera.layers)) {
             const currentSide = material.side;
             material.side = BackSide;
             material.needsUpdate = true;
-            renderObject(object2, scene, camera, geometry, material, group);
+            renderObject(object3, scene, camera, geometry, material, group);
             material.side = currentSide;
             material.needsUpdate = true;
             renderTargetNeedsUpdate = true;
@@ -41166,43 +41166,43 @@ var WebGLRenderer = class {
       const overrideMaterial = scene.isScene === true ? scene.overrideMaterial : null;
       for (let i = 0, l = renderList.length; i < l; i++) {
         const renderItem = renderList[i];
-        const object2 = renderItem.object;
+        const object3 = renderItem.object;
         const geometry = renderItem.geometry;
         const group = renderItem.group;
         let material = renderItem.material;
         if (material.allowOverride === true && overrideMaterial !== null) {
           material = overrideMaterial;
         }
-        if (object2.layers.test(camera.layers)) {
-          renderObject(object2, scene, camera, geometry, material, group);
+        if (object3.layers.test(camera.layers)) {
+          renderObject(object3, scene, camera, geometry, material, group);
         }
       }
     }
-    function renderObject(object2, scene, camera, geometry, material, group) {
-      object2.onBeforeRender(_this, scene, camera, geometry, material, group);
-      object2.modelViewMatrix.multiplyMatrices(camera.matrixWorldInverse, object2.matrixWorld);
-      object2.normalMatrix.getNormalMatrix(object2.modelViewMatrix);
-      material.onBeforeRender(_this, scene, camera, geometry, object2, group);
+    function renderObject(object3, scene, camera, geometry, material, group) {
+      object3.onBeforeRender(_this, scene, camera, geometry, material, group);
+      object3.modelViewMatrix.multiplyMatrices(camera.matrixWorldInverse, object3.matrixWorld);
+      object3.normalMatrix.getNormalMatrix(object3.modelViewMatrix);
+      material.onBeforeRender(_this, scene, camera, geometry, object3, group);
       if (material.transparent === true && material.side === DoubleSide && material.forceSinglePass === false) {
         material.side = BackSide;
         material.needsUpdate = true;
-        _this.renderBufferDirect(camera, scene, geometry, material, object2, group);
+        _this.renderBufferDirect(camera, scene, geometry, material, object3, group);
         material.side = FrontSide;
         material.needsUpdate = true;
-        _this.renderBufferDirect(camera, scene, geometry, material, object2, group);
+        _this.renderBufferDirect(camera, scene, geometry, material, object3, group);
         material.side = DoubleSide;
       } else {
-        _this.renderBufferDirect(camera, scene, geometry, material, object2, group);
+        _this.renderBufferDirect(camera, scene, geometry, material, object3, group);
       }
-      object2.onAfterRender(_this, scene, camera, geometry, material, group);
+      object3.onAfterRender(_this, scene, camera, geometry, material, group);
     }
-    function getProgram(material, scene, object2) {
+    function getProgram(material, scene, object3) {
       if (scene.isScene !== true) scene = _emptyScene;
       const materialProperties = properties.get(material);
       const lights = currentRenderState.state.lights;
       const shadowsArray = currentRenderState.state.shadowsArray;
       const lightsStateVersion = lights.state.version;
-      const parameters2 = programCache.getParameters(material, lights.state, shadowsArray, scene, object2);
+      const parameters2 = programCache.getParameters(material, lights.state, shadowsArray, scene, object3);
       const programCacheKey = programCache.getProgramCacheKey(parameters2);
       let programs = materialProperties.programs;
       materialProperties.environment = material.isMeshStandardMaterial ? scene.environment : null;
@@ -41285,7 +41285,7 @@ var WebGLRenderer = class {
       materialProperties.vertexTangents = parameters2.vertexTangents;
       materialProperties.toneMapping = parameters2.toneMapping;
     }
-    function setProgram(camera, scene, geometry, material, object2) {
+    function setProgram(camera, scene, geometry, material, object3) {
       if (scene.isScene !== true) scene = _emptyScene;
       textures.resetTextureUnits();
       const fog = scene.fog;
@@ -41319,29 +41319,29 @@ var WebGLRenderer = class {
           needsProgramChange = true;
         } else if (materialProperties.outputColorSpace !== colorSpace) {
           needsProgramChange = true;
-        } else if (object2.isBatchedMesh && materialProperties.batching === false) {
+        } else if (object3.isBatchedMesh && materialProperties.batching === false) {
           needsProgramChange = true;
-        } else if (!object2.isBatchedMesh && materialProperties.batching === true) {
+        } else if (!object3.isBatchedMesh && materialProperties.batching === true) {
           needsProgramChange = true;
-        } else if (object2.isBatchedMesh && materialProperties.batchingColor === true && object2.colorTexture === null) {
+        } else if (object3.isBatchedMesh && materialProperties.batchingColor === true && object3.colorTexture === null) {
           needsProgramChange = true;
-        } else if (object2.isBatchedMesh && materialProperties.batchingColor === false && object2.colorTexture !== null) {
+        } else if (object3.isBatchedMesh && materialProperties.batchingColor === false && object3.colorTexture !== null) {
           needsProgramChange = true;
-        } else if (object2.isInstancedMesh && materialProperties.instancing === false) {
+        } else if (object3.isInstancedMesh && materialProperties.instancing === false) {
           needsProgramChange = true;
-        } else if (!object2.isInstancedMesh && materialProperties.instancing === true) {
+        } else if (!object3.isInstancedMesh && materialProperties.instancing === true) {
           needsProgramChange = true;
-        } else if (object2.isSkinnedMesh && materialProperties.skinning === false) {
+        } else if (object3.isSkinnedMesh && materialProperties.skinning === false) {
           needsProgramChange = true;
-        } else if (!object2.isSkinnedMesh && materialProperties.skinning === true) {
+        } else if (!object3.isSkinnedMesh && materialProperties.skinning === true) {
           needsProgramChange = true;
-        } else if (object2.isInstancedMesh && materialProperties.instancingColor === true && object2.instanceColor === null) {
+        } else if (object3.isInstancedMesh && materialProperties.instancingColor === true && object3.instanceColor === null) {
           needsProgramChange = true;
-        } else if (object2.isInstancedMesh && materialProperties.instancingColor === false && object2.instanceColor !== null) {
+        } else if (object3.isInstancedMesh && materialProperties.instancingColor === false && object3.instanceColor !== null) {
           needsProgramChange = true;
-        } else if (object2.isInstancedMesh && materialProperties.instancingMorph === true && object2.morphTexture === null) {
+        } else if (object3.isInstancedMesh && materialProperties.instancingMorph === true && object3.morphTexture === null) {
           needsProgramChange = true;
-        } else if (object2.isInstancedMesh && materialProperties.instancingMorph === false && object2.morphTexture !== null) {
+        } else if (object3.isInstancedMesh && materialProperties.instancingMorph === false && object3.morphTexture !== null) {
           needsProgramChange = true;
         } else if (materialProperties.envMap !== envMap) {
           needsProgramChange = true;
@@ -41370,7 +41370,7 @@ var WebGLRenderer = class {
       }
       let program = materialProperties.currentProgram;
       if (needsProgramChange === true) {
-        program = getProgram(material, scene, object2);
+        program = getProgram(material, scene, object3);
       }
       let refreshProgram = false;
       let refreshMaterial = false;
@@ -41413,32 +41413,32 @@ var WebGLRenderer = class {
           refreshLights = true;
         }
       }
-      if (object2.isSkinnedMesh) {
-        p_uniforms.setOptional(_gl, object2, "bindMatrix");
-        p_uniforms.setOptional(_gl, object2, "bindMatrixInverse");
-        const skeleton = object2.skeleton;
+      if (object3.isSkinnedMesh) {
+        p_uniforms.setOptional(_gl, object3, "bindMatrix");
+        p_uniforms.setOptional(_gl, object3, "bindMatrixInverse");
+        const skeleton = object3.skeleton;
         if (skeleton) {
           if (skeleton.boneTexture === null) skeleton.computeBoneTexture();
           p_uniforms.setValue(_gl, "boneTexture", skeleton.boneTexture, textures);
         }
       }
-      if (object2.isBatchedMesh) {
-        p_uniforms.setOptional(_gl, object2, "batchingTexture");
-        p_uniforms.setValue(_gl, "batchingTexture", object2._matricesTexture, textures);
-        p_uniforms.setOptional(_gl, object2, "batchingIdTexture");
-        p_uniforms.setValue(_gl, "batchingIdTexture", object2._indirectTexture, textures);
-        p_uniforms.setOptional(_gl, object2, "batchingColorTexture");
-        if (object2._colorsTexture !== null) {
-          p_uniforms.setValue(_gl, "batchingColorTexture", object2._colorsTexture, textures);
+      if (object3.isBatchedMesh) {
+        p_uniforms.setOptional(_gl, object3, "batchingTexture");
+        p_uniforms.setValue(_gl, "batchingTexture", object3._matricesTexture, textures);
+        p_uniforms.setOptional(_gl, object3, "batchingIdTexture");
+        p_uniforms.setValue(_gl, "batchingIdTexture", object3._indirectTexture, textures);
+        p_uniforms.setOptional(_gl, object3, "batchingColorTexture");
+        if (object3._colorsTexture !== null) {
+          p_uniforms.setValue(_gl, "batchingColorTexture", object3._colorsTexture, textures);
         }
       }
       const morphAttributes = geometry.morphAttributes;
       if (morphAttributes.position !== void 0 || morphAttributes.normal !== void 0 || morphAttributes.color !== void 0) {
-        morphtargets.update(object2, geometry, program);
+        morphtargets.update(object3, geometry, program);
       }
-      if (refreshMaterial || materialProperties.receiveShadow !== object2.receiveShadow) {
-        materialProperties.receiveShadow = object2.receiveShadow;
-        p_uniforms.setValue(_gl, "receiveShadow", object2.receiveShadow);
+      if (refreshMaterial || materialProperties.receiveShadow !== object3.receiveShadow) {
+        materialProperties.receiveShadow = object3.receiveShadow;
+        p_uniforms.setValue(_gl, "receiveShadow", object3.receiveShadow);
       }
       if (material.isMeshGouraudMaterial && material.envMap !== null) {
         m_uniforms.envMap.value = envMap;
@@ -41463,11 +41463,11 @@ var WebGLRenderer = class {
         material.uniformsNeedUpdate = false;
       }
       if (material.isSpriteMaterial) {
-        p_uniforms.setValue(_gl, "center", object2.center);
+        p_uniforms.setValue(_gl, "center", object3.center);
       }
-      p_uniforms.setValue(_gl, "modelViewMatrix", object2.modelViewMatrix);
-      p_uniforms.setValue(_gl, "normalMatrix", object2.normalMatrix);
-      p_uniforms.setValue(_gl, "modelMatrix", object2.matrixWorld);
+      p_uniforms.setValue(_gl, "modelViewMatrix", object3.modelViewMatrix);
+      p_uniforms.setValue(_gl, "normalMatrix", object3.normalMatrix);
+      p_uniforms.setValue(_gl, "modelMatrix", object3.matrixWorld);
       if (material.isShaderMaterial || material.isRawShaderMaterial) {
         const groups = material.uniformsGroups;
         for (let i = 0, l = groups.length; i < l; i++) {
@@ -41883,81 +41883,147 @@ var WebGLRenderer = class {
   }
 };
 
-// src/domain/portal.ts
-var MAX_PORTALS = 16;
-var PORTAL_PLAYER_RADIUS = 0.28;
-var PORTAL_PLAYER_HEIGHT = 1.75;
-var record = (v) => !!v && typeof v === "object" && !Array.isArray(v);
-var bounded = (v, min, max) => typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
-var vec = (v) => Array.isArray(v) && v.length === 3 && v.every((n) => bounded(n, -2e3, 2e3));
-var identity = (v, prefix) => typeof v === "string" && new RegExp("^" + prefix + "[A-Za-z0-9][A-Za-z0-9._-]{0,159}$").test(v);
-var keys = (v, allowed) => Object.keys(v).every((k) => allowed.includes(k));
-function validateWorldConnections(project) {
-  const errors = [], ids = /* @__PURE__ */ new Set();
-  if (project.portals !== void 0) {
-    if (!Array.isArray(project.portals) || project.portals.length > MAX_PORTALS) errors.push("Worlds may contain at most 16 portals.");
-    for (const p of Array.isArray(project.portals) ? project.portals : []) {
-      if (!record(p) || !keys(p, ["id", "name", "position", "yaw", "width", "height", "destination", "enabled", "view", "traversal", "policyRef", "visual"])) {
-        errors.push("Invalid portal fields.");
-        continue;
-      }
-      if (!identity(p.id, "elsemesh-portal:") || ids.has(p.id)) errors.push("Portal has an invalid or duplicate identity.");
-      ids.add(p.id);
-      if (typeof p.name !== "string" || !p.name.trim() || p.name.length > 120 || !vec(p.position) || !bounded(p.yaw, -Math.PI * 2, Math.PI * 2) || !bounded(p.width, Math.round((PORTAL_PLAYER_RADIUS * 2 + 0.04) * 100) / 100, 20) || !bounded(p.height, PORTAL_PLAYER_HEIGHT + 0.04, 20)) errors.push("Portal geometry must be an upright rectangle large enough for the player capsule.");
-      if (typeof p.enabled !== "boolean" || !record(p.view) || !keys(p.view, ["enabled", "maxDistance"]) || typeof p.view.enabled !== "boolean" || !bounded(p.view.maxDistance, 0.5, 200) || !record(p.traversal) || !keys(p.traversal, ["enabled"]) || typeof p.traversal.enabled !== "boolean") errors.push("Portal view or traversal settings are invalid.");
-      if (!record(p.destination) || !keys(p.destination, ["worldId", "regionId", "portalId"]) || !identity(p.destination.worldId, "elsemesh[.]world:") || !identity(p.destination.regionId, "elsemesh[.]region:") || !identity(p.destination.portalId, "elsemesh-portal:")) errors.push("Portal destination must contain world, region and portal identities.");
-      if (typeof p.policyRef !== "string" || !/^[A-Za-z0-9][A-Za-z0-9:._-]{0,159}$/.test(p.policyRef)) errors.push("Portal policy reference must be a bounded identity, never a URL or credential.");
-      if (!record(p.visual) || !keys(p.visual, ["frameColor", "unavailableColor"]) || ![p.visual.frameColor, p.visual.unavailableColor].every((c) => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c))) errors.push("Portal colors must be hexadecimal RGB.");
-    }
-    for (const p of Array.isArray(project.portals) ? project.portals : []) {
-      if (!record(p) || !record(p.destination)) continue;
-      if (p.destination.worldId === project.metadata?.worldId && (p.destination.regionId !== project.metadata?.regionId || !ids.has(p.destination.portalId))) errors.push("Portal references a missing local region or portal.");
-    }
+// src/domain/geography.ts
+var MAX_IMAGERY_BYTES = 15 * 1024 * 1024;
+function fail(message) {
+  throw new Error(message);
+}
+var finite = (n) => typeof n === "number" && Number.isFinite(n);
+var text = (s, limit = 2e3) => typeof s === "string" && s.trim().length > 0 && s.length <= limit;
+function parseAsciiGrid(input) {
+  if (input.length > 64 * 1024 * 1024) fail("ASCII grid exceeds the 64 MiB text limit.");
+  const tokens = input.trim().split(/\s+/);
+  const header = /* @__PURE__ */ new Map();
+  const keys3 = /* @__PURE__ */ new Set(["ncols", "nrows", "xllcorner", "yllcorner", "xllcenter", "yllcenter", "cellsize", "nodata_value"]);
+  let cursor = 0;
+  while (cursor < tokens.length && keys3.has(tokens[cursor].toLowerCase())) {
+    const key = tokens[cursor++].toLowerCase();
+    if (header.has(key)) fail(`Duplicate ASCII grid header ${key}.`);
+    const raw = tokens[cursor++];
+    const value = raw === void 0 ? Number.NaN : Number(raw);
+    if (!Number.isFinite(value)) fail(`ASCII grid header ${key} must be finite.`);
+    header.set(key, value);
   }
-  if (project.water !== void 0) {
-    const w = project.water;
-    if (!record(w) || !keys(w, ["level", "waveAmplitude", "waveSpeed", "extent"]) || !bounded(w.level, -2e3, 2e3) || !bounded(w.waveAmplitude, 0, 3) || !bounded(w.waveSpeed, 0, 10) || !bounded(w.extent, 16, 4096)) errors.push("Water settings are outside supported bounds.");
+  const ncols = header.get("ncols"), nrows = header.get("nrows"), cellSize = header.get("cellsize");
+  if (![ncols, nrows].every((n) => Number.isInteger(n) && n >= 2) || ncols * nrows > 4194304) fail("ASCII grid must contain 2–4,194,304 bounded sample cells.");
+  if (!finite(cellSize) || cellSize <= 0 || cellSize > 1e4) fail("ASCII cellsize must be a positive spacing in metres.");
+  for (const axis of ["x", "y"]) if (Number(header.has(`${axis}llcorner`)) + Number(header.has(`${axis}llcenter`)) !== 1) fail(`Specify exactly one ${axis}llcorner or ${axis}llcenter header.`);
+  if (tokens.length - cursor !== ncols * nrows) fail(`ASCII sample count differs from ncols × nrows (${ncols * nrows}).`);
+  const values = new Array(ncols * nrows);
+  for (let i = 0; i < values.length; i++) {
+    const value = Number(tokens[cursor + i]);
+    if (!finite(value)) fail(`ASCII sample ${i + 1} is not finite.`);
+    values[i] = value;
   }
-  if (project.terminals !== void 0) {
-    const terminalIds = /* @__PURE__ */ new Set(), objects = new Set((Array.isArray(project.objects) ? project.objects : []).map((o) => o?.id));
-    if (!Array.isArray(project.terminals) || project.terminals.length > 32) errors.push("Worlds may contain at most 32 retro terminals.");
-    for (const t of Array.isArray(project.terminals) ? project.terminals : []) {
-      if (!record(t) || !keys(t, ["id", "objectId", "kind", "screenObjectId", "screenObjectIds", "position", "interactionRadius"]) || typeof t.id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9:._-]{0,159}$/.test(t.id) || terminalIds.has(t.id) || !["c64", "bbc", "sun"].includes(t.kind) || !objects.has(t.objectId) || t.screenObjectId !== void 0 && !objects.has(t.screenObjectId) || t.screenObjectIds !== void 0 && (!Array.isArray(t.screenObjectIds) || t.screenObjectIds.length > 8 || new Set(t.screenObjectIds).size !== t.screenObjectIds.length || t.screenObjectIds.some((id) => !objects.has(id))) || !vec(t.position) || !bounded(t.interactionRadius, 0.5, 5)) errors.push("Retro terminal has invalid settings, duplicate identity or missing object references.");
-      if (record(t) && typeof t.id === "string") terminalIds.add(t.id);
-    }
+  return { ncols, nrows, cellSize, xOrigin: header.get("xllcenter") ?? header.get("xllcorner") + cellSize / 2, yOrigin: header.get("yllcenter") ?? header.get("yllcorner") + cellSize / 2, nodata: header.get("nodata_value") ?? null, values };
+}
+function sampleGeographicGrid(grid, easting, northing) {
+  const x = (easting - grid.xOrigin) / grid.cellSize;
+  const y = (northing - grid.yOrigin) / grid.cellSize;
+  if (!finite(x) || !finite(y) || x < -1e-8 || y < -1e-8 || x > grid.ncols - 1 + 1e-8 || y > grid.nrows - 1 + 1e-8) fail("Selected terrain extends outside source sample coverage. Choose a smaller area or another grid.");
+  const sx = Math.max(0, Math.min(grid.ncols - 1, x)), sy = Math.max(0, Math.min(grid.nrows - 1, y));
+  const x0 = Math.floor(sx), y0 = Math.floor(sy), x1 = Math.min(grid.ncols - 1, x0 + 1), y1 = Math.min(grid.nrows - 1, y0 + 1);
+  const tx = sx - x0, ty = sy - y0;
+  const corners = [[x0, y0, (1 - tx) * (1 - ty)], [x1, y0, tx * (1 - ty)], [x0, y1, (1 - tx) * ty], [x1, y1, tx * ty]];
+  let height = 0;
+  for (const [col, row, weight] of corners) {
+    if (weight <= 1e-12) continue;
+    const value = grid.values[(grid.nrows - 1 - row) * grid.ncols + col];
+    if (!finite(value) || grid.nodata !== null && value === grid.nodata) fail("Selected terrain includes NODATA or missing elevations. Choose a fully covered area.");
+    height += value * weight;
+  }
+  return height;
+}
+function createGeographicTerrain(grid, selection, metadata) {
+  const { easting, northing, radius } = selection;
+  if (![easting, northing].every(finite) || !Number.isInteger(radius) || radius < 8 || radius > 1024) fail("Choose finite British National Grid coordinates and an integer radius from 8 to 1024 metres.");
+  const size = radius * 2;
+  const requested = selection.resolution ?? Math.min(257, Math.max(9, Math.ceil(size / grid.cellSize / 2) * 2 + 1));
+  if (!Number.isInteger(requested) || requested < 9 || requested > 257 || requested % 2 !== 1) fail("Output resolution must be an odd grid size from 9 to 257.");
+  const bounds = { west: easting - radius, east: easting + radius, south: northing - radius, north: northing + radius };
+  const geography = { ...metadata, crs: "EPSG:27700", center: { easting, northing }, bounds, sourceSpacing: grid.cellSize, outputSpacing: size / (requested - 1) };
+  const errors = validateGeography(geography);
+  if (errors.length) fail(errors[0]);
+  const minCol = Math.floor((bounds.west - grid.xOrigin) / grid.cellSize + 1e-8), maxCol = Math.ceil((bounds.east - grid.xOrigin) / grid.cellSize - 1e-8);
+  const minRow = Math.floor((bounds.south - grid.yOrigin) / grid.cellSize + 1e-8), maxRow = Math.ceil((bounds.north - grid.yOrigin) / grid.cellSize - 1e-8);
+  if (minCol < 0 || minRow < 0 || maxCol >= grid.ncols || maxRow >= grid.nrows) fail("Selected terrain extends outside source sample coverage.");
+  for (let row = minRow; row <= maxRow; row++) for (let col = minCol; col <= maxCol; col++) {
+    const value = grid.values[(grid.nrows - 1 - row) * grid.ncols + col];
+    if (!finite(value) || grid.nodata !== null && value === grid.nodata) fail("Selected terrain includes NODATA or missing elevations.");
+  }
+  const heights = [];
+  for (let z = 0; z < requested; z++) for (let x = 0; x < requested; x++) {
+    const value = sampleGeographicGrid(grid, bounds.west + x * geography.outputSpacing, bounds.north - z * geography.outputSpacing);
+    if (Math.abs(value) > 2e3) fail("Source elevations exceed the builder’s supported ±2000 metre datum range.");
+    heights.push(value);
+  }
+  return { terrain: { width: size, depth: size, resolution: requested, seed: 0, heights, materials: Array(heights.length).fill(0) }, geography };
+}
+function validateGeographicBounds(value) {
+  if (!value || typeof value !== "object") return false;
+  const b = value;
+  return [b.west, b.east, b.south, b.north].every(finite) && b.west < b.east && b.south < b.north && b.west >= 0 && b.east <= 7e5 && b.south >= 0 && b.north <= 13e5;
+}
+function validateGeography(value, terrain) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return ["Geographic reference must be an object."];
+  const geo = value;
+  const errors = [];
+  if (geo.crs !== "EPSG:27700") errors.push("Only EPSG:27700 British National Grid geography is supported.");
+  if (!validateGeographicBounds(geo.bounds) || !geo.center || !finite(geo.center.easting) || !finite(geo.center.northing)) errors.push("Geographic bounds or centre are invalid.");
+  else {
+    const width = geo.bounds.east - geo.bounds.west, depth = geo.bounds.north - geo.bounds.south;
+    if (width > 2048 || depth > 2048 || Math.abs(width - depth) > 1e-6 || Math.abs((geo.bounds.west + geo.bounds.east) / 2 - geo.center.easting) > 1e-6 || Math.abs((geo.bounds.south + geo.bounds.north) / 2 - geo.center.northing) > 1e-6) errors.push("Geographic extent must be a centred square no larger than 2048 metres.");
+    if (terrain && (Math.abs(width - terrain.width) > 1e-6 || Math.abs(depth - terrain.depth) > 1e-6 || Math.abs(width / (terrain.resolution - 1) - geo.outputSpacing) > 1e-6)) errors.push("Geographic extent or output spacing does not match the terrain.");
+  }
+  if (![geo.sourceSpacing, geo.outputSpacing].every((n) => finite(n) && n > 0)) errors.push("Geographic source and output sample spacing must be positive.");
+  if (!text(geo.sourceName, 240) || !text(geo.license) || !text(geo.attribution) || !text(geo.verticalDatum, 240) || geo.source !== void 0 && !text(geo.source)) errors.push("Geographic source name, licence, attribution and vertical datum are required.");
+  return errors;
+}
+function validateTerrainImagery(value, geography) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return ["Terrain imagery must be an object."];
+  const imagery = value;
+  const errors = [];
+  if (!geography || imagery.crs !== "EPSG:27700" || !validateGeographicBounds(imagery.bounds)) errors.push("Terrain imagery needs EPSG:27700 bounds and a geographic terrain reference.");
+  else if (validateGeographicBounds(geography.bounds) && (imagery.bounds.west >= geography.bounds.east || imagery.bounds.east <= geography.bounds.west || imagery.bounds.south >= geography.bounds.north || imagery.bounds.north <= geography.bounds.south)) errors.push("Imagery bounds must overlap the selected terrain extent.");
+  if (!text(imagery.sourceName, 240) || !text(imagery.license) || !text(imagery.attribution)) errors.push("Imagery source name, licence and attribution are required.");
+  try {
+    if (typeof imagery.dataUrl !== "string" || imagery.dataUrl.length > MAX_IMAGERY_BYTES * 4 / 3 + 64) fail("Terrain imagery exceeds the 15 MiB embedded image limit.");
+    const match = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]*={0,2})$/.exec(imagery.dataUrl);
+    if (!match || match[2].length % 4 !== 0) fail("Imagery must be an embedded base64 PNG or JPEG.");
+    const binary = atob(match[2]);
+    if (!binary.length || binary.length > MAX_IMAGERY_BYTES) fail("Terrain imagery exceeds the 15 MiB embedded image limit.");
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const [width, height] = imageDimensions(bytes, match[1]);
+    if (width < 1 || height < 1 || width > 8192 || height > 8192 || width * height > 32e6) fail("Terrain imagery exceeds the 8192 pixel side or 32 megapixel decode budget.");
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : "Terrain imagery is invalid.");
   }
   return errors;
 }
-var rotate = (v, yaw) => [Math.cos(yaw) * v[0] + Math.sin(yaw) * v[2], v[1], -Math.sin(yaw) * v[0] + Math.cos(yaw) * v[2]];
-function portalLocalPoint(portal, point) {
-  return rotate([point[0] - portal.position[0], point[1] - portal.position[1], point[2] - portal.position[2]], -portal.yaw);
-}
-function portalWorldPoint(portal, point) {
-  const v = rotate(point, portal.yaw);
-  return [v[0] + portal.position[0], v[1] + portal.position[1], v[2] + portal.position[2]];
-}
-function mapPortalPoint(source, destination, point) {
-  const v = portalLocalPoint(source, point);
-  return portalWorldPoint(destination, [-v[0], v[1], -v[2]]);
-}
-function mapPortalDirection(source, destination, direction) {
-  return rotate(direction, destination.yaw + Math.PI - source.yaw);
-}
-function portalMappingElements(source, destination) {
-  const x = mapPortalDirection(source, destination, [1, 0, 0]), y = mapPortalDirection(source, destination, [0, 1, 0]), z = mapPortalDirection(source, destination, [0, 0, 1]), p = mapPortalPoint(source, destination, [0, 0, 0]);
-  return [x[0], x[1], x[2], 0, y[0], y[1], y[2], 0, z[0], z[1], z[2], 0, p[0], p[1], p[2], 1];
-}
-function mapPortalYaw(source, destination, yaw) {
-  const angle = yaw + destination.yaw + Math.PI - source.yaw;
-  return Math.atan2(Math.sin(angle), Math.cos(angle));
-}
-function sweepPortalCapsule({ portal, previousFeet, nextFeet, radius = PORTAL_PLAYER_RADIUS, bodyHeight = PORTAL_PLAYER_HEIGHT }) {
-  if (!portal.enabled || !portal.traversal.enabled || ![...previousFeet, ...nextFeet, radius, bodyHeight].every(Number.isFinite) || radius < 0 || bodyHeight <= 0) return null;
-  const a = portalLocalPoint(portal, previousFeet), b = portalLocalPoint(portal, nextFeet);
-  if (a[2] <= 0 || b[2] > 0) return null;
-  const fraction = a[2] / (a[2] - b[2]), x = a[0] + (b[0] - a[0]) * fraction, y = a[1] + (b[1] - a[1]) * fraction;
-  if (Math.abs(x) + radius > portal.width / 2 || y < -portal.height / 2 - 1e-7 || y + bodyHeight > portal.height / 2 + 1e-7) return null;
-  return { fraction, feet: portalWorldPoint(portal, [x, y, 0]) };
+function imageDimensions(bytes, type) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (type === "png") {
+    if (bytes.length < 24 || view.getUint32(0) !== 2303741511 || view.getUint32(4) !== 218765834 || view.getUint32(12) !== 1229472850) fail("Imagery PNG header is invalid.");
+    return [view.getUint32(16), view.getUint32(20)];
+  }
+  if (bytes.length < 4 || view.getUint16(0) !== 65496) fail("Imagery JPEG header is invalid.");
+  let offset = 2;
+  while (offset + 4 <= bytes.length) {
+    if (bytes[offset] !== 255) fail("Imagery JPEG marker is invalid.");
+    while (bytes[offset] === 255) offset++;
+    const marker = bytes[offset++];
+    if (marker === 217 || marker === 218) break;
+    if (marker === 1 || marker >= 208 && marker <= 215) continue;
+    if (offset + 2 > bytes.length) fail("Imagery JPEG is truncated.");
+    const length = view.getUint16(offset);
+    if (length < 2 || offset + length > bytes.length) fail("Imagery JPEG segment is truncated.");
+    if ([192, 193, 194].includes(marker)) {
+      if (length < 8) fail("Imagery JPEG dimensions are invalid.");
+      return [view.getUint16(offset + 5), view.getUint16(offset + 3)];
+    }
+    offset += length;
+  }
+  return fail("Imagery JPEG dimensions could not be read.");
 }
 
 // src/domain/computer.ts
@@ -41976,7 +42042,7 @@ function validateComputer(value) {
   return errors;
 }
 function buildComputerGeometry() {
-  const box = (name, size, position, color, emissive = false) => ({ name, geometry: new BoxGeometry(...size).translate(...position), color, ...emissive ? { emissive: true } : {} });
+  const box = (name, size, position, color2, emissive = false) => ({ name, geometry: new BoxGeometry(...size).translate(...position), color: color2, ...emissive ? { emissive: true } : {} });
   const parts = [
     box("base", [0.44, 0.045, 0.3], [0, 0.0225, -0.1], "#1b2028"),
     box("post", [0.075, 0.27, 0.075], [0, 0.18, -0.12], "#373e48"),
@@ -42022,8 +42088,8 @@ var FontLoader = class extends Loader {
     loader.setPath(this.path);
     loader.setRequestHeader(this.requestHeader);
     loader.setWithCredentials(this.withCredentials);
-    loader.load(url, function(text2) {
-      const font = scope.parse(JSON.parse(text2));
+    loader.load(url, function(text3) {
+      const font = scope.parse(JSON.parse(text3));
       if (onLoad) onLoad(font);
     }, onProgress, onError);
   }
@@ -42056,17 +42122,17 @@ var Font = class {
    * @param {number} [size=100] - The text size.
    * @return {Array<Shape>} An array of shapes representing the text.
    */
-  generateShapes(text2, size = 100) {
+  generateShapes(text3, size = 100) {
     const shapes = [];
-    const paths = createPaths(text2, size, this.data);
+    const paths = createPaths(text3, size, this.data);
     for (let p = 0, pl = paths.length; p < pl; p++) {
       shapes.push(...paths[p].toShapes());
     }
     return shapes;
   }
 };
-function createPaths(text2, size, data) {
-  const chars = Array.from(text2);
+function createPaths(text3, size, data) {
+  const chars = Array.from(text3);
   const scale = size / data.resolution;
   const line_height = (data.boundingBox.yMax - data.boundingBox.yMin + data.underlineThickness) * scale;
   const paths = [];
@@ -42137,12 +42203,12 @@ var TextGeometry = class extends ExtrudeGeometry {
    * @param {string} text - The text that should be transformed into a geometry.
    * @param {TextGeometry~Options} [parameters] - The text settings.
    */
-  constructor(text2, parameters = {}) {
+  constructor(text3, parameters = {}) {
     const font = parameters.font;
     if (font === void 0) {
       super();
     } else {
-      const shapes = font.generateShapes(text2, parameters.size);
+      const shapes = font.generateShapes(text3, parameters.size);
       if (parameters.depth === void 0) parameters.depth = 50;
       if (parameters.bevelThickness === void 0) parameters.bevelThickness = 10;
       if (parameters.bevelSize === void 0) parameters.bevelSize = 8;
@@ -42367,8 +42433,8 @@ var optimer_regular_typeface_default = { glyphs: { ο: { x_min: 41, x_max: 710, 
 var NEON_SIGN_SCHEMA = "elsemesh.neon-sign/1";
 var NEON_FONTS = ["helvetiker", "optimer"];
 var NEON_EFFECTS = ["steady", "flicker", "pulse", "flash", "sequence", "colour-cycle", "faulty", "timed"];
-function defaultNeonSign(text2 = "THE RED LION") {
-  return { schema: NEON_SIGN_SCHEMA, text: text2, font: "helvetiker", size: 1, depth: 0.06, tubeThickness: 0.025, letterSpacing: 0.04, lineHeight: 1.4, align: "center", color: "#ff3ea5", secondaryColor: "#35ddff", brightness: 2, glow: 0.6, backing: "panel", backingColor: "#10101c", frame: true, doubleSided: false, mounting: "wall", quality: "medium", powered: true, effect: { mode: "steady", speed: 1, intensity: 1, dutyCycle: 0.5, seed: 7319, startHour: 18, endHour: 6 } };
+function defaultNeonSign(text3 = "THE RED LION") {
+  return { schema: NEON_SIGN_SCHEMA, text: text3, font: "helvetiker", size: 1, depth: 0.06, tubeThickness: 0.025, letterSpacing: 0.04, lineHeight: 1.4, align: "center", color: "#ff3ea5", secondaryColor: "#35ddff", brightness: 2, glow: 0.6, backing: "panel", backingColor: "#10101c", frame: true, doubleSided: false, mounting: "wall", quality: "medium", powered: true, effect: { mode: "steady", speed: 1, intensity: 1, dutyCycle: 0.5, seed: 7319, startHour: 18, endHour: 6 } };
 }
 function validateNeonSign(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return ["Neon configuration must be an object."];
@@ -42408,7 +42474,7 @@ var noise = (step, seed) => {
 };
 function sampleNeonEffect(c, timeSeconds, worldHour) {
   const time = Number.isFinite(timeSeconds) ? Math.max(0, timeSeconds) : 0, hour = Number.isFinite(worldHour) ? (worldHour % 24 + 24) % 24 : 12, e = c.effect, phase = time * e.speed, fraction = phase % 1;
-  let brightness = c.powered ? c.brightness : 0, color = c.color, litGlyphs;
+  let brightness = c.powered ? c.brightness : 0, color2 = c.color, litGlyphs;
   switch (e.mode) {
     case "pulse":
       brightness *= 0.2 + 0.8 * (0.5 - 0.5 * Math.cos(phase * Math.PI * 2));
@@ -42427,7 +42493,7 @@ function sampleNeonEffect(c, timeSeconds, worldHour) {
       break;
     case "colour-cycle": {
       const amount = 0.5 - 0.5 * Math.cos(phase * Math.PI * 2);
-      color = "#" + new Color(c.color).lerp(new Color(c.secondaryColor), amount).getHexString();
+      color2 = "#" + new Color(c.color).lerp(new Color(c.secondaryColor), amount).getHexString();
       break;
     }
     case "timed": {
@@ -42437,9 +42503,9 @@ function sampleNeonEffect(c, timeSeconds, worldHour) {
     }
   }
   if (["pulse", "flash", "flicker", "faulty"].includes(e.mode)) brightness = (c.powered ? c.brightness : 0) * (1 - e.intensity) + brightness * e.intensity;
-  return { brightness, color, ...litGlyphs !== void 0 ? { litGlyphs } : {} };
+  return { brightness, color: color2, ...litGlyphs !== void 0 ? { litGlyphs } : {} };
 }
-var NEON_PRESETS = ["OPEN", "CLOSED", "WELCOME", "BAR", "PUB", "CAFE", "HOTEL", "RESTAURANT", "SHOP", "VACANCIES", "EXIT", "Custom Text"].map((text2, i) => ({ id: text2.toLowerCase().replace(" ", "-"), name: text2, config: { ...defaultNeonSign(i === 11 ? "YOUR TEXT" : text2), font: i % 3 === 0 ? "optimer" : "helvetiker", color: ["#ff3ea5", "#35ddff", "#ffd166"][i % 3] } }));
+var NEON_PRESETS = ["OPEN", "CLOSED", "WELCOME", "BAR", "PUB", "CAFE", "HOTEL", "RESTAURANT", "SHOP", "VACANCIES", "EXIT", "Custom Text"].map((text3, i) => ({ id: text3.toLowerCase().replace(" ", "-"), name: text3, config: { ...defaultNeonSign(i === 11 ? "YOUR TEXT" : text3), font: i % 3 === 0 ? "optimer" : "helvetiker", color: ["#ff3ea5", "#35ddff", "#ffd166"][i % 3] } }));
 var NEON_PREFAB_SCHEMA = "elsemesh.neon-prefab/1";
 function createNeonPrefab(config) {
   const errors = validateNeonSign(config);
@@ -42739,7 +42805,7 @@ function inspectGlbJson(buffer) {
     requireValue(image && image.uri === void 0 && integer(image.bufferView) && json2.bufferViews[image.bufferView] && ["image/png", "image/jpeg"].includes(image.mimeType), "GLB textures must be embedded PNG or JPEG images.");
     const bv = json2.bufferViews[image.bufferView];
     const bytes = binary.subarray(bv.byteOffset ?? 0, (bv.byteOffset ?? 0) + bv.byteLength);
-    const dimensions = imageDimensions(bytes, image.mimeType);
+    const dimensions = imageDimensions2(bytes, image.mimeType);
     requireValue(dimensions[0] > 0 && dimensions[1] > 0 && dimensions.every((n) => n <= 4096), "GLB texture dimensions exceed 4096 pixels or are invalid.");
     imagePixels += dimensions[0] * dimensions[1];
     requireValue(imagePixels <= 32e6, "GLB decoded image budget exceeded.");
@@ -42760,7 +42826,7 @@ function inspectGlbJson(buffer) {
   for (const material of json2.materials ?? []) inspectMaterial(material);
   return { json: json2, materialCount, vertexCount, triangleCount, bounds: { min: bounds.min.toArray(), max: bounds.max.toArray() } };
 }
-function imageDimensions(bytes, mime) {
+function imageDimensions2(bytes, mime) {
   const data = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   if (mime === "image/png") {
     requireValue(bytes.length >= 24 && data.getUint32(0) === 2303741511 && data.getUint32(4) === 218765834 && data.getUint32(12) === 1229472850, "Invalid embedded PNG header.");
@@ -42936,7 +43002,7 @@ function treeWindOffset(x, y, z, time, seed = 7319, species = "broadleaf") {
 var MAX_HIERARCHY_DEPTH = 32;
 var MAX_WORLD_TRANSFORM_COMPONENT = 1e7;
 var MAX_WORLD_BOUND_COMPONENT = 1e9;
-var vec2 = (v) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
+var vec = (v) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
 function validateHierarchy(objects) {
   const errors = [], map = /* @__PURE__ */ new Map();
   for (const o of objects) {
@@ -42945,7 +43011,7 @@ function validateHierarchy(objects) {
       continue;
     }
     map.set(o.id, o);
-    if (!vec2(o.position) || !vec2(o.rotation) || !vec2(o.scale) || o.scale.some((n) => n <= 0 || n > 1e3)) errors.push("Hierarchy transforms must be finite positive local TRS.");
+    if (!vec(o.position) || !vec(o.rotation) || !vec(o.scale) || o.scale.some((n) => n <= 0 || n > 1e3)) errors.push("Hierarchy transforms must be finite positive local TRS.");
     if (o.parentId !== void 0 && (typeof o.parentId !== "string" || !o.parentId)) errors.push("Invalid parent ID.");
     if (o.locked !== void 0 && typeof o.locked !== "boolean") errors.push("Invalid object lock.");
     if (o.description !== void 0 && (typeof o.description !== "string" || o.description.length > 2e3)) errors.push("Description exceeds 2000 characters.");
@@ -42997,8 +43063,8 @@ function assert(objects) {
 function hierarchyOrder(objects) {
   assert(objects);
   const result = [];
-  const visit = (id) => {
-    for (const o of objects) if (o.parentId === id) {
+  const visit = (id2) => {
+    for (const o of objects) if (o.parentId === id2) {
       result.push(o);
       visit(o.id);
     }
@@ -43018,9 +43084,9 @@ function resolveWorldMatrices(objects) {
   }
   return result;
 }
-function effectiveObjectState(objects, id) {
+function effectiveObjectState(objects, id2) {
   const map = new Map(objects.map((o2) => [o2.id, o2]));
-  let o = map.get(id), visible = true, locked = false;
+  let o = map.get(id2), visible = true, locked = false;
   const seen = /* @__PURE__ */ new Set();
   while (o && !seen.has(o.id)) {
     seen.add(o.id);
@@ -43032,8 +43098,8 @@ function effectiveObjectState(objects, id) {
 }
 function pruneSelection(objects, ids) {
   const chosen = new Set(ids), map = new Map(objects.map((o) => [o.id, o]));
-  return [...chosen].filter((id) => {
-    let o = map.get(id);
+  return [...chosen].filter((id2) => {
+    let o = map.get(id2);
     if (!o) return false;
     while (o.parentId) {
       if (chosen.has(o.parentId)) return false;
@@ -43048,7 +43114,7 @@ function subtreeIds(objects, ids) {
   return result;
 }
 function editable(objects, ids) {
-  for (const id of subtreeIds(objects, ids)) if (effectiveObjectState(objects, id).locked) throw new Error("Unlock the selected objects and descendants before editing.");
+  for (const id2 of subtreeIds(objects, ids)) if (effectiveObjectState(objects, id2).locked) throw new Error("Unlock the selected objects and descendants before editing.");
 }
 function fromMatrix(o, matrix, parentId) {
   const position = new Vector3(), quaternion = new Quaternion(), scale = new Vector3();
@@ -43077,29 +43143,29 @@ function reparentObjects(project, ids, parentId) {
   const matrices = resolveWorldMatrices(project.objects), inverse = parentId ? matrices.get(parentId).clone().invert() : new Matrix4(), selected = new Set(roots);
   return checked(project, project.objects.map((o) => selected.has(o.id) ? fromMatrix(o, inverse.clone().multiply(matrices.get(o.id)), parentId) : o));
 }
-function groupObjects(project, ids, name = "Group", id = crypto.randomUUID()) {
+function groupObjects(project, ids, name = "Group", id2 = crypto.randomUUID()) {
   const roots = pruneSelection(project.objects, ids);
   if (!roots.length) throw new Error("Select objects first.");
   editable(project.objects, roots);
-  const group = { id, name, kind: "group", position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1], visible: true, color: "#8ebcc1", collision: "none" };
-  const next = reparentObjects(checked(project, [...project.objects, group]), roots, id);
-  return { project: next, groupId: id };
+  const group = { id: id2, name, kind: "group", position: [0, 0, 0], rotation: [0, 0, 0], scale: [1, 1, 1], visible: true, color: "#8ebcc1", collision: "none" };
+  const next = reparentObjects(checked(project, [...project.objects, group]), roots, id2);
+  return { project: next, groupId: id2 };
 }
 function ungroupObjects(project, ids) {
   let next = project;
   const groups = pruneSelection(project.objects, ids);
   editable(project.objects, groups);
-  for (const id of groups) {
-    const group = next.objects.find((o) => o.id === id);
+  for (const id2 of groups) {
+    const group = next.objects.find((o) => o.id === id2);
     if (group?.kind !== "group") throw new Error("Select a group to ungroup.");
-    const children = next.objects.filter((o) => o.parentId === id).map((o) => o.id);
+    const children = next.objects.filter((o) => o.parentId === id2).map((o) => o.id);
     if (children.length) next = reparentObjects(next, children, group.parentId);
-    next = checked(next, next.objects.filter((o) => o.id !== id));
+    next = checked(next, next.objects.filter((o) => o.id !== id2));
   }
   return next;
 }
 function cloneSubtrees(project, ids) {
-  const roots = pruneSelection(project.objects, ids), all = subtreeIds(project.objects, roots), map = new Map([...all].map((id) => [id, crypto.randomUUID()]));
+  const roots = pruneSelection(project.objects, ids), all = subtreeIds(project.objects, roots), map = new Map([...all].map((id2) => [id2, crypto.randomUUID()]));
   const worlds = resolveWorldMatrices(project.objects), rootSet = new Set(roots);
   const objects = project.objects.filter((o) => all.has(o.id)).map((o) => {
     const clone = structuredClone(o);
@@ -43109,7 +43175,7 @@ function cloneSubtrees(project, ids) {
     clone.parentId = map.get(o.parentId);
     return clone;
   });
-  return { objects, rootIds: roots.map((id) => map.get(id)) };
+  return { objects, rootIds: roots.map((id2) => map.get(id2)) };
 }
 var treeBoundsCache = /* @__PURE__ */ new Map();
 function objectLocalBounds(project, o) {
@@ -43149,19 +43215,19 @@ function objectLocalBounds(project, o) {
   if (o.kind === "cylinder") return new Box3(new Vector3(-0.65, -0.8, -0.65), new Vector3(0.65, 0.8, 0.65));
   return new Box3(new Vector3(-0.8, -0.8, -0.8), new Vector3(0.8, 0.8, 0.8));
 }
-function getGroupBounds(project, id) {
-  const group = project.objects.find((o) => o.id === id);
+function getGroupBounds(project, id2) {
+  const group = project.objects.find((o) => o.id === id2);
   if (group?.kind !== "group") throw new Error("Select a group.");
-  const all = subtreeIds(project.objects, [id]), worlds = resolveWorldMatrices(project.objects), inverse = worlds.get(id).clone().invert(), bounds = new Box3();
+  const all = subtreeIds(project.objects, [id2]), worlds = resolveWorldMatrices(project.objects), inverse = worlds.get(id2).clone().invert(), bounds = new Box3();
   for (const o of project.objects) if (o.kind !== "group" && all.has(o.id)) bounds.union(objectLocalBounds(project, o).applyMatrix4(inverse.clone().multiply(worlds.get(o.id))));
   if (bounds.isEmpty()) return { min: [0, 0, 0], max: [0, 0, 0], dimensions: [0, 0, 0] };
   return { min: bounds.min.toArray(), max: bounds.max.toArray(), dimensions: bounds.getSize(new Vector3()).toArray() };
 }
-function resizeGroup(project, id, dimensions, uniform = false) {
-  editable(project.objects, [id]);
-  const group = project.objects.find((o) => o.id === id);
-  if (group?.kind !== "group" || !vec2(dimensions) || dimensions.some((n) => n <= 0)) throw new Error("Dimensions must be finite and positive.");
-  const size = getGroupBounds(project, id).dimensions;
+function resizeGroup(project, id2, dimensions, uniform = false) {
+  editable(project.objects, [id2]);
+  const group = project.objects.find((o) => o.id === id2);
+  if (group?.kind !== "group" || !vec(dimensions) || dimensions.some((n) => n <= 0)) throw new Error("Dimensions must be finite and positive.");
+  const size = getGroupBounds(project, id2).dimensions;
   if (size.some((n) => n < 1e-8)) throw new Error("Cannot resize a group with a zero extent.");
   const scales = dimensions.map((n, i) => n / size[i]);
   if (uniform) {
@@ -43169,11 +43235,11 @@ function resizeGroup(project, id, dimensions, uniform = false) {
     const factor = axis < 0 ? 1 : scales[axis] / group.scale[axis];
     for (let i = 0; i < 3; i++) scales[i] = group.scale[i] * factor;
   }
-  return checked(project, project.objects.map((o) => o.id === id ? { ...o, scale: scales } : o));
+  return checked(project, project.objects.map((o) => o.id === id2 ? { ...o, scale: scales } : o));
 }
 function collisionWorldBounds(project) {
   const matrices = resolveWorldMatrices(project.objects);
-  return project.objects.filter((o) => o.kind !== "group" && o.collision !== "none" && effectiveObjectState(project.objects, o.id).visible).map((object2) => ({ object: object2, bounds: objectLocalBounds(project, object2).applyMatrix4(matrices.get(object2.id)) }));
+  return project.objects.filter((o) => o.kind !== "group" && o.collision !== "none" && effectiveObjectState(project.objects, o.id).visible).map((object3) => ({ object: object3, bounds: objectLocalBounds(project, object3).applyMatrix4(matrices.get(object3.id)) }));
 }
 function validateWorldBounds(project) {
   try {
@@ -43189,152 +43255,586 @@ function validateWorldBounds(project) {
   }
 }
 
-// src/domain/geography.ts
-var MAX_IMAGERY_BYTES = 15 * 1024 * 1024;
-function fail(message) {
-  throw new Error(message);
+// src/domain/landscape-types.ts
+var LANDSCAPE_CAPABILITY = "landscape/1";
+var LANDSCAPE_PROJECT_SCHEMA = "elsemesh.worlds.project/3";
+var LANDSCAPE_LIMITS = Object.freeze({ materials: 16, layers: 16, images: 16, imageBytes: 2 * 1024 * 1024, totalImageBytes: 4 * 1024 * 1024, maskTiles: 256, tileSize: 16, maskBytes: 65536, operationWork: 4194304, sceneryWork: 16e6, waterWork: 64e6, waterVertices: 2e6, colliderExtent: 128, collisionBins: 1e5, exclusionBins: 1e5, instances: 2e4, candidates: 1e5, points: 2048, tombstones: 2e4 });
+
+// src/domain/landscape.ts
+var check = (ok, message) => {
+  if (!ok) throw Error(message);
+};
+var object = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+var keys = (v, allowed) => object(v) && Object.keys(v).every((k) => allowed.includes(k));
+var number = (v, min, max) => typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
+var integer2 = (v, min, max) => number(v, min, max) && Number.isInteger(v);
+var color = (v) => typeof v === "string" && /^#[0-9a-f]{6}$/.test(v);
+var id = (v) => typeof v === "string" && /^[A-Za-z0-9:_-]{1,120}$/.test(v);
+var text2 = (v, max = 120) => typeof v === "string" && v.trim().length > 0 && v.length <= max;
+var vector = (v) => Array.isArray(v) && v.length === 3 && v.every((n) => number(n, -4e3, 4e3));
+var presets = [["grass", "Grass", "#527b3c", 0.9], ["soil", "Soil", "#71513b", 0.95], ["rock", "Rock", "#777a77", 0.85], ["gravel", "Gravel", "#999388", 0.96], ["sand", "Sand", "#c4ad79", 0.94]];
+var LANDSCAPE_MATERIAL_PRESETS = presets.map(([preset, name, color2, roughness]) => ({ id: "landscape-material:" + preset, name, preset, color: color2, roughness, tiling: 4 }));
+var DEFAULT_LANDSCAPE_CONSTRAINTS = Object.freeze({ minElevation: -2e3, maxElevation: 2e3, maxSlope: 60, excludePaths: true, excludeBuildings: true, excludeWater: true, clearance: 0.5 });
+var hash = (seed, x, z, salt = 0) => {
+  let h = (seed ^ Math.imul(x, 374761393) ^ Math.imul(z, 668265263) ^ Math.imul(salt + 1, 1274126177)) >>> 0;
+  h = Math.imul(h ^ h >>> 13, 1274126177);
+  return ((h ^ h >>> 16) >>> 0) / 4294967296;
+};
+var primes = [];
+for (let n = 2; primes.length < 64; n++) {
+  if (!primes.some((p) => p * p <= n && n % p === 0)) primes.push(n);
 }
-var finite = (n) => typeof n === "number" && Number.isFinite(n);
-var text = (s, limit = 2e3) => typeof s === "string" && s.trim().length > 0 && s.length <= limit;
-function parseAsciiGrid(input) {
-  if (input.length > 64 * 1024 * 1024) fail("ASCII grid exceeds the 64 MiB text limit.");
-  const tokens = input.trim().split(/\s+/);
-  const header = /* @__PURE__ */ new Map();
-  const keys2 = /* @__PURE__ */ new Set(["ncols", "nrows", "xllcorner", "yllcorner", "xllcenter", "yllcenter", "cellsize", "nodata_value"]);
-  let cursor = 0;
-  while (cursor < tokens.length && keys2.has(tokens[cursor].toLowerCase())) {
-    const key = tokens[cursor++].toLowerCase();
-    if (header.has(key)) fail(`Duplicate ASCII grid header ${key}.`);
-    const raw = tokens[cursor++];
-    const value = raw === void 0 ? Number.NaN : Number(raw);
-    if (!Number.isFinite(value)) fail(`ASCII grid header ${key} must be finite.`);
-    header.set(key, value);
-  }
-  const ncols = header.get("ncols"), nrows = header.get("nrows"), cellSize = header.get("cellsize");
-  if (![ncols, nrows].every((n) => Number.isInteger(n) && n >= 2) || ncols * nrows > 4194304) fail("ASCII grid must contain 2–4,194,304 bounded sample cells.");
-  if (!finite(cellSize) || cellSize <= 0 || cellSize > 1e4) fail("ASCII cellsize must be a positive spacing in metres.");
-  for (const axis of ["x", "y"]) if (Number(header.has(`${axis}llcorner`)) + Number(header.has(`${axis}llcenter`)) !== 1) fail(`Specify exactly one ${axis}llcorner or ${axis}llcenter header.`);
-  if (tokens.length - cursor !== ncols * nrows) fail(`ASCII sample count differs from ncols × nrows (${ncols * nrows}).`);
-  const values = new Array(ncols * nrows);
-  for (let i = 0; i < values.length; i++) {
-    const value = Number(tokens[cursor + i]);
-    if (!finite(value)) fail(`ASCII sample ${i + 1} is not finite.`);
-    values[i] = value;
-  }
-  return { ncols, nrows, cellSize, xOrigin: header.get("xllcenter") ?? header.get("xllcorner") + cellSize / 2, yOrigin: header.get("yllcenter") ?? header.get("yllcorner") + cellSize / 2, nodata: header.get("nodata_value") ?? null, values };
-}
-function sampleGeographicGrid(grid, easting, northing) {
-  const x = (easting - grid.xOrigin) / grid.cellSize;
-  const y = (northing - grid.yOrigin) / grid.cellSize;
-  if (!finite(x) || !finite(y) || x < -1e-8 || y < -1e-8 || x > grid.ncols - 1 + 1e-8 || y > grid.nrows - 1 + 1e-8) fail("Selected terrain extends outside source sample coverage. Choose a smaller area or another grid.");
-  const sx = Math.max(0, Math.min(grid.ncols - 1, x)), sy = Math.max(0, Math.min(grid.nrows - 1, y));
-  const x0 = Math.floor(sx), y0 = Math.floor(sy), x1 = Math.min(grid.ncols - 1, x0 + 1), y1 = Math.min(grid.nrows - 1, y0 + 1);
-  const tx = sx - x0, ty = sy - y0;
-  const corners = [[x0, y0, (1 - tx) * (1 - ty)], [x1, y0, tx * (1 - ty)], [x0, y1, (1 - tx) * ty], [x1, y1, tx * ty]];
-  let height = 0;
-  for (const [col, row, weight] of corners) {
-    if (weight <= 1e-12) continue;
-    const value = grid.values[(grid.nrows - 1 - row) * grid.ncols + col];
-    if (!finite(value) || grid.nodata !== null && value === grid.nodata) fail("Selected terrain includes NODATA or missing elevations. Choose a fully covered area.");
-    height += value * weight;
-  }
-  return height;
-}
-function createGeographicTerrain(grid, selection, metadata) {
-  const { easting, northing, radius } = selection;
-  if (![easting, northing].every(finite) || !Number.isInteger(radius) || radius < 8 || radius > 1024) fail("Choose finite British National Grid coordinates and an integer radius from 8 to 1024 metres.");
-  const size = radius * 2;
-  const requested = selection.resolution ?? Math.min(257, Math.max(9, Math.ceil(size / grid.cellSize / 2) * 2 + 1));
-  if (!Number.isInteger(requested) || requested < 9 || requested > 257 || requested % 2 !== 1) fail("Output resolution must be an odd grid size from 9 to 257.");
-  const bounds = { west: easting - radius, east: easting + radius, south: northing - radius, north: northing + radius };
-  const geography = { ...metadata, crs: "EPSG:27700", center: { easting, northing }, bounds, sourceSpacing: grid.cellSize, outputSpacing: size / (requested - 1) };
-  const errors = validateGeography(geography);
-  if (errors.length) fail(errors[0]);
-  const minCol = Math.floor((bounds.west - grid.xOrigin) / grid.cellSize + 1e-8), maxCol = Math.ceil((bounds.east - grid.xOrigin) / grid.cellSize - 1e-8);
-  const minRow = Math.floor((bounds.south - grid.yOrigin) / grid.cellSize + 1e-8), maxRow = Math.ceil((bounds.north - grid.yOrigin) / grid.cellSize - 1e-8);
-  if (minCol < 0 || minRow < 0 || maxCol >= grid.ncols || maxRow >= grid.nrows) fail("Selected terrain extends outside source sample coverage.");
-  for (let row = minRow; row <= maxRow; row++) for (let col = minCol; col <= maxCol; col++) {
-    const value = grid.values[(grid.nrows - 1 - row) * grid.ncols + col];
-    if (!finite(value) || grid.nodata !== null && value === grid.nodata) fail("Selected terrain includes NODATA or missing elevations.");
-  }
-  const heights = [];
-  for (let z = 0; z < requested; z++) for (let x = 0; x < requested; x++) {
-    const value = sampleGeographicGrid(grid, bounds.west + x * geography.outputSpacing, bounds.north - z * geography.outputSpacing);
-    if (Math.abs(value) > 2e3) fail("Source elevations exceed the builder’s supported ±2000 metre datum range.");
-    heights.push(value);
-  }
-  return { terrain: { width: size, depth: size, resolution: requested, seed: 0, heights, materials: Array(heights.length).fill(0) }, geography };
-}
-function validateGeographicBounds(value) {
-  if (!value || typeof value !== "object") return false;
-  const b = value;
-  return [b.west, b.east, b.south, b.north].every(finite) && b.west < b.east && b.south < b.north && b.west >= 0 && b.east <= 7e5 && b.south >= 0 && b.north <= 13e5;
-}
-function validateGeography(value, terrain) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return ["Geographic reference must be an object."];
-  const geo = value;
-  const errors = [];
-  if (geo.crs !== "EPSG:27700") errors.push("Only EPSG:27700 British National Grid geography is supported.");
-  if (!validateGeographicBounds(geo.bounds) || !geo.center || !finite(geo.center.easting) || !finite(geo.center.northing)) errors.push("Geographic bounds or centre are invalid.");
-  else {
-    const width = geo.bounds.east - geo.bounds.west, depth = geo.bounds.north - geo.bounds.south;
-    if (width > 2048 || depth > 2048 || Math.abs(width - depth) > 1e-6 || Math.abs((geo.bounds.west + geo.bounds.east) / 2 - geo.center.easting) > 1e-6 || Math.abs((geo.bounds.south + geo.bounds.north) / 2 - geo.center.northing) > 1e-6) errors.push("Geographic extent must be a centred square no larger than 2048 metres.");
-    if (terrain && (Math.abs(width - terrain.width) > 1e-6 || Math.abs(depth - terrain.depth) > 1e-6 || Math.abs(width / (terrain.resolution - 1) - geo.outputSpacing) > 1e-6)) errors.push("Geographic extent or output spacing does not match the terrain.");
-  }
-  if (![geo.sourceSpacing, geo.outputSpacing].every((n) => finite(n) && n > 0)) errors.push("Geographic source and output sample spacing must be positive.");
-  if (!text(geo.sourceName, 240) || !text(geo.license) || !text(geo.attribution) || !text(geo.verticalDatum, 240) || geo.source !== void 0 && !text(geo.source)) errors.push("Geographic source name, licence, attribution and vertical datum are required.");
-  return errors;
-}
-function validateTerrainImagery(value, geography) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return ["Terrain imagery must be an object."];
-  const imagery = value;
-  const errors = [];
-  if (!geography || imagery.crs !== "EPSG:27700" || !validateGeographicBounds(imagery.bounds)) errors.push("Terrain imagery needs EPSG:27700 bounds and a geographic terrain reference.");
-  else if (validateGeographicBounds(geography.bounds) && (imagery.bounds.west >= geography.bounds.east || imagery.bounds.east <= geography.bounds.west || imagery.bounds.south >= geography.bounds.north || imagery.bounds.north <= geography.bounds.south)) errors.push("Imagery bounds must overlap the selected terrain extent.");
-  if (!text(imagery.sourceName, 240) || !text(imagery.license) || !text(imagery.attribution)) errors.push("Imagery source name, licence and attribution are required.");
-  try {
-    if (typeof imagery.dataUrl !== "string" || imagery.dataUrl.length > MAX_IMAGERY_BYTES * 4 / 3 + 64) fail("Terrain imagery exceeds the 15 MiB embedded image limit.");
-    const match = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]*={0,2})$/.exec(imagery.dataUrl);
-    if (!match || match[2].length % 4 !== 0) fail("Imagery must be an embedded base64 PNG or JPEG.");
-    const binary = atob(match[2]);
-    if (!binary.length || binary.length > MAX_IMAGERY_BYTES) fail("Terrain imagery exceeds the 15 MiB embedded image limit.");
-    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-    const [width, height] = imageDimensions2(bytes, match[1]);
-    if (width < 1 || height < 1 || width > 8192 || height > 8192 || width * height > 32e6) fail("Terrain imagery exceeds the 8192 pixel side or 32 megapixel decode budget.");
-  } catch (error) {
-    errors.push(error instanceof Error ? error.message : "Terrain imagery is invalid.");
-  }
-  return errors;
-}
-function imageDimensions2(bytes, type) {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  if (type === "png") {
-    if (bytes.length < 24 || view.getUint32(0) !== 2303741511 || view.getUint32(4) !== 218765834 || view.getUint32(12) !== 1229472850) fail("Imagery PNG header is invalid.");
-    return [view.getUint32(16), view.getUint32(20)];
-  }
-  if (bytes.length < 4 || view.getUint16(0) !== 65496) fail("Imagery JPEG header is invalid.");
-  let offset = 2;
-  while (offset + 4 <= bytes.length) {
-    if (bytes[offset] !== 255) fail("Imagery JPEG marker is invalid.");
-    while (bytes[offset] === 255) offset++;
-    const marker = bytes[offset++];
-    if (marker === 217 || marker === 218) break;
-    if (marker === 1 || marker >= 208 && marker <= 215) continue;
-    if (offset + 2 > bytes.length) fail("Imagery JPEG is truncated.");
-    const length = view.getUint16(offset);
-    if (length < 2 || offset + length > bytes.length) fail("Imagery JPEG segment is truncated.");
-    if ([192, 193, 194].includes(marker)) {
-      if (length < 8) fail("Imagery JPEG dimensions are invalid.");
-      return [view.getUint16(offset + 5), view.getUint16(offset + 3)];
+var shaK = primes.map((p) => Math.cbrt(p) % 1 * 4294967296 >>> 0);
+var shaInitial = primes.slice(0, 8).map((p) => Math.sqrt(p) % 1 * 4294967296 >>> 0);
+var rotate = (x, n) => x >>> n | x << 32 - n;
+function landscapeImageDigest(bytes) {
+  const padded = new Uint8Array(Math.ceil((bytes.length + 9) / 64) * 64);
+  padded.set(bytes);
+  padded[bytes.length] = 128;
+  const view = new DataView(padded.buffer);
+  view.setUint32(padded.length - 8, Math.floor(bytes.length / 536870912));
+  view.setUint32(padded.length - 4, bytes.length * 8 >>> 0);
+  const state = [...shaInitial], w = new Uint32Array(64);
+  for (let offset = 0; offset < padded.length; offset += 64) {
+    for (let i = 0; i < 16; i++) w[i] = view.getUint32(offset + i * 4);
+    for (let i = 16; i < 64; i++) {
+      const a2 = w[i - 15], b2 = w[i - 2];
+      w[i] = w[i - 16] + (rotate(a2, 7) ^ rotate(a2, 18) ^ a2 >>> 3) + w[i - 7] + (rotate(b2, 17) ^ rotate(b2, 19) ^ b2 >>> 10) >>> 0;
     }
-    offset += length;
+    let [a, b, c, d, e, f, g, h] = state;
+    for (let i = 0; i < 64; i++) {
+      const t1 = h + (rotate(e, 6) ^ rotate(e, 11) ^ rotate(e, 25)) + (e & f ^ ~e & g) + shaK[i] + w[i] >>> 0, t2 = (rotate(a, 2) ^ rotate(a, 13) ^ rotate(a, 22)) + (a & b ^ a & c ^ b & c) >>> 0;
+      h = g;
+      g = f;
+      f = e;
+      e = d + t1 >>> 0;
+      d = c;
+      c = b;
+      b = a;
+      a = t1 + t2 >>> 0;
+    }
+    for (const [i, v] of [a, b, c, d, e, f, g, h].entries()) state[i] = state[i] + v >>> 0;
   }
-  return fail("Imagery JPEG dimensions could not be read.");
+  return state.map((v) => v.toString(16).padStart(8, "0")).join("");
+}
+function landscapeImageBytes(dataUrl) {
+  const match = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]*={0,2})$/.exec(dataUrl);
+  check(match && match[2].length % 4 === 0, "Landscape image must be embedded PNG/JPEG");
+  const binary = atob(match[2]);
+  check(binary.length > 0 && binary.length <= LANDSCAPE_LIMITS.imageBytes, "Landscape image byte limit exceeded");
+  return Uint8Array.from(binary, (c) => c.charCodeAt(0));
+}
+function validateLandscape(project) {
+  if (project.landscape === void 0) return [];
+  try {
+    const l = project.landscape;
+    check(keys(l, ["version", "materials", "images", "layers", "tombstones"]) && l.version === 1, "Invalid landscape version or fields");
+    check(Array.isArray(l.materials) && l.materials.length > 0 && l.materials.length <= 16 && Array.isArray(l.layers) && l.layers.length <= 16 && Array.isArray(l.images) && l.images.length <= 16, "Landscape material/layer/image limit exceeded");
+    const imageIds = /* @__PURE__ */ new Set();
+    let imageBytes = 0;
+    for (const image of l.images) {
+      check(keys(image, ["id", "name", "mediaType", "dataUrl", "bytes", "width", "height"]) && /^sha256:[a-f0-9]{64}$/.test(image.id) && !imageIds.has(image.id) && text2(image.name) && ["image/png", "image/jpeg"].includes(image.mediaType), "Invalid landscape image metadata");
+      check(typeof image.dataUrl === "string" && image.dataUrl.length < LANDSCAPE_LIMITS.imageBytes * 4 / 3 + 64, "Landscape image encoded limit");
+      const bytes = landscapeImageBytes(image.dataUrl);
+      check(bytes.length === image.bytes && image.id === "sha256:" + landscapeImageDigest(bytes), "Landscape image hash/byte mismatch");
+      const [w, h] = imageDimensions(bytes, image.mediaType === "image/png" ? "png" : "jpeg");
+      check(w === image.width && h === image.height && w <= 2048 && h <= 2048 && w * h <= 4194304, "Landscape image decode limit or dimensions mismatch");
+      imageBytes += bytes.length;
+      imageIds.add(image.id);
+    }
+    check(imageBytes <= LANDSCAPE_LIMITS.totalImageBytes, "Landscape image aggregate limit exceeded");
+    const materialIds = /* @__PURE__ */ new Set();
+    for (const m of l.materials) {
+      check(keys(m, ["id", "name", "preset", "color", "roughness", "tiling", "imageRef"]) && id(m.id) && !materialIds.has(m.id) && text2(m.name) && ["grass", "soil", "rock", "gravel", "sand", "custom"].includes(m.preset) && color(m.color) && number(m.roughness, 0, 1) && number(m.tiling, 0.1, 100) && (m.imageRef === void 0 || imageIds.has(m.imageRef)), "Invalid landscape material");
+      materialIds.add(m.id);
+    }
+    const layerIds = /* @__PURE__ */ new Set();
+    let maskBytes = 0, tiles = 0;
+    for (const layer of l.layers) {
+      check(keys(layer, ["id", "name", "kind", "visible", "locked", "mask", "materialId", "scatter", "water", "boundary"]) && id(layer.id) && !layerIds.has(layer.id) && text2(layer.name) && ["ground", "vegetation", "water"].includes(layer.kind) && typeof layer.visible === "boolean" && typeof layer.locked === "boolean", "Invalid landscape layer");
+      layerIds.add(layer.id);
+      check(keys(layer.mask, ["cellSize", "tiles"]) && layer.mask.cellSize === 1 && object(layer.mask.tiles), "Invalid sparse landscape mask");
+      for (const [key, values] of Object.entries(layer.mask.tiles)) {
+        check(/^(0|[1-9][0-9]*):(0|[1-9][0-9]*)$/.test(key), "Invalid landscape tile key");
+        const [x, z] = key.split(":").map(Number);
+        check(x < Math.ceil(project.terrain.width / 16) && z < Math.ceil(project.terrain.depth / 16) && Array.isArray(values) && values.length === 256 && values.every((v) => integer2(v, 0, 255)) && values.some((v) => v !== 0), "Invalid landscape mask tile");
+        for (let i = 0; i < 256; i++) if (values[i] !== 0) check(x * 16 + i % 16 < project.terrain.width && z * 16 + Math.floor(i / 16) < project.terrain.depth, "Landscape mask outside terrain");
+        tiles++;
+        maskBytes += 256;
+      }
+      if (layer.boundary !== void 0) validateBoundary(layer.boundary, project);
+      if (layer.kind === "ground") check(materialIds.has(layer.materialId) && layer.scatter === void 0 && layer.water === void 0, "Ground layer requires a known material");
+      if (layer.kind === "vegetation") {
+        check(layer.materialId === void 0 && layer.water === void 0, "Invalid vegetation layer fields");
+        const s = layer.scatter;
+        check(keys(s, ["kind", "seed", "spacing", "density", "scaleMin", "scaleMax", "variation", "treeSpecies", "assetRef", "constraints"]) && s && ["tree", "shrub", "grass", "flower", "rock"].includes(s.kind) && integer2(s.seed, 0, 4294967295) && number(s.spacing, 0.5, 64) && number(s.density, 0, 1) && number(s.scaleMin, 0.05, 20) && number(s.scaleMax, s.scaleMin, 20) && number(s.variation, 0, 1) && ["broadleaf", "pine", "palm"].includes(s.treeSpecies) && (s.assetRef === void 0 || project.assets.some((a) => a.id === s.assetRef)), "Invalid landscape scatter rule");
+        const c = s.constraints;
+        check(keys(c, ["minElevation", "maxElevation", "maxSlope", "excludePaths", "excludeBuildings", "excludeWater", "clearance"]) && number(c.minElevation, -2e3, 2e3) && number(c.maxElevation, c.minElevation, 2e3) && number(c.maxSlope, 0, 90) && number(c.clearance, 0, 20) && [c.excludePaths, c.excludeBuildings, c.excludeWater].every((v) => typeof v === "boolean"), "Invalid landscape constraints");
+      }
+      if (layer.kind === "water") {
+        check(layer.scatter === void 0 && layer.materialId === void 0, "Invalid water layer fields");
+        const w = layer.water;
+        check(keys(w, ["level", "waveAmplitude", "waveSpeed", "shoreFade"]) && w && number(w.level, -2e3, 2e3) && number(w.waveAmplitude, 0, 5) && number(w.waveSpeed, 0, 10) && number(w.shoreFade, 0.1, 20), "Invalid bounded landscape water");
+      }
+    }
+    check(tiles <= 256 && maskBytes <= 65536, "Landscape mask allocation limit exceeded");
+    check(Array.isArray(l.tombstones) && l.tombstones.length <= 2e4 && new Set(l.tombstones).size === l.tombstones.length && l.tombstones.every((v) => typeof v === "string" && /^landscape-instance:[A-Za-z0-9:_-]+@-?[0-9]+,-?[0-9]+,0$/.test(v) && v.length <= 200), "Invalid generated instance tombstones");
+    for (const o of project.objects) if (o.landscapeOrigin !== void 0) {
+      check(keys(o.landscapeOrigin, ["layerId", "generatedId"]) && id(o.landscapeOrigin.layerId) && typeof o.landscapeOrigin.generatedId === "string" && o.landscapeOrigin.generatedId.startsWith("landscape-instance:" + o.landscapeOrigin.layerId + "@") && l.tombstones.includes(o.landscapeOrigin.generatedId) && (o.kind === "tree" || o.kind === "glb"), "Promoted object must preserve landscape origin and tombstone");
+    }
+    assertLandscapeDerivedBudget(project);
+    return [];
+  } catch (error) {
+    return [error.message];
+  }
+}
+function validateBoundary(boundary, project) {
+  check(Array.isArray(boundary) && boundary.length >= 3 && boundary.length <= 512 && boundary.every((p) => vector(p) && Math.abs(p[0]) <= project.terrain.width / 2 && Math.abs(p[2]) <= project.terrain.depth / 2) && isSimpleOutline(boundary), "Landscape boundary must be simple, closed, nonzero and inside terrain");
+}
+function ensureLandscape(project) {
+  if (project.landscape) return project;
+  return { ...project, schema: LANDSCAPE_PROJECT_SCHEMA, landscape: { version: 1, materials: LANDSCAPE_MATERIAL_PRESETS.map((m) => ({ ...m })), images: [], layers: [], tombstones: [] } };
+}
+function createLandscapeLayer(project, options) {
+  const p = ensureLandscape(project), kind = options.kind, layer = { id: options.id ?? "landscape-layer:" + crypto.randomUUID(), name: options.name ?? (kind === "ground" ? "Ground" : kind === "water" ? "Water" : "Vegetation"), kind, visible: true, locked: false, mask: { cellSize: 1, tiles: {} } };
+  if (kind === "ground") layer.materialId = p.landscape.materials[0].id;
+  if (kind === "vegetation") layer.scatter = { kind: "tree", seed: 7319, spacing: 4, density: 0.6, scaleMin: 0.8, scaleMax: 1.2, variation: 0.25, treeSpecies: "broadleaf", constraints: { ...DEFAULT_LANDSCAPE_CONSTRAINTS } };
+  if (kind === "water") layer.water = { level: 0, waveAmplitude: 0.15, waveSpeed: 1, shoreFade: 1 };
+  const result = { ...p, landscape: { ...p.landscape, layers: [...p.landscape.layers, layer] } };
+  assertLandscape(result);
+  return result;
+}
+function assertLandscape(p) {
+  const errors = validateLandscape(p);
+  check(!errors.length, errors[0] ?? "Invalid landscape");
+}
+function layerCopy(project, layerId) {
+  check(project.landscape, "Create a landscape layer first");
+  const index = project.landscape.layers.findIndex((l) => l.id === layerId);
+  check(index >= 0, "Unknown landscape layer");
+  const original = project.landscape.layers[index];
+  check(!original.locked, "Landscape layer is locked");
+  const layer = { ...original, mask: { cellSize: 1, tiles: Object.fromEntries(Object.entries(original.mask.tiles).map(([k, v]) => [k, [...v]])) } };
+  return { layer, index };
+}
+function setMask(mask, x, z, value) {
+  const key = Math.floor(x / 16) + ":" + Math.floor(z / 16), index = z % 16 * 16 + x % 16;
+  if (!mask.tiles[key] && value === 0) return;
+  const tile = mask.tiles[key] ?? (mask.tiles[key] = Array(256).fill(0));
+  tile[index] = Math.max(0, Math.min(255, Math.round(value)));
+}
+function landscapeMaskAt(project, mask, x, z) {
+  const ix = Math.floor(x + project.terrain.width / 2), iz = Math.floor(z + project.terrain.depth / 2);
+  if (ix < 0 || iz < 0 || ix >= project.terrain.width || iz >= project.terrain.depth) return 0;
+  return mask.tiles[Math.floor(ix / 16) + ":" + Math.floor(iz / 16)]?.[iz % 16 * 16 + ix % 16] ?? 0;
+}
+function editMask(project, layerId, mode, weight, bounds, boundary, workPerCell = 1) {
+  check(["paint", "replace", "erase"].includes(mode), "Invalid landscape operation");
+  const replaceWater = mode === "replace" && project.landscape?.layers.find((l) => l.id === layerId)?.kind === "water";
+  const x0 = Math.max(0, Math.floor(bounds[0] + project.terrain.width / 2)), x1 = Math.min(project.terrain.width, Math.ceil(bounds[1] + project.terrain.width / 2)), z0 = Math.max(0, Math.floor(bounds[2] + project.terrain.depth / 2)), z1 = Math.min(project.terrain.depth, Math.ceil(bounds[3] + project.terrain.depth / 2)), width = Math.max(0, x1 - x0), depth = Math.max(0, z1 - z0);
+  check(width * depth <= LANDSCAPE_LIMITS.maskBytes, "Landscape operation covers too many cells; use a smaller area or shorter stroke (65,536 cell limit).");
+  check(width * depth * workPerCell <= LANDSCAPE_LIMITS.operationWork, "Landscape operation is too complex; use fewer boundary/stroke points or a smaller area.");
+  const tx0 = Math.floor(x0 / 16), tx1 = Math.floor((x1 - 1) / 16), tz0 = Math.floor(z0 / 16), tz1 = Math.floor((z1 - 1) / 16), tileCount = width && depth ? (tx1 - tx0 + 1) * (tz1 - tz0 + 1) : 0;
+  check(tileCount <= LANDSCAPE_LIMITS.maskTiles, "Landscape operation spans too many mask tiles; use a smaller area (256 tile limit).");
+  if (mode !== "erase") {
+    check(project.landscape, "Create a landscape layer first");
+    let total = 0;
+    for (const current of project.landscape.layers) {
+      if (current.id !== layerId) {
+        total += Object.keys(current.mask.tiles).length;
+        continue;
+      }
+      const keys3 = new Set(replaceWater ? [] : Object.keys(current.mask.tiles));
+      if (tileCount) for (let tz = tz0; tz <= tz1; tz++) for (let tx = tx0; tx <= tx1; tx++) keys3.add(tx + ":" + tz);
+      total += keys3.size;
+    }
+    check(total <= LANDSCAPE_LIMITS.maskTiles, "Landscape operation exceeds the shared 256 mask tile budget; erase coverage or use a smaller area.");
+  }
+  const { layer, index } = layerCopy(project, layerId);
+  if (replaceWater) layer.mask.tiles = {};
+  for (let z = z0; z < z1; z++) for (let x = x0; x < x1; x++) {
+    const wx = x + 0.5 - project.terrain.width / 2, wz = z + 0.5 - project.terrain.depth / 2, w = Math.max(0, Math.min(1, weight(wx, wz)));
+    if (!w) continue;
+    const old = landscapeMaskAt(project, layer.mask, wx, wz);
+    setMask(layer.mask, x, z, mode === "erase" ? old * (1 - w) : mode === "replace" ? w * 255 : Math.max(old, w * 255));
+  }
+  for (const [key, tile] of Object.entries(layer.mask.tiles)) if (!tile.some(Boolean)) delete layer.mask.tiles[key];
+  if (boundary && layer.kind === "water" && mode !== "erase") layer.boundary = structuredClone(boundary);
+  const layers = [...project.landscape.layers];
+  layers[index] = layer;
+  const result = { ...project, landscape: { ...project.landscape, layers } };
+  assertLandscape(result);
+  generateLandscapeInstances(result);
+  return result;
+}
+function pointSegmentDistance(x, z, a, b) {
+  const dx = b[0] - a[0], dz = b[2] - a[2], t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[2]) * dz) / (dx * dx + dz * dz || 1)));
+  return Math.hypot(x - a[0] - t * dx, z - a[2] - t * dz);
+}
+function applyLandscapeBrush(project, c) {
+  check(Array.isArray(c.points) && c.points.length > 0 && c.points.length <= 2048 && c.points.every(vector) && number(c.radius, 0.25, 100) && number(c.strength, 0, 1) && number(c.falloff, 0, 1), "Invalid landscape brush command");
+  const xs = c.points.map((p) => p[0]), zs = c.points.map((p) => p[2]);
+  return editMask(project, c.layerId, c.mode, (x, z) => {
+    let d = Infinity;
+    if (c.points.length === 1) d = Math.hypot(x - c.points[0][0], z - c.points[0][2]);
+    else for (let i = 1; i < c.points.length; i++) d = Math.min(d, pointSegmentDistance(x, z, c.points[i - 1], c.points[i]));
+    return d > c.radius ? 0 : c.strength * (c.falloff === 0 ? 1 : Math.pow(Math.max(0, 1 - d / c.radius), c.falloff * 3));
+  }, [Math.min(...xs) - c.radius, Math.max(...xs) + c.radius, Math.min(...zs) - c.radius, Math.max(...zs) + c.radius], void 0, c.points.length);
+}
+function pointInLandscapeBoundary(x, z, points) {
+  let inside = false;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const a = points[i], b = points[j];
+    if (pointSegmentDistance(x, z, a, b) < 1e-8) return true;
+    if (a[2] > z !== b[2] > z && x < (b[0] - a[0]) * (z - a[2]) / (b[2] - a[2]) + a[0]) inside = !inside;
+  }
+  return inside;
+}
+function applyLandscapeArea(project, c) {
+  validateBoundary(c.boundary, project);
+  check(c.strength === void 0 || number(c.strength, 0, 1), "Invalid landscape area strength");
+  const xs = c.boundary.map((p) => p[0]), zs = c.boundary.map((p) => p[2]);
+  return editMask(project, c.layerId, c.mode, (x, z) => pointInLandscapeBoundary(x, z, c.boundary) ? c.strength ?? 1 : 0, [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)], c.boundary, c.boundary.length);
+}
+function sampleLandscapeWater(project, x, z, time = 0) {
+  if (![x, z, time].every(Number.isFinite)) return null;
+  let result = null;
+  for (const layer of project.landscape?.layers ?? []) {
+    if (layer.kind !== "water" || !layer.visible || !layer.boundary || !layer.water || !pointInLandscapeBoundary(x, z, layer.boundary)) continue;
+    const coverage = landscapeMaskAt(project, layer.mask, x, z) / 255, w = layer.water, depth = w.level - sampleTerrain(project.terrain, x, z);
+    if (!coverage || depth <= 0) continue;
+    let edge = Infinity;
+    for (let i = 0; i < layer.boundary.length; i++) edge = Math.min(edge, pointSegmentDistance(x, z, layer.boundary[i], layer.boundary[(i + 1) % layer.boundary.length]));
+    const shoreFactor = Math.min(1, edge / w.shoreFade, depth / Math.max(1e-3, w.waveAmplitude)) * coverage, amplitude = w.waveAmplitude * shoreFactor, height = w.level + Math.sin(x * 0.04 + z * 0.03 + time * w.waveSpeed) * amplitude;
+    result = { height, level: w.level, amplitude, shoreFactor, layerId: layer.id };
+  }
+  return result;
+}
+function createLandscapeSampler(project) {
+  assertLandscape(project);
+  const layers = project.landscape?.layers ?? [];
+  return { groundAt(x, z) {
+    let color2 = [0, 0, 0], opacity = 0;
+    const contributions = [];
+    for (const layer of layers) {
+      if (layer.kind !== "ground" || !layer.visible) continue;
+      const w = landscapeMaskAt(project, layer.mask, x, z) / 255, m = project.landscape.materials.find((m2) => m2.id === layer.materialId);
+      if (!w) continue;
+      contributions.push({ material: m, weight: w, layerId: layer.id });
+      const rgb = [1, 3, 5].map((i) => parseInt(m.color.slice(i, i + 2), 16) / 255);
+      color2 = color2.map((v, i) => v * (1 - w) + rgb[i] * w);
+      opacity = opacity * (1 - w) + w;
+    }
+    return { color: color2, opacity, contributions };
+  }, waterAt: (x, z, time = 0) => sampleLandscapeWater(project, x, z, time), maskAt: (layerId, x, z) => {
+    const l = layers.find((l2) => l2.id === layerId);
+    return l ? landscapeMaskAt(project, l.mask, x, z) / 255 : 0;
+  } };
+}
+function exclusionIndex(project) {
+  const cells = /* @__PURE__ */ new Map(), size = 16, matrices = resolveWorldMatrices(project.objects);
+  let binReferences = 0;
+  const add2 = (bounds, test) => {
+    check(bounds.every(Number.isFinite), "Landscape exclusion bounds must be finite");
+    const [x0, x1, z0, z1] = bounds;
+    binReferences += (Math.floor(x1 / size) - Math.floor(x0 / size) + 1) * (Math.floor(z1 / size) - Math.floor(z0 / size) + 1);
+    check(binReferences <= LANDSCAPE_LIMITS.exclusionBins, "Landscape exclusion index work limit exceeded; reduce path/building bounds or count.");
+    for (let z = Math.floor(z0 / size); z <= Math.floor(z1 / size); z++) for (let x = Math.floor(x0 / size); x <= Math.floor(x1 / size); x++) {
+      const key = x + ":" + z, list2 = cells.get(key) ?? [];
+      list2.push(test);
+      cells.set(key, list2);
+    }
+  };
+  for (const feature of project.features ?? []) if (feature.kind === "path") for (let i = 1; i < feature.points.length; i++) {
+    const a = feature.points[i - 1], b = feature.points[i], r = feature.width / 2 + 20;
+    add2([Math.min(a[0], b[0]) - r, Math.max(a[0], b[0]) + r, Math.min(a[2], b[2]) - r, Math.max(a[2], b[2]) + r], (x, z, c) => pointSegmentDistance(x, z, a, b) <= feature.width / 2 + c);
+  }
+  const pathCells = new Map([...cells].map(([k, v]) => [k, [...v]]));
+  cells.clear();
+  for (const object3 of project.objects) if (object3.visible && (object3.kind === "building" || object3.kind === "glb" && object3.collision !== "none")) {
+    const box = objectLocalBounds(project, object3).applyMatrix4(matrices.get(object3.id));
+    add2([box.min.x - 20, box.max.x + 20, box.min.z - 20, box.max.z + 20], (x, z, c) => x >= box.min.x - c && x <= box.max.x + c && z >= box.min.z - c && z <= box.max.z + c);
+  }
+  return { path: (x, z, c) => (pathCells.get(Math.floor(x / size) + ":" + Math.floor(z / size)) ?? []).some((test) => test(x, z, c)), building: (x, z, c) => (cells.get(Math.floor(x / size) + ":" + Math.floor(z / size)) ?? []).some((test) => test(x, z, c)) };
+}
+function candidatePoint(seed, x, z, spacing) {
+  return [(x + 0.5 + (hash(seed, x, z, 1) - 0.5) * 0.3) * spacing, (z + 0.5 + (hash(seed, x, z, 2) - 0.5) * 0.3) * spacing];
+}
+function spacingWinner(seed, cx, cz, spacing) {
+  const [x, z] = candidatePoint(seed, cx, cz, spacing), rank = hash(seed, cx, cz, 99);
+  for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
+    if (!dx && !dz) continue;
+    const nx = cx + dx, nz = cz + dz, other = hash(seed, nx, nz, 99);
+    if (other > rank || other === rank && (nz > cz || nz === cz && nx > cx)) continue;
+    const [xx, zz] = candidatePoint(seed, nx, nz, spacing);
+    if (Math.hypot(x - xx, z - zz) < spacing) return false;
+  }
+  return true;
+}
+function generateLandscapeInstances(project) {
+  assertLandscape(project);
+  if (!project.landscape || !project.landscape.layers.some((l) => l.visible && l.kind === "vegetation" && Object.keys(l.mask.tiles).length)) return [];
+  const result = [], removed = new Set(project.landscape.tombstones), exclusions = exclusionIndex(project);
+  let totalCandidates = 0;
+  for (const layer of project.landscape.layers) {
+    if (layer.kind !== "vegetation" || !layer.visible || !layer.scatter) continue;
+    const s = layer.scatter, c = s.constraints, cells = /* @__PURE__ */ new Set();
+    for (const tileKey of Object.keys(layer.mask.tiles)) {
+      const [tx, tz] = tileKey.split(":").map(Number), x0 = tx * 16 - project.terrain.width / 2, z0 = tz * 16 - project.terrain.depth / 2;
+      for (let cz = Math.floor(z0 / s.spacing) - 1; cz <= Math.ceil((z0 + 16) / s.spacing) + 1; cz++) for (let cx = Math.floor(x0 / s.spacing) - 1; cx <= Math.ceil((x0 + 16) / s.spacing) + 1; cx++) {
+        cells.add(cx + ":" + cz);
+        check(cells.size + totalCandidates <= LANDSCAPE_LIMITS.candidates, "Landscape candidate limit exceeded");
+      }
+    }
+    totalCandidates += cells.size;
+    for (const key of [...cells].sort((a, b) => {
+      const [x, z] = a.split(":").map(Number), [xx, zz] = b.split(":").map(Number);
+      return z - zz || x - xx;
+    })) {
+      const [cx, cz] = key.split(":").map(Number), [x, z] = candidatePoint(s.seed, cx, cz, s.spacing);
+      if (Math.abs(x) >= project.terrain.width / 2 || Math.abs(z) >= project.terrain.depth / 2) continue;
+      const weight = landscapeMaskAt(project, layer.mask, x, z) / 255;
+      if (hash(s.seed, cx, cz, 3) >= s.density * weight || !spacingWinner(s.seed, cx, cz, s.spacing)) continue;
+      const instanceId = "landscape-instance:" + layer.id + "@" + cx + "," + cz + ",0";
+      if (removed.has(instanceId)) continue;
+      const y = sampleTerrain(project.terrain, x, z), dx = sampleTerrain(project.terrain, x + 0.5, z) - sampleTerrain(project.terrain, x - 0.5, z), dz = sampleTerrain(project.terrain, x, z + 0.5) - sampleTerrain(project.terrain, x, z - 0.5), slope = Math.atan(Math.hypot(dx, dz)) * 180 / Math.PI;
+      if (y < c.minElevation || y > c.maxElevation || slope > c.maxSlope || c.excludePaths && exclusions.path(x, z, c.clearance) || c.excludeBuildings && exclusions.building(x, z, c.clearance)) continue;
+      const water = sampleLandscapeWater(project, x, z, 0), legacyWater = project.water && Math.abs(x) < project.water.extent / 2 && Math.abs(z) < project.water.extent / 2 && y < project.water.level, lake = (project.features ?? []).some((f) => f.kind === "lake" && y < (f.elevation ?? 0) && pointInLandscapeBoundary(x, z, f.points));
+      if (c.excludeWater && (water || legacyWater || lake)) continue;
+      const scale = s.scaleMin + (s.scaleMax - s.scaleMin) * hash(s.seed, cx, cz, 4), tint = hash(s.seed, cx, cz, 5) * s.variation, base = { tree: "#497b39", shrub: "#57813f", grass: "#6b9345", flower: "#b78dcb", rock: "#82877e" }[s.kind], rgb = [1, 3, 5].map((i) => Math.max(0, Math.min(255, Math.round(parseInt(base.slice(i, i + 2), 16) * (1 - s.variation * 0.25 + tint * 0.5))))), color2 = "#" + rgb.map((v) => v.toString(16).padStart(2, "0")).join("");
+      result.push({ id: instanceId, layerId: layer.id, kind: s.kind, position: [x, y, z], rotation: [0, hash(s.seed, cx, cz, 6) * Math.PI * 2, 0], scale: [scale, scale, scale], color: color2, cell: [cx, cz], ordinal: 0, seed: Math.floor(hash(s.seed, cx, cz, 7) * 4294967295), treeSpecies: s.treeSpecies, ...s.assetRef ? { assetRef: s.assetRef } : {} });
+      check(result.length <= LANDSCAPE_LIMITS.instances, "Landscape generated instance limit exceeded");
+    }
+  }
+  return result;
+}
+function eraseGeneratedInstance(project, generatedId) {
+  check(project.landscape, "No landscape");
+  const result = { ...project, landscape: { ...project.landscape, tombstones: [.../* @__PURE__ */ new Set([...project.landscape.tombstones, generatedId])].sort() } };
+  assertLandscape(result);
+  return result;
+}
+function promoteLandscapeInstance(project, generatedId) {
+  const instance = generateLandscapeInstances(project).find((i) => i.id === generatedId);
+  check(instance && instance.kind === "tree", "Only a current generated tree can be promoted");
+  check(project.objects.length < 2e3, "Explicit scene object limit exceeded");
+  const objectId = "landscape-object:" + landscapeImageDigest(new TextEncoder().encode(generatedId)).slice(0, 48);
+  const object3 = { id: objectId, name: "Promoted landscape tree", kind: instance.assetRef ? "glb" : "tree", position: [...instance.position], rotation: [...instance.rotation], scale: [...instance.scale], color: instance.color, visible: true, collision: "solid", treeSpecies: instance.treeSpecies, treeSeed: renderedLandscapeTreeSeed(instance), landscapeOrigin: { layerId: instance.layerId, generatedId }, ...instance.assetRef ? { assetId: instance.assetRef } : {} };
+  check(!project.objects.some((o) => o.id === objectId), "Generated tree was already promoted");
+  const removed = eraseGeneratedInstance(project, generatedId);
+  return { ...removed, objects: [...removed.objects, object3] };
+}
+function updateLandscapeLayer(project, layerId, patch) {
+  check(project.landscape, "No landscape");
+  const layer = project.landscape.layers.find((l) => l.id === layerId);
+  check(layer, "Unknown landscape layer");
+  check(keys(patch, ["name", "visible", "locked", "materialId", "scatter", "water", "boundary"]), "Unsupported layer edit");
+  check(!layer.locked || Object.keys(patch).length === 1 && patch.locked === false, "Landscape layer is locked");
+  const result = { ...project, landscape: { ...project.landscape, layers: project.landscape.layers.map((l) => l.id === layerId ? { ...l, ...structuredClone(patch) } : l) } };
+  assertLandscape(result);
+  return result;
+}
+function addLandscapeMaterial(project, material) {
+  const next = ensureLandscape(project);
+  check(!next.landscape.materials.some((m) => m.id === material.id), "Duplicate landscape material");
+  const result = { ...next, landscape: { ...next.landscape, materials: [...next.landscape.materials, structuredClone(material)] } };
+  assertLandscape(result);
+  return result;
+}
+function updateLandscapeMaterial(project, materialId, patch) {
+  check(project.landscape && project.landscape.materials.some((m) => m.id === materialId), "Unknown landscape material");
+  check(keys(patch, ["name", "preset", "color", "roughness", "tiling", "imageRef"]), "Unsupported material edit");
+  const result = { ...project, landscape: { ...project.landscape, materials: project.landscape.materials.map((m) => m.id === materialId ? { ...m, ...patch } : m) } };
+  assertLandscape(result);
+  return result;
+}
+function reorderLandscapeLayers(project, ids) {
+  check(project.landscape && ids.length === project.landscape.layers.length && new Set(ids).size === ids.length, "Layer order must contain every layer once");
+  const layers = ids.map((id2) => project.landscape.layers.find((l) => l.id === id2));
+  check(layers.every(Boolean), "Unknown landscape layer");
+  return { ...project, landscape: { ...project.landscape, layers } };
+}
+function createLandscapeCollisionIndex(project, instances = generateLandscapeInstances(project)) {
+  check(instances.length <= LANDSCAPE_LIMITS.instances, "Landscape collision instance limit exceeded");
+  const shapes = [], bins = /* @__PURE__ */ new Map();
+  let binReferences = 0;
+  for (const instance of instances) {
+    if (instance.kind !== "tree" && instance.kind !== "rock") continue;
+    check(vector(instance.position) && vector(instance.rotation) && vector(instance.scale) && instance.scale.every((s2) => s2 > 0 && s2 <= 20), "Invalid generated collision transform");
+    const [x, y, z] = instance.position, s = instance.scale[0], radius = instance.kind === "tree" ? 0.18 * s : 0.55 * s;
+    let min = [x - radius, y, z - radius], max = [x + radius, y + (instance.kind === "tree" ? 4.8 : 1.1) * s, z + radius];
+    if (instance.assetRef) {
+      const asset = project.assets.find((a) => a.id === instance.assetRef);
+      check(asset, "Unknown landscape asset");
+      const bounds = objectLocalBounds(project, { kind: "glb", assetId: instance.assetRef }), yaw = instance.rotation[1], c = Math.cos(yaw), sn = Math.sin(yaw), corners = [];
+      for (const xx of [bounds.min.x, bounds.max.x]) for (const yy of [bounds.min.y, bounds.max.y]) for (const zz of [bounds.min.z, bounds.max.z]) corners.push([x + (xx * c + zz * sn) * s, y + yy * s, z + (-xx * sn + zz * c) * s]);
+      min = [0, 1, 2].map((axis) => Math.min(...corners.map((v) => v[axis])));
+      max = [0, 1, 2].map((axis) => Math.max(...corners.map((v) => v[axis])));
+    }
+    check([...min, ...max].every(Number.isFinite) && min.every((v, i) => max[i] >= v && max[i] - v <= LANDSCAPE_LIMITS.colliderExtent), "Landscape collider extent limit exceeded (128 metres); reduce model bounds or scale.");
+    binReferences += (Math.floor(max[0] / 16) - Math.floor(min[0] / 16) + 1) * (Math.floor(max[2] / 16) - Math.floor(min[2] / 16) + 1);
+    check(binReferences <= LANDSCAPE_LIMITS.collisionBins, "Landscape collision index bin limit exceeded; reduce collidable scenery density or size.");
+    const shape = { id: instance.id, kind: instance.kind === "tree" && !instance.assetRef ? "cylinder" : "box", min, max, center: [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2], ...instance.kind === "tree" && !instance.assetRef ? { radius } : {} };
+    shapes.push(shape);
+  }
+  for (const shape of shapes) {
+    const { min, max } = shape;
+    for (let bx = Math.floor(min[0] / 16); bx <= Math.floor(max[0] / 16); bx++) for (let bz = Math.floor(min[2] / 16); bz <= Math.floor(max[2] / 16); bz++) {
+      const key = bx + ":" + bz;
+      const bucket = bins.get(key) ?? [];
+      bucket.push(shape);
+      bins.set(key, bucket);
+    }
+  }
+  return { shapes, query(min, max) {
+    check(vector(min) && vector(max) && min.every((v, i) => v <= max[i]), "Invalid landscape collision query");
+    check((Math.floor(max[0] / 16) - Math.floor(min[0] / 16) + 1) * (Math.floor(max[2] / 16) - Math.floor(min[2] / 16) + 1) <= LANDSCAPE_LIMITS.collisionBins, "Landscape collision query bin limit exceeded");
+    const found = /* @__PURE__ */ new Set();
+    for (let x = Math.floor(min[0] / 16); x <= Math.floor(max[0] / 16); x++) for (let z = Math.floor(min[2] / 16); z <= Math.floor(max[2] / 16); z++) for (const shape of bins.get(x + ":" + z) ?? []) if (shape.min.every((v, i) => v <= max[i] && shape.max[i] >= min[i])) found.add(shape);
+    return [...found];
+  } };
+}
+function createLandscapeImage(dataUrl, name) {
+  const bytes = landscapeImageBytes(dataUrl), mediaType = dataUrl.startsWith("data:image/png;") ? "image/png" : "image/jpeg", [width, height] = imageDimensions(bytes, mediaType === "image/png" ? "png" : "jpeg");
+  return { id: "sha256:" + landscapeImageDigest(bytes), mediaType, dataUrl, bytes: bytes.length, width, height, name };
+}
+function addLandscapeImage(project, image) {
+  const next = ensureLandscape(project);
+  if (next.landscape.images.some((i) => i.id === image.id)) return next;
+  const result = { ...next, landscape: { ...next.landscape, images: [...next.landscape.images, structuredClone(image)] } };
+  assertLandscape(result);
+  return result;
+}
+function admitLandscapeProject(value) {
+  const result = validateWorld(value);
+  if (!result.valid || !result.project) return result;
+  try {
+    const instances = generateLandscapeInstances(result.project), collision = createLandscapeCollisionIndex(result.project, instances);
+    return { ...result, instances, collision };
+  } catch (error) {
+    return { valid: false, errors: [error.message] };
+  }
+}
+function assertLandscapeDerivedBudget(project) {
+  const result = { candidates: 0, sceneryWork: 0, waterWork: 0, waterVertices: 0 };
+  if (!project.landscape) return result;
+  const layers = project.landscape.layers, waterLayers = layers.filter((l) => l.visible && l.kind === "water" && l.boundary && l.water), waterEdges = waterLayers.reduce((n, l) => n + l.boundary.length, 0), lakeEdges = (project.features ?? []).filter((f) => f.kind === "lake").reduce((n, f) => n + f.points.length, 0), pathEdges = (project.features ?? []).filter((f) => f.kind === "path").reduce((n, f) => n + Math.max(0, f.points.length - 1), 0);
+  for (const layer of layers) {
+    if (!layer.visible || layer.kind !== "vegetation" || !layer.scatter) continue;
+    const spacing = layer.scatter.spacing;
+    if (layer.scatter.assetRef) {
+      const bounds = objectLocalBounds(project, { kind: "glb", assetId: layer.scatter.assetRef }), width = bounds.max.x - bounds.min.x, depth = bounds.max.z - bounds.min.z, height = bounds.max.y - bounds.min.y, scale = layer.scatter.scaleMax;
+      check([width, depth, height].every((v) => Number.isFinite(v) && v >= 0) && Math.hypot(width, depth) * scale <= LANDSCAPE_LIMITS.colliderExtent && height * scale <= LANDSCAPE_LIMITS.colliderExtent, "Landscape generated model extent limit exceeded (128 metres); reduce asset bounds or scatter scale.");
+    }
+    for (const key of Object.keys(layer.mask.tiles)) {
+      const [tx, tz] = key.split(":").map(Number), x0 = tx * 16 - project.terrain.width / 2, z0 = tz * 16 - project.terrain.depth / 2;
+      result.candidates += (Math.ceil((x0 + 16) / spacing) - Math.floor(x0 / spacing) + 3) * (Math.ceil((z0 + 16) / spacing) - Math.floor(z0 / spacing) + 3);
+    }
+    check(result.candidates <= LANDSCAPE_LIMITS.candidates, "Landscape candidate limit exceeded by conservative derived-work estimate; increase spacing or reduce painted coverage.");
+  }
+  result.sceneryWork = result.candidates * (41 + waterEdges * 3 + lakeEdges + pathEdges + project.objects.length);
+  check(result.sceneryWork <= LANDSCAPE_LIMITS.sceneryWork, "Landscape scenery derived work limit exceeded; simplify water/lake/path boundaries, reduce coverage or increase spacing.");
+  const terrain = project.terrain, stepX = terrain.width / (terrain.resolution - 1), stepZ = terrain.depth / (terrain.resolution - 1), cellVisits = (Math.ceil(stepX) + 1) * (Math.ceil(stepZ) + 1);
+  for (const layer of waterLayers) {
+    const boundary = layer.boundary, triangles = ShapeUtils.triangulateShape(boundary.map((p) => new Vector2(p[0], p[2])), []);
+    let terrainTriangles = 0;
+    for (const triangle of triangles) {
+      const points = triangle.map((i) => boundary[i]), minX = Math.max(0, Math.floor((Math.min(...points.map((p) => p[0])) / terrain.width + 0.5) * (terrain.resolution - 1))), maxX = Math.min(terrain.resolution - 2, Math.ceil((Math.max(...points.map((p) => p[0])) / terrain.width + 0.5) * (terrain.resolution - 1))), minZ = Math.max(0, Math.floor((Math.min(...points.map((p) => p[2])) / terrain.depth + 0.5) * (terrain.resolution - 1))), maxZ = Math.min(terrain.resolution - 2, Math.ceil((Math.max(...points.map((p) => p[2])) / terrain.depth + 0.5) * (terrain.resolution - 1)));
+      terrainTriangles += Math.max(0, maxX - minX + 1) * Math.max(0, maxZ - minZ + 1) * 2;
+    }
+    const visits = terrainTriangles * 5 * cellVisits, vertices = visits * 15;
+    result.waterVertices += vertices;
+    result.waterWork += terrainTriangles * 32 + visits * (32 + waterEdges * 3) + vertices * waterEdges * 3;
+    check(result.waterVertices <= LANDSCAPE_LIMITS.waterVertices, "Landscape water vertex limit exceeded by conservative derived-work estimate; reduce water boundary/area or use a coarser terrain grid.");
+    check(result.waterWork <= LANDSCAPE_LIMITS.waterWork, "Landscape water derived work limit exceeded; simplify boundaries, reduce water area or use a coarser terrain grid.");
+  }
+  return result;
+}
+function renderedLandscapeTreeSeed(instance) {
+  return 7319 + instance.seed % 4 * 991;
+}
+
+// src/domain/portal.ts
+var MAX_PORTALS = 16;
+var PORTAL_PLAYER_RADIUS = 0.28;
+var PORTAL_PLAYER_HEIGHT = 1.75;
+var record = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+var bounded = (v, min, max) => typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
+var vec2 = (v) => Array.isArray(v) && v.length === 3 && v.every((n) => bounded(n, -2e3, 2e3));
+var identity = (v, prefix) => typeof v === "string" && new RegExp("^" + prefix + "[A-Za-z0-9][A-Za-z0-9._-]{0,159}$").test(v);
+var keys2 = (v, allowed) => Object.keys(v).every((k) => allowed.includes(k));
+function validateWorldConnections(project) {
+  const errors = [], ids = /* @__PURE__ */ new Set();
+  if (project.portals !== void 0) {
+    if (!Array.isArray(project.portals) || project.portals.length > MAX_PORTALS) errors.push("Worlds may contain at most 16 portals.");
+    for (const p of Array.isArray(project.portals) ? project.portals : []) {
+      if (!record(p) || !keys2(p, ["id", "name", "position", "yaw", "width", "height", "destination", "enabled", "view", "traversal", "policyRef", "visual"])) {
+        errors.push("Invalid portal fields.");
+        continue;
+      }
+      if (!identity(p.id, "elsemesh-portal:") || ids.has(p.id)) errors.push("Portal has an invalid or duplicate identity.");
+      ids.add(p.id);
+      if (typeof p.name !== "string" || !p.name.trim() || p.name.length > 120 || !vec2(p.position) || !bounded(p.yaw, -Math.PI * 2, Math.PI * 2) || !bounded(p.width, Math.round((PORTAL_PLAYER_RADIUS * 2 + 0.04) * 100) / 100, 20) || !bounded(p.height, PORTAL_PLAYER_HEIGHT + 0.04, 20)) errors.push("Portal geometry must be an upright rectangle large enough for the player capsule.");
+      if (typeof p.enabled !== "boolean" || !record(p.view) || !keys2(p.view, ["enabled", "maxDistance"]) || typeof p.view.enabled !== "boolean" || !bounded(p.view.maxDistance, 0.5, 200) || !record(p.traversal) || !keys2(p.traversal, ["enabled"]) || typeof p.traversal.enabled !== "boolean") errors.push("Portal view or traversal settings are invalid.");
+      if (!record(p.destination) || !keys2(p.destination, ["worldId", "regionId", "portalId"]) || !identity(p.destination.worldId, "elsemesh[.]world:") || !identity(p.destination.regionId, "elsemesh[.]region:") || !identity(p.destination.portalId, "elsemesh-portal:")) errors.push("Portal destination must contain world, region and portal identities.");
+      if (typeof p.policyRef !== "string" || !/^[A-Za-z0-9][A-Za-z0-9:._-]{0,159}$/.test(p.policyRef)) errors.push("Portal policy reference must be a bounded identity, never a URL or credential.");
+      if (!record(p.visual) || !keys2(p.visual, ["frameColor", "unavailableColor"]) || ![p.visual.frameColor, p.visual.unavailableColor].every((c) => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c))) errors.push("Portal colors must be hexadecimal RGB.");
+    }
+    for (const p of Array.isArray(project.portals) ? project.portals : []) {
+      if (!record(p) || !record(p.destination)) continue;
+      if (p.destination.worldId === project.metadata?.worldId && (p.destination.regionId !== project.metadata?.regionId || !ids.has(p.destination.portalId))) errors.push("Portal references a missing local region or portal.");
+    }
+  }
+  if (project.water !== void 0) {
+    const w = project.water;
+    if (!record(w) || !keys2(w, ["level", "waveAmplitude", "waveSpeed", "extent"]) || !bounded(w.level, -2e3, 2e3) || !bounded(w.waveAmplitude, 0, 3) || !bounded(w.waveSpeed, 0, 10) || !bounded(w.extent, 16, 4096)) errors.push("Water settings are outside supported bounds.");
+  }
+  if (project.terminals !== void 0) {
+    const terminalIds = /* @__PURE__ */ new Set(), objects = new Set((Array.isArray(project.objects) ? project.objects : []).map((o) => o?.id));
+    if (!Array.isArray(project.terminals) || project.terminals.length > 32) errors.push("Worlds may contain at most 32 retro terminals.");
+    for (const t of Array.isArray(project.terminals) ? project.terminals : []) {
+      if (!record(t) || !keys2(t, ["id", "objectId", "kind", "screenObjectId", "screenObjectIds", "position", "interactionRadius"]) || typeof t.id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9:._-]{0,159}$/.test(t.id) || terminalIds.has(t.id) || !["c64", "bbc", "sun"].includes(t.kind) || !objects.has(t.objectId) || t.screenObjectId !== void 0 && !objects.has(t.screenObjectId) || t.screenObjectIds !== void 0 && (!Array.isArray(t.screenObjectIds) || t.screenObjectIds.length > 8 || new Set(t.screenObjectIds).size !== t.screenObjectIds.length || t.screenObjectIds.some((id2) => !objects.has(id2))) || !vec2(t.position) || !bounded(t.interactionRadius, 0.5, 5)) errors.push("Retro terminal has invalid settings, duplicate identity or missing object references.");
+      if (record(t) && typeof t.id === "string") terminalIds.add(t.id);
+    }
+  }
+  return errors;
+}
+var rotate2 = (v, yaw) => [Math.cos(yaw) * v[0] + Math.sin(yaw) * v[2], v[1], -Math.sin(yaw) * v[0] + Math.cos(yaw) * v[2]];
+function portalLocalPoint(portal, point) {
+  return rotate2([point[0] - portal.position[0], point[1] - portal.position[1], point[2] - portal.position[2]], -portal.yaw);
+}
+function portalWorldPoint(portal, point) {
+  const v = rotate2(point, portal.yaw);
+  return [v[0] + portal.position[0], v[1] + portal.position[1], v[2] + portal.position[2]];
+}
+function mapPortalPoint(source, destination, point) {
+  const v = portalLocalPoint(source, point);
+  return portalWorldPoint(destination, [-v[0], v[1], -v[2]]);
+}
+function mapPortalDirection(source, destination, direction) {
+  return rotate2(direction, destination.yaw + Math.PI - source.yaw);
+}
+function portalMappingElements(source, destination) {
+  const x = mapPortalDirection(source, destination, [1, 0, 0]), y = mapPortalDirection(source, destination, [0, 1, 0]), z = mapPortalDirection(source, destination, [0, 0, 1]), p = mapPortalPoint(source, destination, [0, 0, 0]);
+  return [x[0], x[1], x[2], 0, y[0], y[1], y[2], 0, z[0], z[1], z[2], 0, p[0], p[1], p[2], 1];
+}
+function mapPortalYaw(source, destination, yaw) {
+  const angle = yaw + destination.yaw + Math.PI - source.yaw;
+  return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
+function sweepPortalCapsule({ portal, previousFeet, nextFeet, radius = PORTAL_PLAYER_RADIUS, bodyHeight = PORTAL_PLAYER_HEIGHT }) {
+  if (!portal.enabled || !portal.traversal.enabled || ![...previousFeet, ...nextFeet, radius, bodyHeight].every(Number.isFinite) || radius < 0 || bodyHeight <= 0) return null;
+  const a = portalLocalPoint(portal, previousFeet), b = portalLocalPoint(portal, nextFeet);
+  if (a[2] <= 0 || b[2] > 0) return null;
+  const fraction = a[2] / (a[2] - b[2]), x = a[0] + (b[0] - a[0]) * fraction, y = a[1] + (b[1] - a[1]) * fraction;
+  if (Math.abs(x) + radius > portal.width / 2 || y < -portal.height / 2 - 1e-7 || y + bodyHeight > portal.height / 2 + 1e-7) return null;
+  return { fraction, feet: portalWorldPoint(portal, [x, y, 0]) };
 }
 
 // src/domain/world.ts
 var LEGACY_PROJECT_SCHEMA = "elsemesh.worlds.project/1";
 var PROJECT_SCHEMA = "elsemesh.worlds.project/2";
+var LANDSCAPE_PLAYER_WORLD_SCHEMA = "elsemesh.player-world/3";
 var PLAYER_WORLD_SCHEMA = "elsemesh.player-world/2";
 var MAX_TERRAIN_RESOLUTION = 257;
 var MAX_PROJECT_BYTES = 25 * 1024 * 1024;
@@ -43380,13 +43880,13 @@ function createTerrain(width = 128, depth = 128, resolution = 65, seed = 2049) {
   };
 }
 function createWorld(name = "Untitled world") {
-  const id = crypto.randomUUID();
+  const id2 = crypto.randomUUID();
   return {
     schema: PROJECT_SCHEMA,
     metadata: {
       name,
       description: "",
-      worldId: `elsemesh.world:${id}`,
+      worldId: `elsemesh.world:${id2}`,
       regionId: `elsemesh.region:${crypto.randomUUID()}`
     },
     terrain: createTerrain(),
@@ -43430,11 +43930,12 @@ function validateWorld(value) {
     return { valid: false, errors: [error.message] };
   }
   const p = value;
-  if (p.schema !== PROJECT_SCHEMA) errors.push(`Unsupported project schema. Expected ${PROJECT_SCHEMA}.`);
+  if (p.schema !== PROJECT_SCHEMA && p.schema !== LANDSCAPE_PROJECT_SCHEMA) errors.push(`Unsupported project schema. Expected ${PROJECT_SCHEMA}.`);
   if (!p.metadata || typeof p.metadata.name !== "string" || !p.metadata.name.trim() || p.metadata.name.length > 120)
     errors.push("World name must contain 1–120 characters.");
   if (!p.metadata || typeof p.metadata.description !== "string" || typeof p.metadata.worldId !== "string" || typeof p.metadata.regionId !== "string")
     errors.push("World metadata is incomplete.");
+  if (p.schema === LANDSCAPE_PROJECT_SCHEMA !== (p.landscape !== void 0)) errors.push("Landscape content requires project/3; project/3 requires landscape/1 content.");
   const t = p.terrain;
   if (!t || !Number.isInteger(t.width) || !Number.isInteger(t.depth) || !Number.isInteger(t.resolution) || !Number.isInteger(t.seed) || t.seed < 0 || t.seed > 4294967295 || t.width < 16 || t.width > 2048 || t.depth < 16 || t.depth > 2048 || t.resolution < 9 || t.resolution > MAX_TERRAIN_RESOLUTION || (t.resolution - 1) % 2 !== 0) {
     errors.push("Terrain dimensions or resolution are outside supported bounds.");
@@ -43448,30 +43949,46 @@ function validateWorld(value) {
   if (p.geography !== void 0) errors.push(...validateGeography(p.geography, p.terrain));
   if (p.terrainImagery !== void 0) errors.push(...validateTerrainImagery(p.terrainImagery, p.geography));
   errors.push(...validateWorldConnections(p));
+  errors.push(...validateLandscape(p));
+  if (!p.landscape && Array.isArray(p.objects) && p.objects.some((o) => o.landscapeOrigin)) errors.push("Landscape origins require landscape/1.");
+  const pending = [p], inspected = /* @__PURE__ */ new WeakSet();
+  while (pending.length) {
+    const value2 = pending.pop();
+    if (value2 && typeof value2 === "object") {
+      if (inspected.has(value2)) continue;
+      inspected.add(value2);
+    }
+    if (Array.isArray(value2)) {
+      for (const child of value2) pending.push(child);
+    } else if (value2 && typeof value2 === "object") for (const [key, child] of Object.entries(value2)) {
+      if (["script", "scripts", "hook", "hooks", "code", "modules", "extensions", "onload", "onupdate", "__proto__", "prototype", "constructor"].includes(key.toLowerCase())) errors.push("Executable fields are unsupported project content.");
+      if (child && typeof child === "object") pending.push(child);
+    }
+  }
   const assetIds = new Set(Array.isArray(p.assets) ? p.assets.map((asset) => asset?.id) : []);
   const ids = /* @__PURE__ */ new Set();
-  for (const [index, object2] of (Array.isArray(p.objects) ? p.objects : []).entries()) {
-    if (!object2 || typeof object2 !== "object" || typeof object2.id !== "string" || !object2.id || ids.has(object2.id))
+  for (const [index, object3] of (Array.isArray(p.objects) ? p.objects : []).entries()) {
+    if (!object3 || typeof object3 !== "object" || typeof object3.id !== "string" || !object3.id || ids.has(object3.id))
       errors.push(`Object ${index + 1} has a missing or duplicate ID.`);
-    if (object2 && typeof object2 === "object") ids.add(object2.id);
-    if (!object2 || typeof object2.name !== "string" || !object2.name.trim() || !finiteVec3(object2.position) || !finiteVec3(object2.rotation) || !finiteVec3(object2.scale) || object2.scale.some((n) => n <= 0 || n > 1e3))
+    if (object3 && typeof object3 === "object") ids.add(object3.id);
+    if (!object3 || typeof object3.name !== "string" || !object3.name.trim() || !finiteVec3(object3.position) || !finiteVec3(object3.rotation) || !finiteVec3(object3.scale) || object3.scale.some((n) => n <= 0 || n > 1e3))
       errors.push(`Object ${index + 1} has invalid properties or transforms.`);
-    if (!object2 || !["box", "sphere", "cylinder", "cone", "tree", "building", "glb", "group", "neon-sign", "computer"].includes(object2.kind))
+    if (!object3 || !["box", "sphere", "cylinder", "cone", "tree", "building", "glb", "group", "neon-sign", "computer"].includes(object3.kind))
       errors.push(`Object ${index + 1} uses an unsupported type.`);
-    if (object2?.kind === "glb" && (typeof object2.assetId !== "string" || !assetIds.has(object2.assetId)))
+    if (object3?.kind === "glb" && (typeof object3.assetId !== "string" || !assetIds.has(object3.assetId)))
       errors.push(`Object ${index + 1} references an asset that is missing from the project.`);
-    if (object2 && !["solid", "walkable", "none"].includes(object2.collision))
+    if (object3 && !["solid", "walkable", "none"].includes(object3.collision))
       errors.push(`Object ${index + 1} has an unsupported collision setting.`);
-    if (object2?.treeSpecies !== void 0 && !["broadleaf", "palm", "pine"].includes(object2.treeSpecies)) errors.push(`Object ${index + 1} has an unsupported tree species.`);
-    if (object2?.treeSeed !== void 0 && (!Number.isInteger(object2.treeSeed) || object2.treeSeed < 0 || object2.treeSeed > 4294967295)) errors.push(`Object ${index + 1} has an invalid tree seed.`);
-    if (object2?.materialOverrides !== void 0) {
+    if (object3?.treeSpecies !== void 0 && !["broadleaf", "palm", "pine"].includes(object3.treeSpecies)) errors.push(`Object ${index + 1} has an unsupported tree species.`);
+    if (object3?.treeSeed !== void 0 && (!Number.isInteger(object3.treeSeed) || object3.treeSeed < 0 || object3.treeSeed > 4294967295)) errors.push(`Object ${index + 1} has an invalid tree seed.`);
+    if (object3?.materialOverrides !== void 0) {
       const seen = /* @__PURE__ */ new Set();
-      if (!Array.isArray(object2.materialOverrides) || object2.materialOverrides.length > 256 || object2.materialOverrides.some((entry) => {
+      if (!Array.isArray(object3.materialOverrides) || object3.materialOverrides.length > 256 || object3.materialOverrides.some((entry) => {
         if (!entry || typeof entry !== "object" || !Number.isInteger(entry.materialIndex) || entry.materialIndex < 0 || seen.has(entry.materialIndex)) return true;
         seen.add(entry.materialIndex);
         return entry.color !== void 0 && (typeof entry.color !== "string" || !/^#[0-9a-f]{6}$/i.test(entry.color)) || [entry.roughness, entry.metalness].some((n) => n !== void 0 && (!Number.isFinite(n) || n < 0 || n > 1));
       })) errors.push(`Object ${index + 1} has invalid or duplicate material overrides.`);
-      if (object2.kind !== "glb") errors.push(`Object ${index + 1} material overrides require an imported GLB.`);
+      if (object3.kind !== "glb") errors.push(`Object ${index + 1} material overrides require an imported GLB.`);
     }
   }
   if (Array.isArray(p.objects)) {
@@ -43563,12 +44080,12 @@ function validateWorld(value) {
       }
     }
     if (totalBytes > 15 * 1024 * 1024) errors.push("Imported assets may total at most 15 MiB.");
-    for (const object2 of Array.isArray(p.objects) ? p.objects : []) if (object2?.kind === "glb" && Array.isArray(object2.materialOverrides)) {
-      const count = materialCounts.get(object2.assetId);
-      if (count === void 0 || object2.materialOverrides.some((entry) => !entry || entry.materialIndex >= count)) errors.push("A material override references a missing GLB material slot.");
+    for (const object3 of Array.isArray(p.objects) ? p.objects : []) if (object3?.kind === "glb" && Array.isArray(object3.materialOverrides)) {
+      const count = materialCounts.get(object3.assetId);
+      if (count === void 0 || object3.materialOverrides.some((entry) => !entry || entry.materialIndex >= count)) errors.push("A material override references a missing GLB material slot.");
     }
   }
-  if (p.terrainImagery !== void 0) {
+  if (p.terrainImagery !== void 0 || p.landscape !== void 0) {
     try {
       if (new TextEncoder().encode(JSON.stringify(p)).byteLength > MAX_PROJECT_BYTES) errors.push("Projects with embedded imagery must fit the 25 MiB project limit.");
     } catch {
@@ -43585,11 +44102,30 @@ function validateWorld(value) {
   }
   return errors.length ? { valid: false, errors } : { valid: true, errors, project: { ...p, features: p.features ?? [] } };
 }
+function validatePlayerWorldPackage(value) {
+  const invalid = (message) => ({ valid: false, errors: [message] });
+  if (!value || typeof value !== "object" || Array.isArray(value)) return invalid("Player world package must be an object.");
+  const p = value;
+  if (Object.keys(p).some((k) => !["schema", "capabilities", "units", "axes", "project"].includes(k)) || p.units !== "metres" || p.axes !== "right-handed-y-up-minus-z-forward") return invalid("Unsupported player world package fields, units or axes.");
+  if (p.schema !== PLAYER_WORLD_SCHEMA && p.schema !== LANDSCAPE_PLAYER_WORLD_SCHEMA) return invalid("Unsupported player world package schema.");
+  const result = validateWorld(p.project);
+  if (!result.valid || !result.project) return result;
+  if (p.schema === LANDSCAPE_PLAYER_WORLD_SCHEMA) {
+    if (!result.project.landscape || !Array.isArray(p.capabilities) || p.capabilities.length !== 2 || new Set(p.capabilities).size !== 2 || !["project/3", "landscape/1"].every((c) => p.capabilities.includes(c))) return invalid("Unsupported or missing player world landscape capabilities.");
+  } else if (result.project.landscape || p.capabilities !== void 0) return invalid("Landscape requires player-world/3 capabilities.");
+  try {
+    if (new TextEncoder().encode(JSON.stringify(value)).byteLength > MAX_PROJECT_BYTES) return invalid("Player world package exceeds the 25 MiB limit.");
+  } catch {
+    return invalid("Player world package is not serializable.");
+  }
+  return result;
+}
 function createPlayerWorldPackage(value) {
-  const result = validateWorld(value);
+  const result = admitLandscapeProject(value);
   if (!result.valid || !result.project) throw new Error(result.errors[0] ?? "Project is invalid.");
   const packageFile = {
-    schema: PLAYER_WORLD_SCHEMA,
+    schema: result.project.landscape ? LANDSCAPE_PLAYER_WORLD_SCHEMA : PLAYER_WORLD_SCHEMA,
+    ...result.project.landscape ? { capabilities: ["project/3", "landscape/1"] } : {},
     units: "metres",
     axes: "right-handed-y-up-minus-z-forward",
     project: result.project
@@ -43658,31 +44194,33 @@ function paintTerrain(terrain, x, z, radius, material) {
 // src/domain/world-repository.ts
 var LEGACY_WORLD_REPOSITORY_SCHEMA = "elsemesh.world-repository/1";
 var PREVIOUS_WORLD_REPOSITORY_SCHEMA = "elsemesh.world-repository/2";
-var WORLD_REPOSITORY_SCHEMA = "elsemesh.world-repository/3";
+var CONNECTION_WORLD_REPOSITORY_SCHEMA = "elsemesh.world-repository/3";
+var WORLD_REPOSITORY_SCHEMA = "elsemesh.world-repository/4";
 var WORLD_ENGINE_CONTRACT = "elsemesh.worlds.runtime/1";
-var WORLD_CAPABILITIES = ["project/2", "terrain", "objects", "hierarchy", "features", "neon-sign", "computer", "geography", "terrain-imagery", "weather", "portal/1", "water/1", "retro-terminal/1"];
+var WORLD_CAPABILITIES = ["project/2", "project/3", "landscape/1", "terrain", "objects", "hierarchy", "features", "neon-sign", "computer", "geography", "terrain-imagery", "weather", "portal/1", "water/1", "retro-terminal/1"];
 var WORLD_REPOSITORY_MANIFEST = "world.json";
 var WORLD_REPOSITORY_MANIFEST_LIMIT = 64 * 1024;
 var ENGINE_REFERENCE = "95719848d5ffa4428b57c75c272483e1c2113a72";
 var legacyRoles = ["metadata", "terrain", "objects", "features", "environment", "spawn", "geography", "assets"];
-var roles = [...legacyRoles, "connections"];
+var connectionRoles = [...legacyRoles, "connections"];
+var roles = [...connectionRoles, "landscape"];
 var encoder = new TextEncoder();
 var decoder = new TextDecoder("utf-8", { fatal: true });
 var hashPattern = /^[a-f0-9]{64}$/;
-var object = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var object2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var json = (value) => encoder.encode(JSON.stringify(value, null, 2) + "\n");
 async function repositoryDigest(bytes) {
   const digest = await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 function parse(bytes) {
-  const text2 = decoder.decode(bytes);
-  if (text2.startsWith("version https://git-lfs.github.com/spec/v1")) throw new Error("Git LFS pointer found: download the actual content before opening this world.");
-  return JSON.parse(text2);
+  const text3 = decoder.decode(bytes);
+  if (text3.startsWith("version https://git-lfs.github.com/spec/v1")) throw new Error("Git LFS pointer found: download the actual content before opening this world.");
+  return JSON.parse(text3);
 }
 function reference(value, expectedPath) {
-  if (!object(value) || typeof value.path !== "string" || typeof value.sha256 !== "string" || !hashPattern.test(value.sha256) || !Number.isSafeInteger(value.bytes) || value.bytes < 1 || value.bytes > MAX_PROJECT_BYTES) throw new Error("Invalid repository file reference.");
-  if (expectedPath !== void 0 ? value.path !== expectedPath : !new RegExp(`^(assets/[a-f0-9]{64}\\.glb|imagery/[a-f0-9]{64}\\.(png|jpg))$`).test(value.path)) throw new Error("Repository file path is not allowed.");
+  if (!object2(value) || typeof value.path !== "string" || typeof value.sha256 !== "string" || !hashPattern.test(value.sha256) || !Number.isSafeInteger(value.bytes) || value.bytes < 1 || value.bytes > MAX_PROJECT_BYTES) throw new Error("Invalid repository file reference.");
+  if (expectedPath !== void 0 ? value.path !== expectedPath : !new RegExp(`^(assets/[a-f0-9]{64}\\.glb|landscape-images/[a-f0-9]{64}\\.(png|jpg)|imagery/[a-f0-9]{64}\\.(png|jpg))$`).test(value.path)) throw new Error("Repository file path is not allowed.");
   if (expectedPath === void 0 && !value.path.includes(value.sha256)) throw new Error("Binary filename does not match its content hash.");
   return { path: value.path, sha256: value.sha256, bytes: value.bytes };
 }
@@ -43710,6 +44248,9 @@ function encodeDataUrl(bytes, mediaType) {
 async function packWorldRepository(project, options = {}) {
   project = structuredClone(project);
   validateProject(project);
+  const admitted = admitLandscapeProject(project);
+  if (!admitted.valid || !admitted.project) throw Error(admitted.errors[0] ?? "Invalid project.");
+  project = admitted.project;
   const files = /* @__PURE__ */ new Map();
   const binary = async (dataUrl, directory, extension) => {
     const bytes = decodeDataUrl(dataUrl), sha256 = await repositoryDigest(bytes), path = `${directory}/${sha256}.${extension}`;
@@ -43725,9 +44266,13 @@ async function packWorldRepository(project, options = {}) {
     geography: project.geography ?? null,
     terrainImagery: imagery ? { ...imagery, dataUrl: void 0, file: await binary(imagery.dataUrl, "imagery", imagery.dataUrl.startsWith("data:image/png;") ? "png" : "jpg") } : null
   };
+  const landscape = project.landscape ? { ...project.landscape, images: await Promise.all(project.landscape.images.map(async (image) => {
+    const { dataUrl, ...metadata } = image;
+    return { ...metadata, file: await binary(dataUrl, "landscape-images", image.mediaType === "image/png" ? "png" : "jpg") };
+  })) } : void 0;
   const extended = project.portals !== void 0 || project.water !== void 0 || project.terminals !== void 0;
-  const activeRoles = extended ? roles : legacyRoles;
-  const values = { metadata: project.metadata, terrain: project.terrain, objects: project.objects, features: project.features ?? [], environment: project.environment, spawn: project.spawn, geography, assets, connections: { ...project.portals !== void 0 ? { portals: project.portals } : {}, ...project.water !== void 0 ? { water: project.water } : {}, ...project.terminals !== void 0 ? { terminals: project.terminals } : {} } };
+  const activeRoles = landscape ? roles : extended ? connectionRoles : legacyRoles;
+  const values = { landscape, metadata: project.metadata, terrain: project.terrain, objects: project.objects, features: project.features ?? [], environment: project.environment, spawn: project.spawn, geography, assets, connections: { ...project.portals !== void 0 ? { portals: project.portals } : {}, ...project.water !== void 0 ? { water: project.water } : {}, ...project.terminals !== void 0 ? { terminals: project.terminals } : {} } };
   const components = {};
   const contents = /* @__PURE__ */ new Map();
   for (const role of activeRoles) {
@@ -43740,7 +44285,7 @@ async function packWorldRepository(project, options = {}) {
     components[role].path = `snapshots/${snapshot}/${role}.json`;
     files.set(components[role].path, contents.get(role));
   }
-  const manifest = { schema: extended ? WORLD_REPOSITORY_SCHEMA : PREVIOUS_WORLD_REPOSITORY_SCHEMA, version: extended ? 3 : 2, projectSchema: PROJECT_SCHEMA, engine: { commit: ENGINE_REFERENCE, contract: WORLD_ENGINE_CONTRACT, requires: requiredWorldCapabilities(project) }, snapshot, components, world: project.metadata, regions: [{ regionId: project.metadata.regionId, name: project.metadata.name, scene: { snapshot } }], attribution: options.attribution ?? { authors: [] }, ...options.provenance ? { provenance: options.provenance } : {} };
+  const manifest = { schema: landscape ? WORLD_REPOSITORY_SCHEMA : extended ? CONNECTION_WORLD_REPOSITORY_SCHEMA : PREVIOUS_WORLD_REPOSITORY_SCHEMA, version: landscape ? 4 : extended ? 3 : 2, projectSchema: project.schema, engine: { commit: ENGINE_REFERENCE, contract: WORLD_ENGINE_CONTRACT, requires: requiredWorldCapabilities(project) }, snapshot, components, world: project.metadata, regions: [{ regionId: project.metadata.regionId, name: project.metadata.name, scene: { snapshot } }], attribution: options.attribution ?? { authors: [] }, ...options.provenance ? { provenance: options.provenance } : {} };
   validateManifestMetadata(manifest);
   files.set("README.md", encoder.encode("# Player world content repository\n\nOpen this folder in ElseMesh Worlds using Open world repository. The builder validates hashes and hydrated content before loading. world.json selects an immutable snapshot; previous snapshots are retained. To edit JSON by hand, import the edited content through tooling that recomputes the snapshot and file hashes.\n\nThe engine reference is " + ENGINE_REFERENCE + ". This is provenance only: loading this repository in the original game runtime is unverified. No engine source is included.\n\nAsset source and licence metadata are preserved in the assets and geography JSON. This repository grants no new rights to those assets. Choose a licence appropriate to your own content before publishing.\n\nUse ordinary Git for this bounded repository. Git LFS pointer files are not supported by the folder importer; actual binary content must be present.\n"));
   files.set(".gitattributes", encoder.encode("* text=auto\n*.json text eol=lf\n*.glb binary\n*.png binary\n*.jpg binary\n"));
@@ -43756,7 +44301,7 @@ async function unpackWorldRepository(read) {
   validateManifestMetadata(raw);
   const manifest = raw;
   const components = {};
-  const activeRoles = manifest.version === 3 ? roles : legacyRoles;
+  const activeRoles = manifest.version === 4 ? roles : manifest.version === 3 ? connectionRoles : legacyRoles;
   for (const role of activeRoles) components[role] = reference(manifest.components[role], `snapshots/${manifest.snapshot}/${role}.json`);
   if (await snapshotDigest(components) !== manifest.snapshot) throw new Error("Snapshot identifier does not match its components.");
   let total = manifestBytes.byteLength;
@@ -43778,11 +44323,11 @@ async function unpackWorldRepository(read) {
   };
   const values = {};
   for (const role of activeRoles) values[role] = parse(await verified(components[role]));
-  if (!Array.isArray(values.assets) || values.assets.length > 128 || !object(values.geography)) throw new Error("Invalid repository asset/geography components.");
+  if (!Array.isArray(values.assets) || values.assets.length > 128 || !object2(values.geography)) throw new Error("Invalid repository asset/geography components.");
   const assetPlans = [];
   let glbBytes = 0;
   for (const asset of values.assets) {
-    if (!object(asset) || "dataUrl" in asset) throw new Error("Invalid external asset descriptor.");
+    if (!object2(asset) || "dataUrl" in asset) throw new Error("Invalid external asset descriptor.");
     const { file, ...metadata } = asset, ref = reference(file);
     if (!ref.path.startsWith("assets/")) throw new Error("GLB asset must use an assets path.");
     if (metadata.bytes !== ref.bytes) throw new Error("Asset byte metadata does not match its binary reference.");
@@ -43793,14 +44338,31 @@ async function unpackWorldRepository(read) {
   const geo = values.geography;
   let imageryPlan;
   if (geo.terrainImagery !== null) {
-    if (!object(geo.terrainImagery) || "dataUrl" in geo.terrainImagery) throw new Error("Invalid external terrain imagery descriptor.");
+    if (!object2(geo.terrainImagery) || "dataUrl" in geo.terrainImagery) throw new Error("Invalid external terrain imagery descriptor.");
     const { file, ...metadata } = geo.terrainImagery, ref = reference(file);
     if (!ref.path.startsWith("imagery/")) throw new Error("Terrain imagery must use an imagery path.");
     imageryPlan = { metadata, ref, mediaType: ref.path.endsWith(".png") ? "image/png" : "image/jpeg" };
   }
-  const connections = manifest.version === 3 ? values.connections : {};
-  if (!object(connections) || Object.keys(connections).some((key) => !["portals", "water", "terminals"].includes(key))) throw new Error("Invalid repository connections component.");
+  const connections = manifest.version >= 3 ? values.connections : {};
+  if (!object2(connections) || Object.keys(connections).some((key) => !["portals", "water", "terminals"].includes(key))) throw new Error("Invalid repository connections component.");
+  const rawLandscape = manifest.version === 4 ? values.landscape : void 0;
+  const imagePlans = [];
+  if (rawLandscape !== void 0) {
+    if (!object2(rawLandscape) || !Array.isArray(rawLandscape.images) || rawLandscape.images.length > 16) throw Error("Invalid landscape image component");
+    let bytes = 0;
+    for (const image of rawLandscape.images) {
+      if (!object2(image) || "dataUrl" in image) throw Error("Invalid external landscape image");
+      const { file, ...metadata } = image, ref = reference(file);
+      if (!ref.path.startsWith("landscape-images/") || metadata.id !== "sha256:" + ref.sha256 || metadata.bytes !== ref.bytes) throw Error("Landscape image reference/hash mismatch");
+      const mediaType = ref.path.endsWith(".png") ? "image/png" : "image/jpeg";
+      if (metadata.mediaType !== mediaType) throw Error("Landscape image media mismatch");
+      bytes += ref.bytes;
+      if (ref.bytes > 2 * 1024 * 1024 || bytes > 4 * 1024 * 1024) throw Error("Landscape image byte budget exceeded");
+      imagePlans.push({ metadata, ref, mediaType });
+    }
+  }
   const candidate = {
+    ...rawLandscape ? { landscape: { ...rawLandscape, images: imagePlans.map(({ metadata }) => ({ ...metadata, dataUrl: "" })) } } : {},
     ...connections,
     schema: manifest.projectSchema,
     metadata: values.metadata,
@@ -43814,7 +44376,7 @@ async function unpackWorldRepository(read) {
     ...imageryPlan ? { terrainImagery: { ...imageryPlan.metadata, dataUrl: "" } } : {}
   };
   const dataUrlBytes = (ref, mediaType) => 4 * Math.ceil(ref.bytes / 3) + `data:${mediaType};base64,`.length;
-  const hydratedBytes = encoder.encode(JSON.stringify(candidate)).byteLength + assetPlans.reduce((sum, { ref }) => sum + dataUrlBytes(ref, "application/octet-stream"), 0) + (imageryPlan ? dataUrlBytes(imageryPlan.ref, imageryPlan.mediaType) : 0);
+  const hydratedBytes = encoder.encode(JSON.stringify(candidate)).byteLength + assetPlans.reduce((sum, { ref }) => sum + dataUrlBytes(ref, "application/octet-stream"), 0) + (imageryPlan ? dataUrlBytes(imageryPlan.ref, imageryPlan.mediaType) : 0) + imagePlans.reduce((sum, { ref, mediaType }) => sum + dataUrlBytes(ref, mediaType), 0);
   if (hydratedBytes > MAX_PROJECT_BYTES) throw new Error("Hydrated world exceeds the 25 MiB project limit, including repeated binary references.");
   const encodedCache = /* @__PURE__ */ new Map();
   const hydrate = async (ref, mediaType) => {
@@ -43831,6 +44393,10 @@ async function unpackWorldRepository(read) {
     candidate.assets[index].dataUrl = await hydrate(plan.ref, "application/octet-stream");
   }
   if (imageryPlan && candidate.terrainImagery) candidate.terrainImagery.dataUrl = await hydrate(imageryPlan.ref, imageryPlan.mediaType);
+  if (candidate.landscape) for (let i = 0; i < imagePlans.length; i++) {
+    const plan = imagePlans[i];
+    candidate.landscape.images[i].dataUrl = await hydrate(plan.ref, plan.mediaType);
+  }
   const project = validateProject(candidate);
   if (manifest.version >= 2) {
     if (Object.keys(project.metadata).some((key) => manifest.world?.[key] !== project.metadata[key]) || manifest.regions[0].regionId !== project.metadata.regionId) throw new Error("Manifest identity does not match scene metadata.");
@@ -43839,7 +44405,8 @@ async function unpackWorldRepository(read) {
   return project;
 }
 function requiredWorldCapabilities(project) {
-  const capabilities = /* @__PURE__ */ new Set(["project/2", "terrain", "objects"]);
+  const capabilities = /* @__PURE__ */ new Set([project.landscape ? "project/3" : "project/2", "terrain", "objects"]);
+  if (project.landscape) capabilities.add("landscape/1");
   if (project.objects.some((o) => o.kind === "group" || o.parentId)) capabilities.add("hierarchy");
   for (const kind of ["neon-sign", "computer"]) if (project.objects.some((o) => o.kind === kind)) capabilities.add(kind);
   if (project.portals?.length) capabilities.add("portal/1");
@@ -43853,18 +44420,18 @@ function requiredWorldCapabilities(project) {
 }
 function validateManifestMetadata(raw) {
   rejectExecutableFields(raw);
-  if (!object(raw) || ![WORLD_REPOSITORY_SCHEMA, PREVIOUS_WORLD_REPOSITORY_SCHEMA, LEGACY_WORLD_REPOSITORY_SCHEMA].includes(raw.schema) || ![PROJECT_SCHEMA, LEGACY_PROJECT_SCHEMA].includes(raw.projectSchema) || !object(raw.engine) || typeof raw.snapshot !== "string" || !hashPattern.test(raw.snapshot) || !object(raw.components) || Object.keys(raw.components).length !== (raw.schema === WORLD_REPOSITORY_SCHEMA ? roles.length : legacyRoles.length)) throw new Error("Unsupported or invalid world repository manifest.");
+  if (!object2(raw) || ![WORLD_REPOSITORY_SCHEMA, CONNECTION_WORLD_REPOSITORY_SCHEMA, PREVIOUS_WORLD_REPOSITORY_SCHEMA, LEGACY_WORLD_REPOSITORY_SCHEMA].includes(raw.schema) || ![PROJECT_SCHEMA, LEGACY_PROJECT_SCHEMA, LANDSCAPE_PROJECT_SCHEMA].includes(raw.projectSchema) || !object2(raw.engine) || typeof raw.snapshot !== "string" || !hashPattern.test(raw.snapshot) || !object2(raw.components) || Object.keys(raw.components).length !== (raw.schema === WORLD_REPOSITORY_SCHEMA ? roles.length : raw.schema === CONNECTION_WORLD_REPOSITORY_SCHEMA ? connectionRoles.length : legacyRoles.length)) throw new Error("Unsupported or invalid world repository manifest.");
   if (raw.schema === LEGACY_WORLD_REPOSITORY_SCHEMA) {
     if (raw.version !== 1 || typeof raw.engine.commit !== "string" || !/^[a-f0-9]{40}$/.test(raw.engine.commit) || raw.engine.compatibility !== "reference-only-runtime-unverified") throw new Error("Invalid legacy engine provenance.");
     return;
   }
   if (Object.keys(raw).some((k) => !["schema", "version", "projectSchema", "engine", "snapshot", "components", "world", "regions", "attribution", "provenance"].includes(k)) || Object.keys(raw.engine).some((k) => !["commit", "contract", "requires"].includes(k))) throw new Error("Unknown manifest field or engine requirement.");
-  if ((raw.schema === WORLD_REPOSITORY_SCHEMA ? raw.version !== 3 : raw.version !== 2) || raw.projectSchema !== PROJECT_SCHEMA || raw.engine.contract !== WORLD_ENGINE_CONTRACT || typeof raw.engine.commit !== "string" || !/^[a-f0-9]{40}$/.test(raw.engine.commit) || !Array.isArray(raw.engine.requires) || raw.engine.requires.length > WORLD_CAPABILITIES.length || new Set(raw.engine.requires).size !== raw.engine.requires.length || raw.engine.requires.some((c) => !WORLD_CAPABILITIES.includes(c))) throw new Error("Unsupported engine contract or required capability.");
-  if (!object(raw.world) || !["worldId", "regionId", "name", "description"].every((k) => typeof raw.world[k] === "string") || !Array.isArray(raw.regions) || raw.regions.length !== 1 || !object(raw.regions[0]) || raw.regions[0].regionId !== raw.world.regionId || raw.regions[0].name !== raw.world.name || !object(raw.regions[0].scene) || raw.regions[0].scene.snapshot !== raw.snapshot) throw new Error("Invalid world or region identity/scene. This engine supports one region per repository.");
+  if ((raw.schema === WORLD_REPOSITORY_SCHEMA ? raw.version !== 4 : raw.schema === CONNECTION_WORLD_REPOSITORY_SCHEMA ? raw.version !== 3 : raw.version !== 2) || raw.projectSchema !== (raw.version === 4 ? LANDSCAPE_PROJECT_SCHEMA : PROJECT_SCHEMA) || raw.engine.contract !== WORLD_ENGINE_CONTRACT || typeof raw.engine.commit !== "string" || !/^[a-f0-9]{40}$/.test(raw.engine.commit) || !Array.isArray(raw.engine.requires) || raw.engine.requires.length > WORLD_CAPABILITIES.length || new Set(raw.engine.requires).size !== raw.engine.requires.length || raw.engine.requires.some((c) => !WORLD_CAPABILITIES.includes(c))) throw new Error("Unsupported engine contract or required capability.");
+  if (!object2(raw.world) || !["worldId", "regionId", "name", "description"].every((k) => typeof raw.world[k] === "string") || !Array.isArray(raw.regions) || raw.regions.length !== 1 || !object2(raw.regions[0]) || raw.regions[0].regionId !== raw.world.regionId || raw.regions[0].name !== raw.world.name || !object2(raw.regions[0].scene) || raw.regions[0].scene.snapshot !== raw.snapshot) throw new Error("Invalid world or region identity/scene. This engine supports one region per repository.");
   if (Object.keys(raw.world).some((k) => !["worldId", "regionId", "name", "description"].includes(k)) || ["worldId", "regionId"].some((k) => !raw.world[k]?.trim() || raw.world[k].length > 200)) throw new Error("World and region identifiers must be nonempty bounded strings.");
-  if (!object(raw.attribution) || !Array.isArray(raw.attribution.authors) || raw.attribution.authors.length > 64 || raw.attribution.authors.some((a) => typeof a !== "string" || a.length > 200) || [raw.attribution.license, raw.attribution.source].some((v) => v !== void 0 && (typeof v !== "string" || v.length > 2e3))) throw new Error("Invalid attribution metadata.");
+  if (!object2(raw.attribution) || !Array.isArray(raw.attribution.authors) || raw.attribution.authors.length > 64 || raw.attribution.authors.some((a) => typeof a !== "string" || a.length > 200) || [raw.attribution.license, raw.attribution.source].some((v) => v !== void 0 && (typeof v !== "string" || v.length > 2e3))) throw new Error("Invalid attribution metadata.");
   if (raw.provenance !== void 0) {
-    if (!object(raw.provenance) || Object.keys(raw.provenance).some((k) => !["sourceWorldId", "sourceLocation", "sourceCommit", "sourceDigest"].includes(k)) || Object.values(raw.provenance).some((v) => typeof v !== "string" || v.length > 2e3) || raw.provenance.sourceCommit !== void 0 && !/^[a-f0-9]{40}$/.test(raw.provenance.sourceCommit) || raw.provenance.sourceDigest !== void 0 && !hashPattern.test(raw.provenance.sourceDigest)) throw new Error("Invalid source provenance.");
+    if (!object2(raw.provenance) || Object.keys(raw.provenance).some((k) => !["sourceWorldId", "sourceLocation", "sourceCommit", "sourceDigest"].includes(k)) || Object.values(raw.provenance).some((v) => typeof v !== "string" || v.length > 2e3) || raw.provenance.sourceCommit !== void 0 && !/^[a-f0-9]{40}$/.test(raw.provenance.sourceCommit) || raw.provenance.sourceDigest !== void 0 && !hashPattern.test(raw.provenance.sourceDigest)) throw new Error("Invalid source provenance.");
   }
 }
 async function inspectWorldRepository(read) {
@@ -43881,7 +44448,7 @@ function rejectExecutableFields(value) {
   while (pending.length) {
     const current = pending.pop();
     if (Array.isArray(current)) pending.push(...current);
-    else if (object(current)) for (const [key, child] of Object.entries(current)) {
+    else if (object2(current)) for (const [key, child] of Object.entries(current)) {
       if (["script", "scripts", "hook", "hooks", "code", "modules", "extensions", "onload", "onupdate", "__proto__", "prototype", "constructor"].includes(key.toLowerCase())) throw new Error("Executable hooks, scripts, and extension fields are not supported world content.");
       if (typeof child === "object" && child !== null) pending.push(child);
     }
@@ -43978,7 +44545,7 @@ async function loadWorldSource(source, options = {}) {
     if (!commitPattern.test(source.commit)) throw new Error("World content must be pinned to a full Git commit.");
     const prefix = `https://raw.githubusercontent.com/${validated.owner}/${validated.repository}/${source.commit}/${validated.path ? validated.path + "/" : ""}`;
     read = (path, limit) => {
-      if (path !== WORLD_REPOSITORY_MANIFEST && !/^(snapshots\/[a-f0-9]{64}\/(metadata|terrain|objects|features|environment|spawn|geography|assets)\.json|assets\/[a-f0-9]{64}\.glb|imagery\/[a-f0-9]{64}\.(png|jpg))$/.test(path)) throw new Error("World content path is not allowed.");
+      if (path !== WORLD_REPOSITORY_MANIFEST && !/^(snapshots\/[a-f0-9]{64}\/(metadata|terrain|objects|features|environment|spawn|geography|assets|connections|landscape)\.json|assets\/[a-f0-9]{64}\.glb|landscape-images\/[a-f0-9]{64}\.(png|jpg)|imagery\/[a-f0-9]{64}\.(png|jpg))$/.test(path)) throw new Error("World content path is not allowed.");
       return boundedFetch(prefix + path, limit, options, "application/octet-stream");
     };
     location2 = githubWorldSourceLocation(source);
@@ -44010,15 +44577,15 @@ function describeRuntimeWorld(input) {
   if (!result.valid || !result.project) throw new Error(result.errors.join(" "));
   const project = structuredClone(result.project);
   const matrices = resolveWorldMatrices(project.objects);
-  const boxes = project.objects.flatMap((object2) => {
-    if (object2.kind === "group" || object2.collision === "none" || !effectiveObjectState(project.objects, object2.id).visible) return [];
-    const bounds = objectLocalBounds(project, object2).applyMatrix4(matrices.get(object2.id));
+  const boxes = project.objects.flatMap((object3) => {
+    if (object3.kind === "group" || object3.collision === "none" || !effectiveObjectState(project.objects, object3.id).visible) return [];
+    const bounds = objectLocalBounds(project, object3).applyMatrix4(matrices.get(object3.id));
     const center = bounds.getCenter(new Vector3()), half = bounds.getSize(new Vector3()).multiplyScalar(0.5);
     return [{
-      id: object2.id,
+      id: object3.id,
       center: center.toArray(),
       half: half.toArray(),
-      walkable: object2.collision === "walkable",
+      walkable: object3.collision === "walkable",
       solid: true
     }];
   });
@@ -44030,7 +44597,7 @@ function describeRuntimeWorld(input) {
     boxes,
     terrain: { heightAt: (x, z) => sampleTerrain(project.terrain, x, z) },
     // Interaction identifiers travel as authored data; authority remains external.
-    interactions: project.objects.filter((object2) => object2.kind === "neon-sign" || object2.kind === "computer").map((object2) => ({ id: object2.id, kind: object2.kind, targetSignId: object2.computer?.targetSignId }))
+    interactions: project.objects.filter((object3) => object3.kind === "neon-sign" || object3.kind === "computer").map((object3) => ({ id: object3.id, kind: object3.kind, targetSignId: object3.computer?.targetSignId }))
   };
 }
 
@@ -44163,8 +44730,8 @@ function featureFlowWarnings(feature, project) {
     warnings.push("River rises downstream. Lower the later vertices for downhill flow.");
     break;
   }
-  for (const [id, point, label] of [[feature.startLakeId, feature.points[0], "Start"], [feature.endLakeId, feature.points.at(-1), "End"]]) {
-    const lake = project.features?.find((f) => f.id === id);
+  for (const [id2, point, label] of [[feature.startLakeId, feature.points[0], "Start"], [feature.endLakeId, feature.points.at(-1), "End"]]) {
+    const lake = project.features?.find((f) => f.id === id2);
     if (lake && point && Math.abs(point[1] - (lake.elevation ?? 0)) > 0.15) warnings.push(`${label} vertex differs from its connected lake level. Reconnect to match the level.`);
     if (lake && point) {
       let inside = false, nearest = Infinity;
@@ -44246,7 +44813,7 @@ var PRIVATE_NEON_PROTOCOL = "elsemesh.neon-session/1";
 function privateNeonMatchesWorld(snapshot, worldId, signIds) {
   if (!snapshot || snapshot.worldId !== worldId || snapshot.signs.length !== signIds.length) return false;
   const local = new Set(signIds), remote = new Set(snapshot.signs.map((sign2) => sign2.id));
-  return local.size === signIds.length && remote.size === snapshot.signs.length && [...remote].every((id) => local.has(id));
+  return local.size === signIds.length && remote.size === snapshot.signs.length && [...remote].every((id2) => local.has(id2));
 }
 function canonical(value) {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
@@ -44269,12 +44836,12 @@ async function privateNeonIdentity() {
       r.onerror = () => reject(r.error);
     });
     if (existing) return existing;
-    const keys2 = await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]);
-    const der = new Uint8Array(await crypto.subtle.exportKey("spki", keys2.publicKey));
+    const keys3 = await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]);
+    const der = new Uint8Array(await crypto.subtle.exportKey("spki", keys3.publicKey));
     const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", der));
     const nodeId = "elsemesh-node:" + Array.from(digest, (x) => x.toString(16).padStart(2, "0")).join("");
     const encoded = base64(der);
-    const identity2 = { nodeId, publicKey: "-----BEGIN PUBLIC KEY-----\n" + encoded.match(/.{1,64}/g).join("\n") + "\n-----END PUBLIC KEY-----\n", privateKey: keys2.privateKey };
+    const identity2 = { nodeId, publicKey: "-----BEGIN PUBLIC KEY-----\n" + encoded.match(/.{1,64}/g).join("\n") + "\n-----END PUBLIC KEY-----\n", privateKey: keys3.privateKey };
     try {
       await new Promise((resolve, reject) => {
         const tx = db.transaction("keys", "readwrite");
@@ -44656,8 +45223,8 @@ function GLTFRegistry() {
     get: function(key) {
       return objects[key];
     },
-    add: function(key, object2) {
-      objects[key] = object2;
+    add: function(key, object3) {
+      objects[key] = object3;
     },
     remove: function(key) {
       delete objects[key];
@@ -44717,21 +45284,21 @@ var GLTFLightsExtension = class {
     const lightDefs = extensions.lights || [];
     const lightDef = lightDefs[lightIndex];
     let lightNode;
-    const color = new Color(16777215);
-    if (lightDef.color !== void 0) color.setRGB(lightDef.color[0], lightDef.color[1], lightDef.color[2], LinearSRGBColorSpace);
+    const color2 = new Color(16777215);
+    if (lightDef.color !== void 0) color2.setRGB(lightDef.color[0], lightDef.color[1], lightDef.color[2], LinearSRGBColorSpace);
     const range = lightDef.range !== void 0 ? lightDef.range : 0;
     switch (lightDef.type) {
       case "directional":
-        lightNode = new DirectionalLight(color);
+        lightNode = new DirectionalLight(color2);
         lightNode.target.position.set(0, 0, -1);
         lightNode.add(lightNode.target);
         break;
       case "point":
-        lightNode = new PointLight(color);
+        lightNode = new PointLight(color2);
         lightNode.distance = range;
         break;
       case "spot":
-        lightNode = new SpotLight(color);
+        lightNode = new SpotLight(color2);
         lightNode.distance = range;
         lightDef.spot = lightDef.spot || {};
         lightDef.spot.innerConeAngle = lightDef.spot.innerConeAngle !== void 0 ? lightDef.spot.innerConeAngle : 0;
@@ -45567,18 +46134,18 @@ function createDefaultMaterial(cache2) {
   }
   return cache2["DefaultMaterial"];
 }
-function addUnknownExtensionsToUserData(knownExtensions, object2, objectDef) {
+function addUnknownExtensionsToUserData(knownExtensions, object3, objectDef) {
   for (const name in objectDef.extensions) {
     if (knownExtensions[name] === void 0) {
-      object2.userData.gltfExtensions = object2.userData.gltfExtensions || {};
-      object2.userData.gltfExtensions[name] = objectDef.extensions[name];
+      object3.userData.gltfExtensions = object3.userData.gltfExtensions || {};
+      object3.userData.gltfExtensions[name] = objectDef.extensions[name];
     }
   }
 }
-function assignExtrasToUserData(object2, gltfDef) {
+function assignExtrasToUserData(object3, gltfDef) {
   if (gltfDef.extras !== void 0) {
     if (typeof gltfDef.extras === "object") {
-      Object.assign(object2.userData, gltfDef.extras);
+      Object.assign(object3.userData, gltfDef.extras);
     } else {
       console.warn("THREE.GLTFLoader: Ignoring primitive type .extras, " + gltfDef.extras);
     }
@@ -45665,9 +46232,9 @@ function createPrimitiveKey(primitiveDef) {
 }
 function createAttributesKey(attributes) {
   let attributesKey = "";
-  const keys2 = Object.keys(attributes).sort();
-  for (let i = 0, il = keys2.length; i < il; i++) {
-    attributesKey += keys2[i] + ":" + attributes[keys2[i]] + ";";
+  const keys3 = Object.keys(attributes).sort();
+  for (let i = 0, il = keys3.length; i < il; i++) {
+    attributesKey += keys3[i] + ":" + attributes[keys3[i]] + ";";
   }
   return attributesKey;
 }
@@ -45835,9 +46402,9 @@ var GLTFParser = class {
    * @param {Object} object
    * @return {Object}
    */
-  _getNodeRef(cache2, index, object2) {
-    if (cache2.refs[index] <= 1) return object2;
-    const ref = object2.clone();
+  _getNodeRef(cache2, index, object3) {
+    if (cache2.refs[index] <= 1) return object3;
+    const ref = object3.clone();
     const updateMappings = (original, clone) => {
       const mappings = this.associations.get(original);
       if (mappings != null) {
@@ -45847,7 +46414,7 @@ var GLTFParser = class {
         updateMappings(child, clone.children[i]);
       }
     };
-    updateMappings(object2, ref);
+    updateMappings(object3, ref);
     ref.name += "_instance_" + cache2.uses[index]++;
     return ref;
   }
@@ -46800,9 +47367,9 @@ var GLTFParser = class {
     const targetName = node.name ? node.name : node.uuid;
     const targetNames = [];
     if (PATH_PROPERTIES[target.path] === PATH_PROPERTIES.weights) {
-      node.traverse(function(object2) {
-        if (object2.morphTargetInfluences) {
-          targetNames.push(object2.name ? object2.name : object2.uuid);
+      node.traverse(function(object3) {
+        if (object3.morphTargetInfluences) {
+          targetNames.push(object3.name ? object3.name : object3.uuid);
         }
       });
     } else {
@@ -46896,7 +47463,7 @@ function computeBounds(geometry, primitiveDef, parser) {
   const targets = primitiveDef.targets;
   if (targets !== void 0) {
     const maxDisplacement = new Vector3();
-    const vector = new Vector3();
+    const vector2 = new Vector3();
     for (let i = 0, il = targets.length; i < il; i++) {
       const target = targets[i];
       if (target.POSITION !== void 0) {
@@ -46904,14 +47471,14 @@ function computeBounds(geometry, primitiveDef, parser) {
         const min = accessor.min;
         const max = accessor.max;
         if (min !== void 0 && max !== void 0) {
-          vector.setX(Math.max(Math.abs(min[0]), Math.abs(max[0])));
-          vector.setY(Math.max(Math.abs(min[1]), Math.abs(max[1])));
-          vector.setZ(Math.max(Math.abs(min[2]), Math.abs(max[2])));
+          vector2.setX(Math.max(Math.abs(min[0]), Math.abs(max[0])));
+          vector2.setY(Math.max(Math.abs(min[1]), Math.abs(max[1])));
+          vector2.setZ(Math.max(Math.abs(min[2]), Math.abs(max[2])));
           if (accessor.normalized) {
             const boxScale = getNormalizedComponentScale(WEBGL_COMPONENT_TYPES[accessor.componentType]);
-            vector.multiplyScalar(boxScale);
+            vector2.multiplyScalar(boxScale);
           }
-          maxDisplacement.max(vector);
+          maxDisplacement.max(vector2);
         } else {
           console.warn("THREE.GLTFLoader: Missing min/max properties for accessor POSITION.");
         }
@@ -46957,10 +47524,10 @@ function addPrimitiveAttributes(geometry, primitiveDef, parser) {
 // src/ui/asset-admission.ts
 function disposeAssetScene(scene) {
   const geometries = /* @__PURE__ */ new Set(), materials = /* @__PURE__ */ new Set(), textures = /* @__PURE__ */ new Set();
-  scene.traverse((object2) => {
-    if (!(object2 instanceof Mesh)) return;
-    geometries.add(object2.geometry);
-    for (const material of Array.isArray(object2.material) ? object2.material : [object2.material]) {
+  scene.traverse((object3) => {
+    if (!(object3 instanceof Mesh)) return;
+    geometries.add(object3.geometry);
+    for (const material of Array.isArray(object3.material) ? object3.material : [object3.material]) {
       materials.add(material);
       for (const value of Object.values(material)) if (value instanceof Texture) textures.add(value);
     }
@@ -46980,24 +47547,24 @@ async function inspectAndLoadAsset(buffer) {
     let vertices = 0, triangles = 0, texturePixels = 0;
     const textures = /* @__PURE__ */ new Set();
     const bounds = new Box3();
-    scene.traverse((object2) => {
-      if (!(object2 instanceof Mesh)) return;
-      if (object2 instanceof SkinnedMesh || object2.morphTargetInfluences?.length) throw new Error("Use static meshes without skinning or morph targets.");
-      const position = object2.geometry.getAttribute("position");
+    scene.traverse((object3) => {
+      if (!(object3 instanceof Mesh)) return;
+      if (object3 instanceof SkinnedMesh || object3.morphTargetInfluences?.length) throw new Error("Use static meshes without skinning or morph targets.");
+      const position = object3.geometry.getAttribute("position");
       if (!position || position.count < 3) throw new Error("Asset mesh has no usable vertices.");
       vertices += position.count;
-      triangles += (object2.geometry.index?.count ?? position.count) / 3;
+      triangles += (object3.geometry.index?.count ?? position.count) / 3;
       if (vertices > MAX_ASSET_VERTICES || triangles > MAX_ASSET_TRIANGLES) throw new Error("Asset decoded geometry budget exceeded.");
       const point = new Vector3();
       for (let i = 0; i < position.count; i++) {
-        point.fromBufferAttribute(position, i).applyMatrix4(object2.matrixWorld);
+        point.fromBufferAttribute(position, i).applyMatrix4(object3.matrixWorld);
         if (![point.x, point.y, point.z].every(Number.isFinite)) throw new Error("Asset has nonfinite transformed vertices.");
         bounds.expandByPoint(point);
       }
-      if (!object2.geometry.getAttribute("normal")) object2.geometry.computeVertexNormals();
-      object2.castShadow = true;
-      object2.receiveShadow = true;
-      for (const material of Array.isArray(object2.material) ? object2.material : [object2.material]) {
+      if (!object3.geometry.getAttribute("normal")) object3.geometry.computeVertexNormals();
+      object3.castShadow = true;
+      object3.receiveShadow = true;
+      for (const material of Array.isArray(object3.material) ? object3.material : [object3.material]) {
         const index = loaded.parser.associations.get(material)?.materials ?? -1;
         material.userData.gltfMaterialIndex = index;
         materialIndices.set(material, index);
@@ -47049,6 +47616,286 @@ function adoptRuntimeSettings(project, snapshot, expected) {
   return result;
 }
 
+// src/ui/landscape-render.ts
+var TILE = 16;
+var PIXELS = 64;
+var STRIDE = 66;
+var HASH_SIZE = 4096;
+var mod = (a, n) => (a % n + n) % n;
+async function bakeLandscapeAtlas(p) {
+  const layers = p.landscape?.layers.filter((l) => l.visible && l.kind === "ground") ?? [];
+  const keys3 = [...new Set(layers.flatMap((l) => Object.keys(l.mask.tiles)))].sort();
+  if (!keys3.length) return null;
+  const side = Math.ceil(Math.sqrt(keys3.length)), size = side * STRIDE, data = new Uint8Array(size * size * 4), rough = new Uint8Array(size * size * 4), index = new Float32Array(HASH_SIZE * 4);
+  const sampler = createLandscapeSampler(p), images = /* @__PURE__ */ new Map();
+  for (const image of p.landscape?.images ?? []) {
+    const bitmap = await createImageBitmap(await (await fetch(image.dataUrl)).blob());
+    try {
+      const c = document.createElement("canvas");
+      c.width = bitmap.width;
+      c.height = bitmap.height;
+      const ctx = c.getContext("2d");
+      ctx.drawImage(bitmap, 0, 0);
+      images.set(image.id, {
+        data: ctx.getImageData(0, 0, c.width, c.height).data,
+        width: c.width,
+        height: c.height
+      });
+    } finally {
+      bitmap.close();
+    }
+  }
+  keys3.forEach((key, i) => {
+    const [tx, tz] = key.split(":").map(Number);
+    let h = mod(tx * 17 + tz * 31, HASH_SIZE);
+    while (index[h * 4 + 2]) h = (h + 1) % HASH_SIZE;
+    index.set([tx, tz, i + 1, 1], h * 4);
+    const ax = i % side * STRIDE, az = Math.floor(i / side) * STRIDE;
+    for (let z = 0; z < STRIDE; z++)
+      for (let x = 0; x < STRIDE; x++) {
+        const wx = tx * TILE + (Math.max(1, Math.min(PIXELS, x)) - 0.5) * TILE / PIXELS - p.terrain.width / 2, wz = tz * TILE + (Math.max(1, Math.min(PIXELS, z)) - 0.5) * TILE / PIXELS - p.terrain.depth / 2;
+        const sample = sampler.groundAt(wx, wz);
+        let r = 0, g = 0, b = 0, a = 0, rs = 0;
+        for (const { material, weight } of sample.contributions) {
+          const c = new Color(material.color);
+          let tint = [c.r, c.g, c.b];
+          const image = material.imageRef && images.get(material.imageRef);
+          if (image) {
+            const ix = Math.floor(mod(wx / material.tiling, 1) * image.width), iz = Math.floor(mod(wz / material.tiling, 1) * image.height), o2 = (iz * image.width + ix) * 4;
+            tint = tint.map(
+              (v, k) => v * ((v2) => v2 <= 0.04045 ? v2 / 12.92 : Math.pow((v2 + 0.055) / 1.055, 2.4))(
+                (image.data[o2 + k] ?? 0) / 255
+              )
+            );
+          } else {
+            const grain = 0.94 + 0.06 * Math.sin(wx * material.tiling * 2.7) * Math.sin(wz * material.tiling * 3.1);
+            tint = tint.map((v) => v * grain);
+          }
+          r = r * (1 - weight) + tint[0] * weight;
+          g = g * (1 - weight) + tint[1] * weight;
+          b = b * (1 - weight) + tint[2] * weight;
+          rs = rs * (1 - weight) + material.roughness * weight;
+          a = a + (1 - a) * weight;
+        }
+        const o = ((az + z) * size + ax + x) * 4;
+        data.set([r / (a || 1) * 255, g / (a || 1) * 255, b / (a || 1) * 255, a * 255], o);
+        rough.set([rs / (a || 1) * 255, 0, 0, a * 255], o);
+      }
+  });
+  return { data, rough, index, size, side, tiles: keys3.length };
+}
+function threeAtlas(atlas) {
+  const color2 = new DataTexture(atlas.data, atlas.size, atlas.size);
+  color2.minFilter = color2.magFilter = LinearFilter;
+  color2.needsUpdate = true;
+  const rough = new DataTexture(atlas.rough, atlas.size, atlas.size);
+  rough.minFilter = rough.magFilter = LinearFilter;
+  rough.needsUpdate = true;
+  const index = new DataTexture(atlas.index, HASH_SIZE, 1, RGBAFormat, FloatType);
+  index.needsUpdate = true;
+  return {
+    color: color2,
+    rough,
+    index,
+    dispose() {
+      color2.dispose();
+      rough.dispose();
+      index.dispose();
+    }
+  };
+}
+var atlasGLSL = `uniform sampler2D landscapeColor;uniform sampler2D landscapeRough;uniform sampler2D landscapeIndex;uniform vec4 landscapeSize;varying vec2 landscapeWorld;
+vec4 landscapeSample(sampler2D tex){vec2 cell=(landscapeWorld+landscapeSize.zw*.5)/16.;vec2 tile=floor(cell);float h=mod(mod(tile.x*17.+tile.y*31.,4096.)+4096.,4096.);float id=0.;for(int i=0;i<256;i++){vec4 entry=texture2D(landscapeIndex,vec2((h+.5)/4096.,.5));if(entry.z<.5)break;if(all(lessThan(abs(entry.xy-tile),vec2(.1)))){id=entry.z;break;}h=mod(h+1.,4096.);}if(id<.5)return vec4(0.);float n=id-1.;vec2 slot=vec2(mod(n,landscapeSize.y),floor(n/landscapeSize.y));vec2 uv=(slot*66.+1.+fract(cell)*64.)/landscapeSize.x;return texture2D(tex,uv);}`;
+function installLandscapeShader(shader, textures, atlas, p) {
+  shader.uniforms.landscapeColor = { value: textures.color };
+  shader.uniforms.landscapeRough = { value: textures.rough };
+  shader.uniforms.landscapeIndex = { value: textures.index };
+  shader.uniforms.landscapeSize = {
+    value: new Vector4(atlas.size, atlas.side, p.terrain.width, p.terrain.depth)
+  };
+  shader.vertexShader = "varying vec2 landscapeWorld;\n" + shader.vertexShader;
+  shader.vertexShader = shader.vertexShader.replace(
+    "#include <worldpos_vertex>",
+    "#include <worldpos_vertex>\nlandscapeWorld=(modelMatrix*vec4(transformed,1.)).xz;"
+  );
+  shader.fragmentShader = atlasGLSL + "\n" + shader.fragmentShader;
+  shader.fragmentShader = shader.fragmentShader.replace(
+    "#include <roughnessmap_fragment>",
+    "#include <roughnessmap_fragment>\nvec4 landR=landscapeSample(landscapeRough);roughnessFactor=mix(roughnessFactor,landR.r,landR.a);"
+  ).replace(
+    "#include <metalnessmap_fragment>",
+    "#include <metalnessmap_fragment>\nvec4 land=landscapeSample(landscapeColor);diffuseColor.rgb=mix(diffuseColor.rgb,land.rgb,land.a);"
+  );
+}
+function sceneryParts(kind, species, variant) {
+  const lift = (g2, y) => {
+    g2.translate(0, y, 0);
+    return g2;
+  };
+  if (kind === "tree") {
+    const tree = createTreeGeometry(species, renderedLandscapeTreeSeed({ seed: variant }));
+    const buffer = (data) => {
+      const g2 = new BufferGeometry();
+      g2.setAttribute("position", new Float32BufferAttribute(data.positions, 3));
+      g2.setIndex(data.indices);
+      g2.computeVertexNormals();
+      g2.computeBoundingSphere();
+      return g2;
+    };
+    return [
+      { geometry: buffer(tree.bark), color: species === "palm" ? "#897156" : "#66503a", semantic: "bark" },
+      { geometry: buffer(tree.foliage), color: "#ffffff", semantic: "foliage" }
+    ];
+  }
+  if (kind === "rock") {
+    const g2 = lift(new IcosahedronGeometry(0.65, 1), 0.4);
+    g2.scale(1, 0.7, 1);
+    return [{ geometry: g2, color: "#848680" }];
+  }
+  if (kind === "shrub")
+    return [{ geometry: lift(new IcosahedronGeometry(0.65, 1), 0.5), color: "#648e49" }];
+  if (kind === "flower")
+    return [
+      { geometry: lift(new CylinderGeometry(0.025, 0.035, 0.65, 4), 0.325), color: "#568648" },
+      {
+        geometry: lift(new IcosahedronGeometry(0.16, 0), 0.69),
+        color: ["#e9c76d", "#b287b9", "#d8e7b8", "#e29eac"][variant % 4]
+      }
+    ];
+  const g = new BufferGeometry(), pos = [];
+  for (let i = 0; i < 3; i++) {
+    const a = i * Math.PI / 3, dx = Math.cos(a) * 0.22, dz = Math.sin(a) * 0.22;
+    pos.push(-dx, 0, -dz, dx, 0, dz, dx * 0.2, 0.65, dz * 0.2);
+  }
+  g.setAttribute("position", new Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return [{ geometry: g, color: "#719952" }];
+}
+function landscapeChunks(p) {
+  const groups = /* @__PURE__ */ new Map();
+  for (const item of preflightLandscape(p)) {
+    const key = [
+      Math.floor(item.position[0] / 64),
+      Math.floor(item.position[2] / 64),
+      item.kind,
+      item.treeSpecies,
+      item.seed % 4,
+      item.assetRef ?? ""
+    ].join("/");
+    const list2 = groups.get(key) ?? [];
+    list2.push(item);
+    groups.set(key, list2);
+  }
+  return groups;
+}
+function landscapeWaterGeometry(p) {
+  assertLandscapeDerivedBudget(p);
+  const positions = [], levels = [], sampler = createLandscapeSampler(p);
+  const clip2 = (input, axis, value, sign2) => {
+    const output = [];
+    for (let i = 0; i < input.length; i++) {
+      const a = input[i], b = input[(i + 1) % input.length], da = (a[axis] - value) * sign2, db = (b[axis] - value) * sign2;
+      if (da >= -1e-7) output.push(a);
+      if (da >= 0 !== db >= 0) {
+        const t = da / (da - db);
+        output.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]);
+      }
+    }
+    return output;
+  };
+  for (const layer of p.landscape?.layers ?? []) {
+    if (!layer.visible || layer.kind !== "water" || !layer.boundary || !layer.water) continue;
+    const parts = buildFeatureGeometry(
+      {
+        id: layer.id,
+        name: layer.name,
+        kind: "lake",
+        points: layer.boundary,
+        elevation: layer.water.level,
+        width: 1
+      },
+      p
+    );
+    for (const part of parts) {
+      const a = part.geometry.getAttribute("position");
+      for (let i = 0; i < a.count; i += 3) {
+        const triangle = [0, 1, 2].map((n) => [a.getX(i + n), a.getY(i + n), a.getZ(i + n)]);
+        const minX = Math.floor(Math.min(...triangle.map((v) => v[0])) + p.terrain.width / 2), maxX = Math.floor(Math.max(...triangle.map((v) => v[0])) + p.terrain.width / 2), minZ = Math.floor(Math.min(...triangle.map((v) => v[2])) + p.terrain.depth / 2), maxZ = Math.floor(Math.max(...triangle.map((v) => v[2])) + p.terrain.depth / 2);
+        for (let cz = minZ; cz <= maxZ; cz++)
+          for (let cx = minX; cx <= maxX; cx++) {
+            const x = cx - p.terrain.width / 2, z = cz - p.terrain.depth / 2;
+            if (sampler.maskAt(layer.id, x + 0.5, z + 0.5) <= 0) continue;
+            let polygon = clip2(triangle, 0, x, 1);
+            polygon = clip2(polygon, 0, x + 1, -1);
+            polygon = clip2(polygon, 2, z, 1);
+            polygon = clip2(polygon, 2, z + 1, -1);
+            if (polygon.length < 3) continue;
+            const center = polygon.reduce(
+              (v, q) => [v[0] + q[0] / polygon.length, 0, v[2] + q[2] / polygon.length],
+              [0, 0, 0]
+            ), winning = sampleLandscapeWater(p, center[0], center[2], 0);
+            if (winning?.layerId !== layer.id) continue;
+            for (let k = 1; k + 1 < polygon.length; k++)
+              for (const vertex3 of [polygon[0], polygon[k], polygon[k + 1]]) {
+                positions.push(vertex3[0], layer.water.level, vertex3[2]);
+                levels.push(layer.water.level);
+              }
+          }
+      }
+      part.geometry.dispose();
+    }
+  }
+  const g = new BufferGeometry();
+  g.setAttribute("position", new Float32BufferAttribute(positions, 3));
+  g.setAttribute("waterLevel", new Float32BufferAttribute(levels, 1));
+  const amplitude = new Float32Array(levels.length), speed = new Float32Array(levels.length);
+  const position = g.getAttribute("position");
+  for (let i = 0; i < levels.length; i++) {
+    const sample = sampleLandscapeWater(p, position.getX(i), position.getZ(i), 0);
+    amplitude[i] = sample?.amplitude ?? 0;
+    speed[i] = p.landscape?.layers.find((layer) => layer.id === sample?.layerId)?.water?.waveSpeed ?? 0;
+  }
+  g.setAttribute("waterAmplitude", new BufferAttribute(amplitude, 1));
+  g.setAttribute("waterSpeed", new BufferAttribute(speed, 1));
+  g.computeVertexNormals();
+  return g;
+}
+function updateLandscapeWater(_p, g, time) {
+  const a = g.getAttribute("position"), level = g.getAttribute("waterLevel"), amplitude = g.getAttribute("waterAmplitude"), speed = g.getAttribute("waterSpeed");
+  for (let i = 0; i < a.count; i++)
+    a.setY(
+      i,
+      level.getX(i) + Math.sin(a.getX(i) * 0.04 + a.getZ(i) * 0.03 + time * speed.getX(i)) * amplitude.getX(i)
+    );
+  a.needsUpdate = true;
+}
+var generatedCache = /* @__PURE__ */ new WeakMap();
+function preflightLandscape(project) {
+  let list2 = generatedCache.get(project);
+  if (!list2) {
+    const admitted = admitLandscapeProject(project);
+    if (!admitted.valid || !admitted.instances) throw new Error(admitted.errors[0] ?? "Landscape admission failed.");
+    list2 = admitted.instances;
+    generatedCache.set(project, list2);
+  }
+  return list2;
+}
+function landscapeInstanceTint(item) {
+  const base = { tree: "#497b39", shrub: "#57813f", grass: "#6b9345", flower: "#b78dcb", rock: "#82877e" }[item.kind];
+  let ratio = 0;
+  for (const offset of [1, 3, 5])
+    ratio += parseInt(item.color.slice(offset, offset + 2), 16) / Math.max(1, parseInt(base.slice(offset, offset + 2), 16)) / 3;
+  const linear = Math.pow(Math.max(0.5, Math.min(1.5, ratio)), 2.2);
+  return new Color().setRGB(linear, linear, linear);
+}
+function landscapePartTint(item, semantic) {
+  if (item.kind === "tree" && !item.assetRef) {
+    if (semantic === "foliage") return new Color(item.color);
+    if (semantic === "bark") return new Color(1, 1, 1);
+  }
+  return landscapeInstanceTint(item);
+}
+
 // src/runtime/world-engine-contract.ts
 var WORLD_SOFTWARE_BUNDLE_SCHEMA = "elsemesh.world-software/1";
 function assetPrimitiveGroups(child) {
@@ -47077,7 +47924,14 @@ export {
   GLTFLoader as BuiltinCharacterGLTFLoader,
   COMPUTER_BOUNDS,
   COMPUTER_SCHEMA,
+  CONNECTION_WORLD_REPOSITORY_SCHEMA,
+  DEFAULT_LANDSCAPE_CONSTRAINTS,
   ENGINE_REFERENCE,
+  LANDSCAPE_CAPABILITY,
+  LANDSCAPE_LIMITS,
+  LANDSCAPE_MATERIAL_PRESETS,
+  LANDSCAPE_PLAYER_WORLD_SCHEMA,
+  LANDSCAPE_PROJECT_SCHEMA,
   LEGACY_PROJECT_SCHEMA,
   LEGACY_WORLD_REPOSITORY_SCHEMA,
   MAX_COMPUTERS,
@@ -47113,10 +47967,17 @@ export {
   WORLD_REPOSITORY_SCHEMA,
   WORLD_SOFTWARE_BUNDLE_SCHEMA,
   acquireNeonGeometry,
+  addLandscapeImage,
+  addLandscapeMaterial,
   admitFederatedRuntimeWorld,
   admitGlb,
+  admitLandscapeProject,
   adoptRuntimeSettings,
+  applyLandscapeArea,
+  applyLandscapeBrush,
+  assertLandscapeDerivedBudget,
   assetPrimitiveGroups,
+  bakeLandscapeAtlas,
   buildComputerGeometry,
   buildFeatureGeometry,
   buildNeonGeometry,
@@ -47125,6 +47986,10 @@ export {
   cloneSubtrees,
   collisionWorldBounds,
   createGeographicTerrain,
+  createLandscapeCollisionIndex,
+  createLandscapeImage,
+  createLandscapeLayer,
+  createLandscapeSampler,
   createNeonPrefab,
   createPlayerWorldPackage,
   createTerrain,
@@ -47137,17 +48002,29 @@ export {
   disposeComputerGeometry,
   disposeNeonGeometry,
   effectiveObjectState,
+  ensureLandscape,
+  eraseGeneratedInstance,
   featureFlowWarnings,
   forkWorldSource,
+  generateLandscapeInstances,
   getGroupBounds,
   getNeonBounds,
   githubWorldSourceLocation,
   groupObjects,
   hierarchyOrder,
+  imageDimensions,
   inspectAndLoadAsset,
   inspectGlbJson,
   inspectWorldRepository,
+  installLandscapeShader,
   isSimpleOutline,
+  landscapeChunks,
+  landscapeImageBytes,
+  landscapeImageDigest,
+  landscapeInstanceTint,
+  landscapeMaskAt,
+  landscapePartTint,
+  landscapeWaterGeometry,
   loadWorldSource,
   localMatrix,
   mapPortalDirection,
@@ -47163,14 +48040,18 @@ export {
   parseAsciiGrid,
   parseGitHubWorldLocation,
   parseNeonPrefab,
+  pointInLandscapeBoundary,
   portalLocalPoint,
   portalMappingElements,
   portalWorldPoint,
   privateNeonIdentity,
   privateNeonMatchesWorld,
+  promoteLandscapeInstance,
   pruneSelection,
   quadIndices,
   rainCount,
+  renderedLandscapeTreeSeed,
+  reorderLandscapeLayers,
   reparentObjects,
   repositoryDigest,
   requiredWorldCapabilities,
@@ -47179,20 +48060,29 @@ export {
   resolveWorldMatrices,
   runtimePresentation,
   sampleGeographicGrid,
+  sampleLandscapeWater,
   sampleNeonEffect,
   sampleTerrain,
+  sceneryParts,
   sculptTerrain,
   stormState,
   subtreeIds,
   sweepPortalCapsule,
+  threeAtlas,
   treeWindOffset,
   ungroupObjects,
   unpackWorldRepository,
+  updateLandscapeLayer,
+  updateLandscapeMaterial,
+  updateLandscapeWater,
+  validateBoundary,
   validateComputer,
   validateGeographicBounds,
   validateGeography,
   validateHierarchy,
+  validateLandscape,
   validateNeonSign,
+  validatePlayerWorldPackage,
   validateTerrainImagery,
   validateWorld,
   validateWorldBounds,

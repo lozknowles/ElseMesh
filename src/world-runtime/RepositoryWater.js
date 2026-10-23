@@ -1,3 +1,4 @@
+import {sampleLandscapeWater} from './vendor/world-engine-contract.js';
 import * as N from '../engine/index.js';
 import { Material } from '../engine/render/Material.js';
 // The same analytic surface is queried by the existing Player and rendered by the material.
@@ -5,9 +6,16 @@ export function repositoryWaterHeight(water,x,z,time=0){
  if(!water||Math.abs(x)>water.extent/2||Math.abs(z)>water.extent/2)return -100000;
  return water.level+water.waveAmplitude*Math.sin(x*.04+z*.03+time*water.waveSpeed);
 }
-export function repositoryWaterQuery(water){
+/** Shared camera/player surface query; bounded ponds override legacy sea only inside their wet boundary. */
+export function repositoryProjectWaterHeight(project,x,z,time=0){return (project?sampleLandscapeWater(project,x,z,time)?.height:undefined)??repositoryWaterHeight(project?.water,x,z,time);}
+export function repositoryMediumWaterSettings(project,position,time=0){
+ const height=repositoryProjectWaterHeight(project,position.x,position.z,time),enabled=height>-99999;
+ return {waterEnabled:enabled?1:0,waterLevel:enabled?height:0,waveAmplitude:0,waveSpeed:0,waterExtent:Math.max(16,Math.abs(position.x)*2+4,Math.abs(position.z)*2+4)};
+}
+export function repositoryWaterQuery(water,project){
  const cpu=new Float32Array([-100000,0,0,0]);let time=0,x=0,z=0;
- return {cpu,cpuValid:true,allocate:()=>0,setPoint(_slot,nx,nz){x=nx;z=nz;cpu[0]=repositoryWaterHeight(water,x,z,time);},setTime(t){time=t;cpu[0]=repositoryWaterHeight(water,x,z,time);}};
+ const height=()=>project?repositoryProjectWaterHeight(project,x,z,time):repositoryWaterHeight(water,x,z,time);
+ return {cpu,cpuValid:true,allocate:()=>0,setPoint(_slot,nx,nz){x=nx;z=nz;cpu[0]=height();},setTime(t){time=t;cpu[0]=height();}};
 }
 export function buildRepositoryWater(project){
  const water=project.water;if(!water)return null;

@@ -98,3 +98,19 @@ test('native preview readiness failure never publishes a live image',async()=>{
  views.setDestination('failed',{candidate:{root:new N.Group()},source:pose(),destination:pose([10,0,0]),authorizedView:true,state:'live'});
  await assert.rejects(views.whenReady('failed'),/pipeline failed/);const e=views.entries.get('failed');assert.equal(e.state,'unavailable');assert.equal(e.hasImage,false);views.dispose();
 });
+
+test('parked view bundles retain exact aperture and candidate ownership across promotion without compiling again',async()=>{
+ let warms=0;const views=new PortalViews({engine:{},meshRenderer:{render(){}},mainCamera:new N.PerspectiveCamera(),prepareResources:async()=>{warms++;}}),root=new N.Group(),candidate={root,residentReady:true};
+ const aperture=views.setDestination('resident',{candidate,ownsCandidate:false,source:pose(),destination:pose([10,0,0]),authorizedView:true,state:'live'});await views.whenReady('resident');const count=warms,entries=views.park(),activeScene=new N.Scene();activeScene.add(root);
+ views.restore({identity:{worldId:'source'}},entries);assert.throws(()=>views.setDestination('resident',{candidate,ownsCandidate:false,authorizedView:true,state:'live'}),/detached/);assert.equal(root.parent,activeScene,'fresh authorization cannot steal an active root');root.removeFromParent();views.setDestination('resident',{candidate,ownsCandidate:false,authorizedView:true,state:'live'});await views.whenReady('resident');assert.equal(warms,count);assert.equal(views.getAperture('resident'),aperture);views.clear();assert.equal(root.parent,null);
+});
+
+
+test('restored native graphics never restore previous VIEW permission or cached image',async()=>{
+ const views=setup(),root=new N.Group(),candidate={root,residentReady:true};let draws=0;views.meshRenderer.render=()=>draws++;
+ views.setDestination('return',{candidate,ownsCandidate:false,authorizedView:true,source:pose(),destination:pose([10,0,0]),state:'live'});await views.whenReady('return');const e=views.entries.get('return');e.hasImage=true;
+ const target=e.target,aperture=e.aperture,entries=views.park();views.restore({identity:{worldId:'source'}},entries);
+ assert.equal(e.authorizedView,false);assert.equal(e.hasImage,false);assert.equal(e.candidate,null);assert.equal(root.parent,null);assert.equal(e.target,target);assert.equal(e.aperture,aperture);
+ views.render({width:640,height:480});assert.equal(draws,0);assert.equal(e.aperture.userData.portalViewState,'loading');
+ views.setState('return','restricted');views.render({width:640,height:480});assert.equal(draws,0);assert.equal(e.aperture.userData.portalViewState,'restricted');views.dispose();
+});

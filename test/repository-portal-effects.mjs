@@ -7,7 +7,7 @@ const portal={id:'a',position:[3,4,5],yaw:.3,width:2,height:3,visual:{frameColor
 for(const isWebGL of [false,true])test('electric rim retains an open centre and animates on '+(isWebGL?'WebGL':'native'),()=>{
  const E=isWebGL?T:N,root=new E.Group(),effects=createPortalEffects({isWebGL});
  const frame=effects.addFrame(root,portal);assert.deepEqual(frame.position.toArray(),portal.position);assert.equal(frame.rotation.y,portal.yaw);
- const arcs=frame.children.filter(c=>c.name==='Portal electrical storm arc');assert.equal(arcs.length,8);assert.equal(frame.children.length,12);
+ const arcs=frame.children.filter(c=>c.name==='Portal electrical storm arc');assert.equal(arcs.length,8);assert.equal(frame.children.length,13);
  for(const arc of arcs){const p=arc.geometry.getAttribute('position');for(let i=0;i<p.count;i++)assert.ok(Math.abs(p.getX(i))>portal.width/2+.09||Math.abs(p.getY(i))>portal.height/2+.09,'geometry stays on outside rim');}
  const before=arcs[0].geometry.getAttribute('position').array.slice();effects.update(.05,1);assert.notDeepEqual(arcs[0].geometry.getAttribute('position').array,before);
  assert.equal(effects.diagnostics().source,PORTAL_STORM_SOURCE);

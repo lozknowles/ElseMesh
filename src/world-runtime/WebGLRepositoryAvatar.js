@@ -1,3 +1,4 @@
+import {createAvatarTransportPresentation,createAvatarTransportMaterialAdapter,prepareWebGLAvatarTransportMaterial} from './AvatarTransportPresentation.js';
 import {T,BuiltinCharacterGLTFLoader} from './vendor/world-engine-contract.js';
 import {AVATAR_STYLES,DEFAULT_APPEARANCE,validateAppearance,appearanceKey} from '../player/AvatarAppearance.js';
 
@@ -30,9 +31,11 @@ function customizeMaterial(material,appearance){
  material.needsUpdate=true;
 }
 export class WebGLRepositoryAvatar{
- constructor(scene){
+ constructor(scene,{prepareResources}={}){
+  this.prepareResources=prepareResources;
   this.scene=scene;this.group=new T.Group();this.group.name='ElseMesh_builtin_animated_explorer';scene.add(this.group);
   this.appearance={...DEFAULT_APPEARANCE};this.version=0;this.disposed=false;this.cinematic=null;this.currentClip=null;this.materials=[];
+  this.transportPresentation=createAvatarTransportPresentation({root:this.group,isWebGL:true,materialAdapter:createAvatarTransportMaterialAdapter(()=>this.materials,{isWebGL:true})});
   this.ready=this.setAppearance(this.appearance);this.ready.catch(()=>{});
  }
  setAppearance(value=DEFAULT_APPEARANCE){
@@ -42,7 +45,7 @@ export class WebGLRepositoryAvatar{
   // cancellation back to the already displayed asset with new colours.
   const version=++this.version;
   this.appearanceId=key;this.appearance={...value};const asset=AVATAR_STYLES[value.style].asset;
-  if(this.model&&this.asset===asset){this.tint();return this.ready=Promise.resolve(true);}
+  if(this.model&&this.asset===asset){this.tint();this.error=null;return this.ready=Promise.resolve(true);}
   this.ready=this.load(asset,version).catch(error=>{if(version===this.version&&!this.disposed){this.error=error.message;this.appearanceId=null;}throw error;});
   this.ready.catch(()=>{});return this.ready;
  }
@@ -53,12 +56,18 @@ export class WebGLRepositoryAvatar{
   try{
    const clips=new Map(gltf.animations.map(clip=>[clip.name,clip]));for(const name of REQUIRED_CLIPS)if(!clips.has(name))throw Error('Built-in character clip missing: '+name);
    const materials=new Set();gltf.scene.traverse(object=>{if(!object.isMesh)return;object.castShadow=true;object.frustumCulled=false;for(const material of Array.isArray(object.material)?object.material:[object.material])materials.add(material);});
-   for(const material of materials)customizeMaterial(material,this.appearance);
+   for(const material of materials){customizeMaterial(material,this.appearance);prepareWebGLAvatarTransportMaterial(material);}
+   // Prepare the candidate and the already-owned FX material variants without
+   // exposing it or replacing the current original avatar before readiness.
+   if(this.prepareResources){const preparation=new T.Group();preparation.add(gltf.scene,this.transportPresentation.group.clone(true));try{await this.prepareResources(preparation);}finally{preparation.clear();}}
+   if(this.disposed||version!==this.version){disposeScene(gltf.scene);return false;}
    this.mixer?.stopAllAction();if(this.model){this.group.remove(this.model);this.mixer?.uncacheRoot(this.model);disposeScene(this.model);}
    this.model=gltf.scene;this.asset=asset;this.materials=[...materials];this.group.add(this.model);this.mixer=new T.AnimationMixer(this.model);
    this.actions=new Map([...clips].map(([name,clip])=>[name,this.mixer.clipAction(clip)]));this.currentClip=null;this.play('idle');this.mixer.update(0);this.error=null;return true;
   }catch(error){disposeScene(gltf.scene);throw error;}
  }
+ observeVerifiedTransfer(record,worldId){return this.transportPresentation.observeVerifiedTransfer(record,worldId);}
+ async prepareTransportResources(prepareResources=this.prepareResources){await this.ready;return prepareResources?.(this.group);}
  tint(){for(const material of this.materials)for(const [key,uniform]of Object.entries(material.userData.avatarUniforms??{}))uniform.value.set(this.appearance[key.slice(7)]);}
  play(name){
   if(!this.actions||name===this.currentClip)return;const next=this.actions.get(name);if(!next)return;
@@ -69,6 +78,7 @@ export class WebGLRepositoryAvatar{
   const c=this.cinematic;
   if(c){this.group.position.set(c.x,c.y,c.z);this.group.rotation.y=c.yaw??0;}
   else if(player){this.group.position.copy(player.position);this.group.rotation.y=(player.yaw??0)+Math.PI;}
+  this.transportPresentation.update();
   const velocity=player?.velocity,speed=c?(c.speed??(c.walk?3.4:0)):Math.hypot(velocity?.x??0,velocity?.z??0);
   const mode=c?.mode??player?.mode,helm=mode==='helm'||mode==='boat'||c?.seated;
   this.play(helm?'helm':speed>.1?(speed>4.3?'run':'walk'):'idle');this.mixer?.update(Math.max(0,Math.min(.1,dt)));
@@ -76,6 +86,6 @@ export class WebGLRepositoryAvatar{
   if(this.group.visible&&camera?.position&&!freeCam){this.group.updateMatrixWorld(true);this.group.visible=camera.position.distanceTo(this.group.localToWorld(new T.Vector3(0,1.58,0)))>=.45;}
  }
  dispose(){
-  if(this.disposed)return;this.disposed=true;++this.version;this.mixer?.stopAllAction();if(this.model){this.mixer?.uncacheRoot(this.model);disposeScene(this.model);}this.group.removeFromParent();this.group.clear();this.materials=[];this.actions?.clear();
+  if(this.disposed)return;this.transportPresentation.dispose();this.disposed=true;++this.version;this.mixer?.stopAllAction();if(this.model){this.mixer?.uncacheRoot(this.model);disposeScene(this.model);}this.group.removeFromParent();this.group.clear();this.materials=[];this.actions?.clear();
  }
 }

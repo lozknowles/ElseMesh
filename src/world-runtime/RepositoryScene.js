@@ -1,3 +1,4 @@
+import {buildRepositoryLandscape,addLandscapeCollisions,landscapeAssets} from './RepositoryLandscape.js';
 import * as N from '../engine/index.js';
 import { Material } from '../engine/render/Material.js';
 import { Colliders } from '../world/Colliders.js';
@@ -22,12 +23,13 @@ export function nativeGeometry(geometry) {
 }
 export function disposeRepositoryScene(candidate) {
  if(!candidate)return;
- candidate.root.removeFromParent();const materials=new Set();
- candidate.root.traverse(n=>{n.geometry?.dispose();if(n.material)materials.add(n.material);n.userData.disposeAssetTextures?.();n.userData.disposeTerrainImagery?.();});
+ candidate.root.removeFromParent();const materials=new Set(),geometries=new Set();
+ candidate.root.traverse(n=>{if(n.geometry)geometries.add(n.geometry);if(n.material)materials.add(n.material);n.userData.disposeAssetTextures?.();n.userData.disposeTerrainImagery?.();n.userData.disposeLandscape?.();});
+ for(const g of geometries)g.dispose();
  for(const m of materials)if(!m.userData.sharedBuilderTreeMaterial)m.dispose();
 }
 export async function buildRepositoryScene(descriptor,camera) {
- const project=descriptor.project, root=new N.Group(),candidate={root,descriptor,terrain:descriptor.terrain,colliders:new Colliders(),assets:[],query:repositoryWaterQuery(project.water)};
+ const project=descriptor.project, root=new N.Group(),candidate={root,descriptor,terrain:descriptor.terrain,colliders:new Colliders(),assets:[],query:repositoryWaterQuery(project.water,project)};
  root.name='repository-world:'+descriptor.worldId;
  try {
   for(const b of descriptor.boxes)candidate.colliders.addBox(new N.Vector3(...b.center),new N.Vector3(...b.half),0,{walkable:b.walkable,solid:b.solid,tag:b.id});
@@ -39,7 +41,7 @@ export async function buildRepositoryScene(descriptor,camera) {
   }
   const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(positions,3));geometry.setAttribute('color',new T.Float32BufferAttribute(colors,3));geometry.setIndex(indices);geometry.computeVertexNormals();
   const surface=await createNativeTerrainMaterial(project),terrainMesh=new N.Mesh(nativeGeometry(geometry),surface.material);geometry.dispose();terrainMesh.userData.disposeTerrainImagery=surface.dispose;root.add(terrainMesh);
-  const matrices=resolveWorldMatrices(project.objects);
+  const generatedAssets=landscapeAssets(project),allObjects=[...project.objects,...generatedAssets],matrices=resolveWorldMatrices(allObjects);
   const add=(item,geometry,color)=>{item.add(new N.Mesh(nativeGeometry(geometry),new Material({color,roughness:.85,side:'double'})));geometry.dispose();};
   for(const object of project.objects){
    if(['group','tree','glb'].includes(object.kind)||!effectiveObjectState(project.objects,object.id).visible)continue;
@@ -53,9 +55,10 @@ export async function buildRepositoryScene(descriptor,camera) {
     add(item,new T.BoxGeometry(3.6,2.2,3).translate(0,1.1,0),object.color);add(item,new T.ConeGeometry(2.7,1.1,4).rotateY(Math.PI/4).translate(0,2.55,0),'#574e42');
    }else add(item,object.kind==='sphere'?new T.SphereGeometry(.8,24,16):object.kind==='cylinder'?new T.CylinderGeometry(.65,.65,1.6,24):object.kind==='cone'?new T.ConeGeometry(.8,1.6,24):new T.BoxGeometry(1.6,1.6,1.6),object.color);
   }
-  const assets=await buildRepositoryAssetBatches(project,project.objects.filter(o=>o.kind==='glb'&&effectiveObjectState(project.objects,o.id).visible),matrices,nativeGeometry);root.add(assets.root);candidate.assets=assets.diagnostics;candidate.assetBatchCount=assets.root.userData.assetBatchCount;
+  const assets=await buildRepositoryAssetBatches(project,allObjects.filter(o=>o.kind==='glb'&&effectiveObjectState(allObjects,o.id).visible),matrices,nativeGeometry);root.add(assets.root);candidate.assets=assets.diagnostics;candidate.assetBatchCount=assets.root.userData.assetBatchCount;
   const water=buildRepositoryWater(project);if(water)root.add(water);
   candidate.forest=buildNativeForest(project.objects,camera.position);root.add(candidate.forest);root.add(buildNativeFeatures(project,nativeGeometry));
+  const landscape=buildRepositoryLandscape(project,{native:true,convertGeometry:nativeGeometry});root.add(landscape);candidate.landscape=landscape;candidate.landscapeCollisions=addLandscapeCollisions(project,candidate.colliders);const setTime=candidate.query.setTime.bind(candidate.query);candidate.query.setTime=t=>{setTime(t);landscape.userData.updateLandscape(t);};
   candidate.matrices=matrices;return candidate;
  }catch(error){disposeRepositoryScene(candidate);throw error;}
 }

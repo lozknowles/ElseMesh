@@ -20,7 +20,16 @@ void main(){
 }`;
 /** Detached independent authorized previews, hard recursion depth one. */
 export class WebGLPortalViews{
- constructor({renderer,engine,mainCamera,configureScene,maxLongEdge=512}){this.maxLongEdge=maxLongEdge;this.renderer=renderer??engine?.renderer;this.mainCamera=mainCamera??engine?.camera;this.configureScene=configureScene;this.entries=new Map();this.active=null;}
+ constructor({renderer,engine,mainCamera,configureScene,maxLongEdge=512}){this.forkOptions={renderer,engine,mainCamera,configureScene,maxLongEdge};this.maxLongEdge=maxLongEdge;this.renderer=renderer??engine?.renderer;this.mainCamera=mainCamera??engine?.camera;this.configureScene=configureScene;this.entries=new Map();this.active=null;}
+ fork(){return new WebGLPortalViews(this.forkOptions);}
+ park(){const entries=this.entries;this.entries=new Map();this.active=null;return entries;}
+ restore(active,entries){
+  if(this.entries.size)this.clear();this.active=active;this.entries=entries??new Map();
+  // Graphics may remain resident, but VIEW grants are scoped to the new membership.
+  // Drop destination references before prune can leave a stale/evicted candidate here.
+  for(const e of this.entries.values()){this._releaseCandidate(e);e.authorizedView=false;e.hasImage=false;e.state=e.source?.enabled===false?'unavailable':'loading';this._status(e);}
+ }
+ disposeEntries(entries){const current=this.entries;this.entries=entries;this.clear();this.entries=current;}
  setActive(a){if(this.active!==a){this.clear();this.active=a;}}
  setDestination(id,o={}){
   if(o.candidate){if(o.authorizedView!==true)throw Error('Portal destination requires explicit authorizedView');if(o.candidate!==this.entries.get(id)?.candidate&&o.candidate.root.parent)throw Error('Portal preview root must be independently built and detached');}
@@ -60,7 +69,7 @@ export class WebGLPortalViews{
    finally{for(const[n,v]of hidden)n.visible=v;r.clippingPlanes=state.clip;r.localClippingEnabled=state.localClip;r.autoClear=state.autoClear;r.setRenderTarget(state.target,state.cube,state.mip);r.setViewport(state.viewport);r.setScissor(state.scissor);r.setScissorTest(state.scissorTest);r.setClearColor(state.clearColor,state.clearAlpha);}
   }
  }
- _releaseCandidate(e){if(e.candidate){e.candidate.root.removeFromParent();if(e.ownsCandidate)disposeWebGLRepositoryScene(e.candidate);e.candidate=null;}}
+ _releaseCandidate(e){if(e.candidate){if(e.candidate.root.parent===e.scene)e.candidate.root.removeFromParent();if(e.ownsCandidate)disposeWebGLRepositoryScene(e.candidate);e.candidate=null;}}
  remove(id){const e=this.entries.get(id);if(!e)return;e.aperture.removeFromParent();this._releaseCandidate(e);e.aperture.geometry.dispose();e.material.dispose();e.target.dispose();this.entries.delete(id);}
  clear(){for(const id of [...this.entries.keys()])this.remove(id);}
  dispose(){this.clear();this.active=null;}

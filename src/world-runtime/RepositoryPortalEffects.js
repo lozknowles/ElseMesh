@@ -27,6 +27,24 @@ export function createWebGLPortalStormMaterial(){
  #include <colorspace_fragment>
  }`});
 }
+/** Closed rectangular strip. Explicit corner miters and identical seam UVs
+ * keep all four edges joined even when the original vertex jitter is active. */
+export function createClosedPortalRimGeometry(width,height){
+ const w=width+.26,h=height+.26,total=2*(w+h),half=.032,distances=new Set([0,w,w+h,2*w+h,total]);
+ for(let i=0;i<=192;i++)distances.add(total*i/192);
+ const points=[...distances].sort((a,b)=>a-b),positions=[],normals=[],uvs=[],indices=[];
+ for(let i=0;i<points.length;i++){
+  const d=points[i];let x,y,nx,ny;
+  if(d<=w){x=-w/2+d;y=-h/2;nx=0;ny=-1;}
+  else if(d<=w+h){x=w/2;y=-h/2+d-w;nx=1;ny=0;}
+  else if(d<=2*w+h){x=w/2-(d-w-h);y=h/2;nx=0;ny=1;}
+  else{x=-w/2;y=h/2-(d-2*w-h);nx=-1;ny=0;}
+  if(d===0||d===total){nx=-1;ny=-1;}else if(d===w){nx=1;ny=-1;}else if(d===w+h){nx=1;ny=1;}else if(d===2*w+h){nx=-1;ny=1;}
+  for(const side of [-1,1]){positions.push(x+nx*half*side,y+ny*half*side,0);normals.push(0,0,1);uvs.push(d===total?0:d/total,(side+1)/2);}
+  if(i+1<points.length){const j=i*2;indices.push(j,j+1,j+2,j+1,j+3,j+2);}
+ }
+ const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(positions,3));geometry.setAttribute('normal',new T.Float32BufferAttribute(normals,3));geometry.setAttribute('uv',new T.Float32BufferAttribute(uvs,2));geometry.setIndex(indices);return geometry;
+}
 function rimGeometry(width,height,start,sweep){
  const geometry=new T.TorusGeometry(1.35,.028,4,48,sweep),position=geometry.getAttribute('position'),original=Float32Array.from(position.array);
  const update=phase=>{
@@ -68,13 +86,15 @@ export function createPortalEffects({engine,isWebGL=engine?.backend==='webgl2'}=
    const mesh=new E.Mesh(geometry,material);mesh.name='Portal electrical storm arc';mesh.position.z=.16;mesh.frustumCulled=false;mesh.userData.portalEffect=true;group.add(mesh);
    arcs.push({mesh,data,phase:0,index:i});
   }
-  root.add(group);frames.add({group,arcs,material,frameMaterial});return group;
+  const strip=createClosedPortalRimGeometry(portal.width,portal.height),continuous=new E.Mesh(isWebGL?strip:nativeGeometry(strip),material);
+  if(!isWebGL)strip.dispose();continuous.name='Portal continuous electrical perimeter';continuous.position.z=.15;continuous.frustumCulled=false;continuous.userData.portalEffect=true;continuous.userData.closedElectricalPerimeter=true;group.add(continuous);
+  root.add(group);frames.add({group,arcs,continuous,material,frameMaterial});return group;
  };
- const release=frame=>{frame.group.removeFromParent();for(const arc of frame.arcs){arc.mesh.geometry.dispose();if(!isWebGL)arc.data.geometry.dispose();}for(const child of frame.group.children)if(!child.userData.portalEffect)child.geometry?.dispose();frame.material.dispose();frame.frameMaterial.dispose();if(!isWebGL){frame.material.uniformBlock.buffer?.destroy();frame.frameMaterial.uniformBlock.buffer?.destroy();}frames.delete(frame);};
+ const release=frame=>{frame.group.removeFromParent();frame.continuous.geometry.dispose();for(const arc of frame.arcs){arc.mesh.geometry.dispose();if(!isWebGL)arc.data.geometry.dispose();}for(const child of frame.group.children)if(!child.userData.portalEffect)child.geometry?.dispose();frame.material.dispose();frame.frameMaterial.dispose();if(!isWebGL){frame.material.uniformBlock.buffer?.destroy();frame.frameMaterial.uniformBlock.buffer?.destroy();}frames.delete(frame);};
  return {
   addFrame,
   removeRoot(root){for(const frame of [...frames])if(frame.group.parent===root)release(frame);},
-  clear({preserveRoot}={}){for(const frame of [...frames])if(frame.group.parent!==preserveRoot)release(frame);beamAge=2;surge=0;if(overlay)overlay.style.opacity='0';},
+  clear({preserveRoot,preserveRoots}={}){for(const frame of [...frames])if(frame.group.parent!==preserveRoot&&!preserveRoots?.has(frame.group.parent))release(frame);beamAge=2;surge=0;if(overlay)overlay.style.opacity='0';},
   transition(next){
    const value=typeof next==='string'?next:next?.state??'idle';if(value===state)return;state=value;
    if(['suspending','handoff-pending','travelling'].includes(state)){surge=1;beamAge=0;beamKind='depart';}
@@ -92,7 +112,7 @@ export function createPortalEffects({engine,isWebGL=engine?.backend==='webgl2'}=
     for(const arc of frame.arcs){arc.phase+=dt*(arc.index%2?-.21:.17);arc.data.update(arc.phase);if(!isWebGL){const source=arc.data.geometry.getAttribute('position'),target=arc.mesh.geometry.getAttribute('position');target.array.set(source.array);target.needsUpdate=true;}}
    }
   },
-  diagnostics(){return {source:PORTAL_STORM_SOURCE,state,surge,frames:frames.size,arcs:frames.size*8,beamVisible:beamAge<1.15,reducedMotion,transitionPresentation:'new electricity transport particles'};},
+  diagnostics(){return {source:PORTAL_STORM_SOURCE,state,surge,frames:frames.size,arcs:frames.size*8,continuousPerimeters:frames.size,beamVisible:beamAge<1.15,reducedMotion,transitionPresentation:'new electricity transport particles'};},
   dispose(){if(disposed)return;disposed=true;for(const frame of [...frames])release(frame);overlay?.remove();}
  };
 }

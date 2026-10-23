@@ -44,9 +44,18 @@ const output=/* wgsl */`
  */
 export class PortalViews {
  constructor({engine,meshRenderer,mainCamera,maxLongEdge=512,prepareResources}) {
-  this.prepareResources=prepareResources;this.maxLongEdge=maxLongEdge;this.engine=engine;this.meshRenderer=meshRenderer;this.mainCamera=mainCamera;
+  this.forkOptions={engine,meshRenderer,mainCamera,maxLongEdge,prepareResources};this.prepareResources=prepareResources;this.maxLongEdge=maxLongEdge;this.engine=engine;this.meshRenderer=meshRenderer;this.mainCamera=mainCamera;
   this.entries=new Map();this.active=null;
  }
+ fork(){return new PortalViews(this.forkOptions);}
+ park(){const entries=this.entries;this.entries=new Map();this.active=null;return entries;}
+ restore(active,entries){
+  if(this.entries.size)this.clear();this.active=active;this.entries=entries??new Map();
+  // Graphics may remain resident, but VIEW grants are scoped to the new membership.
+  // Drop destination references before prune can leave a stale/evicted candidate here.
+  for(const e of this.entries.values()){this._releaseCandidate(e);e.authorizedView=false;e.hasImage=false;e.state=e.source?.enabled===false?'unavailable':'loading';this._status(e);}
+ }
+ disposeEntries(entries){const current=this.entries;this.entries=entries;this.clear();this.entries=current;}
  setActive(active) { if(this.active!==active){this.clear();this.active=active;} }
  setDestination(portalId,options={}) {
   let e=this.entries.get(portalId);
@@ -74,11 +83,11 @@ export class PortalViews {
    e.aperture.position.fromArray(e.source.position);e.aperture.rotation.set(0,e.source.yaw||0,0);
    e.aperture.scale.set(e.source.width||2,e.source.height||3,1);
   }
-  if(this.prepareResources){
+  if(this.prepareResources&&(!e.resourcesReady||options.candidate&&!options.candidate.residentReady)){
    const token=(e.prepareToken??0)+1;e.prepareToken=token;e.preparing=true;e.aperture.visible=false;const candidate=e.candidate;
    e.readyPromise=Promise.all([this.prepareResources(e.aperture),...(candidate?[this.prepareResources(candidate.root)]:[])]).then(()=>{
     if(this.entries.get(portalId)!==e||e.prepareToken!==token)return false;
-    e.preparing=false;e.aperture.visible=true;this._status(e);return true;
+    e.preparing=false;e.resourcesReady=true;e.aperture.visible=true;this._status(e);return true;
    },error=>{if(this.entries.get(portalId)===e&&e.prepareToken===token){e.preparing=false;e.state='unavailable';e.readinessError=error.message;this._status(e);}throw error;});
    void e.readyPromise.catch(()=>{});
   }
@@ -127,7 +136,7 @@ export class PortalViews {
    e.hasImage=true;this._status(e,true);
   }
  }
- _releaseCandidate(e){if(e.candidate){e.candidate.root.removeFromParent();if(e.ownsCandidate)disposeRepositoryScene(e.candidate);e.candidate=null;}}
+ _releaseCandidate(e){if(e.candidate){if(e.candidate.root.parent===e.scene)e.candidate.root.removeFromParent();if(e.ownsCandidate)disposeRepositoryScene(e.candidate);e.candidate=null;}}
  remove(id){const e=this.entries.get(id);if(!e)return;e.aperture.removeFromParent();this._releaseCandidate(e);e.aperture.geometry.dispose();e.material.dispose();e.material.uniformBlock.buffer?.destroy();e.target.texture.destroy();e.target.depthTexture.destroy();e.block.buffer?.destroy();this.entries.delete(id);}
  clear(){for(const id of [...this.entries.keys()])this.remove(id);}
  dispose(){this.clear();this.active=null;}

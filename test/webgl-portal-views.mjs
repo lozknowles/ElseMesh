@@ -35,3 +35,11 @@ test('back side never refreshes a cached view and destination plane retains fron
  views.render({width:1600,height:900});mainCamera.position.z=-3;views.render({width:1600,height:900});assert.equal(views.getAperture('a').userData.portalViewState,'cached');
  const plane=portalDestinationPlane(pose([10,0,0]));assert.ok(plane.distanceToPoint(new T.Vector3(10,0,-1))<0);views.dispose();
 });
+
+
+test('return-trip restoration requires fresh VIEW and denied subscription cannot expose cached WebGL content',()=>{
+ const {views,renderer}=setup(),root=new T.Group(),candidate={root,residentReady:true};let draws=0;renderer.render=()=>draws++;
+ views.setDestination('return',{candidate,ownsCandidate:false,authorizedView:true,source:pose(),destination:pose([10,0,0]),state:'live'});views.render({width:640,height:480});assert.equal(draws,1);const e=views.entries.get('return'),target=e.target,entries=views.park();
+ views.restore({identity:{worldId:'source'}},entries);assert.equal(e.authorizedView,false);assert.equal(e.hasImage,false);assert.equal(e.candidate,null);assert.equal(root.parent,null);assert.equal(e.target,target);
+ views.render({width:640,height:480});assert.equal(draws,1);assert.equal(e.aperture.userData.portalViewState,'loading');views.setState('return','restricted');views.render({width:640,height:480});assert.equal(draws,1);assert.equal(e.aperture.userData.portalViewState,'restricted');views.dispose();
+});

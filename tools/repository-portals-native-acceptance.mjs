@@ -23,11 +23,13 @@ import {privateNeonIdentity} from '/src/world-runtime/vendor/world-engine-contra
 try{
  await GPU.init({headless:true});const gpuErrors=[];GPU.device.addEventListener('uncapturederror',e=>gpuErrors.push(e.error.message));
  const identity=await privateNeonIdentity(),engine={scene:new Scene(),camera:new PerspectiveCamera(),meshRenderer:new MeshRenderer()},input=new Input(document.querySelector('canvas')),statuses=[],transitions=[];
- engine.prepareRepositoryResources=root=>prepareNativeRepositoryResources({meshRenderer:engine.meshRenderer,camera:engine.camera,root});
+ const resourceCounts={builds:0,worldWarms:0};engine.prepareRepositoryResources=root=>{if(root.name.startsWith('repository-world:'))resourceCounts.worldWarms++;return prepareNativeRepositoryResources({meshRenderer:engine.meshRenderer,camera:engine.camera,root});};
  const host=new RepositoryWorldHost({engine,input,prepareResources:prepared=>engine.prepareRepositoryResources(prepared.root),onChange:a=>transitions.push({worldId:a.identity.worldId,root:a.root.name,player:a.player.constructor.name,colliders:a.colliders.boxes.length})});
+ const originalBuild=host.buildCandidate;host.buildCandidate=async(...args)=>{resourceCounts.builds++;return originalBuild(...args);};
  const runtime=new RepositoryPortalRuntime({engine,host,input,onStatus:s=>statuses.push(s)});
+ const originalPreviewBuild=runtime.buildScene;runtime.buildScene=async(...args)=>{resourceCounts.builds++;return originalPreviewBuild(...args);};
  let timer=null,time=0;const step=()=>{if(!host.active)return;time+=.05;GPU.beginFrame();if(!runtime.pending)host.update(.05,time);runtime.update(.05,time);GPU.submit();};
- window.acceptance={identity,engine,input,host,runtime,statuses,transitions,gpuErrors,step,
+ window.acceptance={resourceCounts,identity,engine,input,host,runtime,statuses,transitions,gpuErrors,step,
  publicIdentity:()=>({nodeId:identity.nodeId,publicKey:identity.publicKeyPEM??identity.publicKey}),
  connect:async()=>{const cfg=await(await fetch('/operator.json')).json();await runtime.connect(cfg);timer=setInterval(step,50);},
  snapshot:()=>({worldId:host.active?.identity.worldId,player:host.active?.player.position.toArray(),velocity:host.active?.player.velocity.toArray(),yaw:host.active?.player.yaw,mode:host.active?.player.mode,rootCount:engine.scene.children.filter(n=>n.name.startsWith('repository-world:')).length,diagnostics:runtime.diagnostics(),statuses:[...statuses],transitions:[...transitions],gpuErrors}),
@@ -82,6 +84,7 @@ export async function runRepositoryPortalsNativeAcceptance({evidenceDirectory=re
   check('authorized detached native destination contains remote player avatar',await owner.evaluate(()=>({previewRoots:[...acceptance.runtime.views.entries.values()].map(e=>({world:e.candidate?.descriptor.worldId,root:e.candidate?.root.name})),peers:[...acceptance.runtime.previewLayers.values()].map(l=>l.avatars.size)})));
   await owner.waitForFunction(()=>[...acceptance.runtime.previewLayers.values()].some(l=>[...l.avatars.values()].some(a=>a.scanned&&a.characterAsset==='stock-female'&&a.appearance.shirt==='#33785b')),{timeout:30000});
   check('original female stock GLB with saved personal design loads into native portal preview',await owner.evaluate(()=>[...acceptance.runtime.previewLayers.values()].flatMap(l=>[...l.avatars.values()].map(a=>({asset:a.characterAsset,appearance:a.appearance,loaded:!!a.scanned})))));
+  const warmBaseline=await owner.evaluate(()=>({...acceptance.resourceCounts}));
   // Actual DOM keyboard -> Input -> Player -> sweep -> runtime prepare/ready/commit -> host swap.
   await owner.keyboard.down('KeyW');await owner.waitForFunction(id=>acceptance.host.active.identity.worldId===id,worlds[1].worldId,{timeout:30000});await owner.keyboard.up('KeyW');
   const arrived=await owner.evaluate(()=>acceptance.snapshot());assert.equal(arrived.rootCount,1);assert.equal(arrived.diagnostics.worldId,worlds[1].worldId);assert.ok(arrived.transitions.length>=2);check('native Input and Player sweep commits A to B and swaps a single root',arrived);
@@ -92,6 +95,7 @@ export async function runRepositoryPortalsNativeAcceptance({evidenceDirectory=re
   await owner.evaluate(()=>{acceptance.host.active.player.yaw+=Math.PI;});
   await owner.keyboard.down('KeyW');await owner.waitForFunction(id=>acceptance.host.active.identity.worldId===id,worlds[0].worldId,{timeout:30000});await owner.keyboard.up('KeyW');
   const returned=await owner.evaluate(()=>acceptance.snapshot());assert.equal(returned.rootCount,1);assert.equal(returned.diagnostics.worldId,worlds[0].worldId);check('native return crossing B to A',returned);
+  assert.deepEqual(await owner.evaluate(()=>({...acceptance.resourceCounts})),warmBaseline);check('warm round trip reuses resident world packages without scene builds or world precompilation',warmBaseline);
   // Negative VIEW/ENTER separation at the real coordinator and transport.
   const b=coordinator.federation.world(worlds[1].worldId);b.policies.enter=[identities[1].nodeId];
   await owner.evaluate(()=>{acceptance.host.active.player.yaw=0;acceptance.runtime.rearm=null;});

@@ -1,3 +1,4 @@
+import {buildRepositoryLandscape,addLandscapeCollisions,landscapeAssets,installRepositoryLandscapeMaterial} from './RepositoryLandscape.js';
 import { T, resolveWorldMatrices,effectiveObjectState,buildComputerGeometry,disposeComputerGeometry,inspectAndLoadAsset,disposeAssetScene,acquireNeonGeometry,sampleNeonEffect,createTreeGeometry,buildFeatureGeometry } from './vendor/world-engine-contract.js';
 import { Vector3 } from '../engine/index.js';
 import { Colliders } from '../world/Colliders.js';
@@ -52,7 +53,7 @@ function terrainGeometry(project){
 }
 async function terrainMaterial(project,geometry){
  const material=standard('#ffffff',{vertexColors:true,roughness:.92});
- if(!project.terrainImagery)return material;
+ if(!project.terrainImagery){await installRepositoryLandscapeMaterial(project,material);return material;}
  const image=project.terrainImagery,geo=project.geography;
  if(!geo||image.crs!=='EPSG:27700'||geo.crs!=='EPSG:27700')throw Error('Imagery and terrain must use EPSG:27700.');
  const response=await fetch(image.dataUrl);if(!response.ok)throw Error('Terrain imagery failed');
@@ -65,18 +66,18 @@ async function terrainMaterial(project,geometry){
  material.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',`#ifdef USE_MAP
  if(all(greaterThanEqual(vMapUv,vec2(0.0)))&&all(lessThanEqual(vMapUv,vec2(1.0)))){vec4 sampledDiffuseColor=texture2D(map,vMapUv);diffuseColor*=sampledDiffuseColor;}
 #endif`);};material.customProgramCacheKey=()=> 'repository-geographic-imagery/1';
- texture.addEventListener('dispose',()=>bitmap.close());return material;
+ texture.addEventListener('dispose',()=>bitmap.close());await installRepositoryLandscapeMaterial(project,material);return material;
 }
 function forest(project,matrices,time){
  const root=new T.Group(),groups=new Map();
  for(const o of project.objects.filter(o=>o.kind==='tree'&&effectiveObjectState(project.objects,o.id).visible)){
-  const key=(o.treeSpecies??'broadleaf')+':'+((o.treeSeed??7319)>>>0)%4;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(o);
+  const key=(o.treeSpecies??'broadleaf')+':'+(o.landscapeOrigin?'p'+o.treeSeed:((o.treeSeed??7319)>>>0)%4);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(o);
  }
  for(const [key,objects]of groups){
-  const [species,seed]=key.split(':'),data=createTreeGeometry(species,7319+Number(seed)*113);
+  const [species,seed]=key.split(':'),data=createTreeGeometry(species,seed.startsWith("p")?Number(seed.slice(1)):7319+Number(seed)*113);
   for(const part of ['bark','foliage']){
    const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(data[part].positions,3));geometry.setIndex(data[part].indices);geometry.computeVertexNormals();
-   const material=standard(part==='bark'?'#594633':'#ffffff');
+   const material=standard(part==='bark'?(objects[0].landscapeOrigin?(species==='palm'?'#897156':'#66503a'):'#594633'):'#ffffff');
    material.onBeforeCompile=shader=>{shader.uniforms.repositoryTime=time;shader.vertexShader='uniform float repositoryTime;\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\n transformed.x += sin(repositoryTime*0.85+position.y*.17)*pow(max(position.y/7.0,0.0),2.0)*.09;');};
    material.customProgramCacheKey=()=> 'repository-tree-wind/1';
    const mesh=new T.InstancedMesh(geometry,material,objects.length);mesh.userData.editorObjectIds=objects.map(o=>o.id);
@@ -98,12 +99,12 @@ function sea(project,time){
  * batched by asset+override+terminal kind, preserving saved world matrices and object IDs.
  */
 export async function buildWebGLRepositoryScene(descriptor,camera){
- const project=descriptor.project,root=new T.Group(),candidate={root,descriptor,terrain:descriptor.terrain,colliders:new Colliders(),query:repositoryWaterQuery(project.water),assets:[],loadedAssets:new Set()};
+ const project=descriptor.project,root=new T.Group(),candidate={root,descriptor,terrain:descriptor.terrain,colliders:new Colliders(),query:repositoryWaterQuery(project.water,project),assets:[],loadedAssets:new Set()};
  candidate.project=project;root.name='repository-world:'+descriptor.worldId;const time={value:0};root.userData.updateWebGL=t=>{time.value=t;};
  try{
   for(const b of descriptor.boxes)candidate.colliders.addBox(new Vector3(...b.center),new Vector3(...b.half),0,{walkable:b.walkable,solid:b.solid,tag:b.id});
   const ground=terrainGeometry(project);root.add(new T.Mesh(ground,await terrainMaterial(project,ground)));
-  const matrices=resolveWorldMatrices(project.objects);candidate.matrices=matrices;
+  const generatedAssets=landscapeAssets(project),allObjects=[...project.objects,...generatedAssets],matrices=resolveWorldMatrices(allObjects);candidate.matrices=matrices;
   const add=(parent,geometry,color)=>parent.add(new T.Mesh(geometry,standard(color)));
   for(const object of project.objects){
    if(['group','tree','glb'].includes(object.kind)||!effectiveObjectState(project.objects,object.id).visible)continue;
@@ -115,7 +116,7 @@ export async function buildWebGLRepositoryScene(descriptor,camera){
    else throw Error('Unsupported WebGL repository object '+object.kind);
   }
   const groups=new Map(),cache=new Map(),screensByObject=new Map((project.terminals??[]).filter(t=>t.screenObjectId).map(t=>[t.screenObjectId,t.kind]));
-  for(const object of project.objects.filter(o=>o.kind==='glb'&&effectiveObjectState(project.objects,o.id).visible)){const kind=screensByObject.get(object.id),key=object.assetId+JSON.stringify(object.materialOverrides??[])+(kind??'');if(!groups.has(key))groups.set(key,{objects:[],kind});groups.get(key).objects.push(object);}
+  for(const object of allObjects.filter(o=>o.kind==='glb'&&effectiveObjectState(allObjects,o.id).visible)){const kind=screensByObject.get(object.id),key=object.assetId+JSON.stringify(object.materialOverrides??[])+(kind??'')+(object.landscapeChunk??'');if(!groups.has(key))groups.set(key,{objects:[],kind});groups.get(key).objects.push(object);}
   for(const {objects,kind}of groups.values()){
    const first=objects[0],asset=project.assets.find(a=>a.id===first.assetId);if(!asset)throw Error('Missing asset '+first.assetId);
    let loaded=cache.get(asset.id);if(!loaded){const response=await fetch(asset.dataUrl);if(!response.ok)throw Error('Asset read failed');loaded=await inspectAndLoadAsset(await response.arrayBuffer());cache.set(asset.id,loaded);candidate.loadedAssets.add(loaded);}
@@ -127,13 +128,14 @@ export async function buildWebGLRepositoryScene(descriptor,camera){
      const slot=loaded.materialIndices.get(part.material)??-1;let material=retro??materialCache.get(part.material);
      if(!material){material=part.material.clone();const override=first.materialOverrides?.find(o=>o.materialIndex===slot);if(override?.color!==undefined)material.color.set(override.color);if(override?.roughness!==undefined)material.roughness=override.roughness;if(override?.metalness!==undefined)material.metalness=override.metalness;materialCache.set(part.material,material);}
      const mesh=new T.InstancedMesh(part.geometry,material,objects.length);mesh.userData.editorObjectIds=objects.map(o=>o.id);
-     for(let i=0;i<objects.length;i++)mesh.setMatrixAt(i,matrices.get(objects[i].id));mesh.instanceMatrix.needsUpdate=true;root.add(mesh);primitives++;
+     for(let i=0;i<objects.length;i++){mesh.setMatrixAt(i,matrices.get(objects[i].id));if(objects[i].landscapeTint)mesh.setColorAt(i,new T.Color().fromArray(objects[i].landscapeTint));}mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;root.add(mesh);primitives++;
     }
    });for(const object of objects)candidate.assets.push({objectId:object.id,primitives,kind,backend:'webgl2'});
   }
   candidate.assetBatchCount=groups.size;candidate.forest=forest(project,matrices,time);root.add(candidate.forest);
   const water=sea(project,time);if(water)root.add(water);
   for(const feature of project.features??[]){if(feature.visible===false)continue;for(const part of buildFeatureGeometry(feature,project)){const wet=['water','foam'].includes(part.semantic);root.add(new T.Mesh(part.geometry,standard(part.color,wet?{roughness:.22,transparent:true,opacity:.9,metalness:.1}:{})));}}
+  const landscape=buildRepositoryLandscape(project);root.add(landscape);candidate.landscape=landscape;candidate.landscapeCollisions=addLandscapeCollisions(project,candidate.colliders);const update=root.userData.updateWebGL;root.userData.updateWebGL=t=>{update(t);landscape.userData.updateLandscape(t);};
   root.updateMatrixWorld(true);return candidate;
  }catch(error){disposeWebGLRepositoryScene(candidate);throw error;}
 }

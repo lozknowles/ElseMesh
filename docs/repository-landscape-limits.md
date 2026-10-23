@@ -1,0 +1,23 @@
+# Repository landscape runtime qualification
+
+The game consumes the builder contract for masks, material atlas baking, canonical scenery instances, bounded water clipping, water sampling and collision shapes. Native WebGPU and Three WebGL each compose the ground atlas after imagery in one existing terrain material. Procedural geometry and materials are shared per kind/species/four deterministic variants within a candidate; 64 m chunks contain instances. Generated asset references enter existing admitted asset loaders and include the chunk in the batch key. Tree and rock collision shapes enter the existing spatial collider index; grass, flowers and shrubs are decorative.
+
+Water geometry stores canonical per-vertex level, tapered amplitude and wave speed once. Per-frame updates perform one sine expression per vertex using those cached arrays, with native rendering copying the updated position array into its native geometry. They perform no per-vertex project, polygon, mask or terrain queries after creation. The queried surface remains the canonical CPU sampler. Vertex interpolation approximates the analytic wave between vertices; the one metre clipped mesh is not an exact continuous analytic surface. Creation still clips terrain triangles and masks, and may be expensive for large water masks or complicated boundaries.
+
+The Player resets its wave smoothing when entering or leaving the exact -100000 no-water sentinel. Negative legitimate water levels remain valid, and wet-to-wet wave smoothing retains its existing four second time constant. Previously a dry starting position seeded the sentinel into this smoothing history and delayed swimming for many seconds after entering a bounded pond.
+
+## Evidence
+
+Run on hpubuntu, 23 October 2026:
+
+- `node --test test/repository-landscape.mjs test/repository-water.mjs test/webgl-repository-scene.mjs`: nine tests passed. These exercise five scenery kinds, instancing/collision mapping, native and WebGL water vertex/query equality at several times, independent candidate ownership, single material compositing, real Player movement against a generated trunk, walk/swim/dive/exit/reentry, negative-elevation water, wet sample smoothing, and existing sea behavior.
+- `node test/repository-landscape-browser-gpu.mjs`: actual headless Chromium SwiftShader rendering through both native WebGPU and WebGL, owned hashed PNG atlas, five scenery kinds, bounded water and a real admitted triangle GLB asset reference. Both rendered 20,436 nonblack pixels and 1,896 magenta pixels in the small fixture. Disabling the paint changed 1,953 WebGL pixels while 18,483 visible pixels remained unchanged. Four asset instances rendered. No browser or shader errors were reported.
+- `npm run build`: passed with the local regenerated builder contract.
+
+The representative CPU fixture uses 2,805 generated scenery instances and 15,297 water vertices. After shared fast water regeneration, one run measured 1,334 ms total creation (including project assembly and admission), 1.2 ms median water update and 1.4 ms p95 over 120 updates. The prior updater that sampled the whole project per vertex measured 19.7 ms median and 23.3 ms p95 at the same representative counts. A subsequent actual draw run at those counts measured 1,152 ms WebGL fixture creation, 1.2 ms median / 1.9 ms p95 WebGL CPU updates, and 361 ms native candidate creation with 1.3 ms median / 5.3 ms p95 native CPU updates. WebGL submitted 115 draws / 182,937 triangles, with 18,775 covered pixels; draw plus synchronous readback took 295 ms. Native submitted 114 draws with 18,776 covered pixels; two draws including new pipeline preparation and synchronous readback took 13,577 ms under SwiftShader. That native software cold path is slow and has not been qualified as interactive device behavior. These are observed software-browser timings, not performance guarantees.
+
+## Limits
+
+The format limits of 20,000 generated instances, 100,000 candidates and 256 sparse mask tiles are rejection limits, not qualified performance claims. The runtime has not qualified maximum-size masks, maximum layer combinations, 20,000 visible instances, large imported asset collections, or sustained device frame rate. GPU fixtures use software rendering on hpubuntu and do not establish physical device usability, production readiness, multiplayer landscape editing, or live publication. Custom asset admission is covered with a minimal owned untextured GLB; this does not qualify every asset texture/material combination.
+
+Underwater optics, arrival lifecycle and application release acceptance are integrated and reviewed separately by the primary session. No production release is authorized by this document.

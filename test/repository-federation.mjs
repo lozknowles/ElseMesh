@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newIdentity } from '../network/identity.mjs';
+import { verifyObject, newIdentity } from '../network/identity.mjs';
 import { publishRegion, FEDERATION_CAPABILITIES } from '../network/federation.mjs';
 import { RepositoryFederation, approveRepositoryPortal, repositoryFederationPortal, mapPortalMotion } from '../network/repository-federation.mjs';
 function fixture({enter='PUBLIC',capacity=16,clearance=()=>true}={}){
@@ -31,4 +31,10 @@ test('appearance rejects arbitrary URLs, extra fields and malformed colours with
   assert.throws(()=>f.update(s.nodeId,{...packet,appearance:bad}),/appearance/);assert.equal(s.sequence,-1);assert.deepEqual(s.appearance,appearance);
  }
  f.update(s.nodeId,packet);assert.deepEqual(s.appearance,appearance);
+});
+
+test('authority signs one immutable presentation only after committed transfer',()=>{
+ const {f,players,cross,tick,authority}=fixture(),s=f.attach(players[0].nodeId);assert.equal(f.presence(s.worldId)[0].presentation,undefined);cross(s.nodeId);const r=f.prepare(s.nodeId,'elsemesh-portal:door-alpha');assert.equal(r.presentation,undefined);f.ready(s.nodeId,r.id,r.contentDigest,r.epoch);f.issue(s.nodeId,r.id);const committed=f.commit(s.nodeId,r.id),p=committed.presentation;
+ assert.equal(verifyObject(p,new Set([authority.nodeId])),true);assert.equal(p.playerNodeId,s.nodeId);assert.equal(p.destinationGeneration,s.generation);assert.equal(p.sourceWorldId,'world.alpha');assert.equal(p.destinationWorldId,'world.beta');assert.equal(p.transferId,r.id);assert.equal(p.expiresAt-p.committedAt,3000);assert.equal(p.handoff,undefined);assert.equal(p.sessionId,undefined);assert.deepEqual(f.status(s.nodeId,r.id).presentation,p);assert.deepEqual(f.commit(s.nodeId,r.id).presentation,p);assert.deepEqual(f.presence('world.beta')[0].presentation,p);
+ tick(100);f.update(s.nodeId,{worldId:s.worldId,generation:s.generation,sequence:0,timestamp:f.now(),position:s.position,velocity:[0,0,0],yaw:0,presentation:{transferId:'forged'}});assert.deepEqual(f.presence(s.worldId)[0].presentation,p);f.detach(s.nodeId);tick(100);f.attach(s.nodeId);assert.deepEqual(f.presence(s.worldId)[0].presentation,p);tick(3000);assert.equal(f.presence(s.worldId)[0].presentation,undefined);assert.deepEqual(f.status(s.nodeId,r.id).presentation,p);
 });

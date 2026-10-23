@@ -1,6 +1,7 @@
 import {GPU} from '../engine/gpu/GPU.js';
 import {RenderTarget} from '../engine/gpu/Texture.js';
 import {SCENE_FORMATS,DEPTH_FORMAT} from '../engine/render/SceneRenderer.js';
+import {createAvatarTransportPresentation,createAvatarTransportMaterialAdapter} from './AvatarTransportPresentation.js';
 import {PlayerAvatar} from '../player/PlayerAvatar.js';
 /** Reuses App.precompile: collect every mesh, request async pipelines, no draws.
  * Flags are restored synchronously before yielding to the running source frame.
@@ -33,17 +34,21 @@ export async function prepareNativeRepositoryResources({meshRenderer,camera,root
 }
 /** Installed original avatars become visible only after exact native variants compile. */
 export class ReadiedRepositoryAvatar extends PlayerAvatar{
- constructor(scene,boat,{prepareResources,...options}={}){super(scene,boat,options);this.prepareResources=prepareResources;}
+ constructor(scene,boat,{prepareResources,...options}={}){super(scene,boat,options);this.prepareResources=prepareResources;this.transportPresentation=createAvatarTransportPresentation({root:this.group,materialAdapter:createAvatarTransportMaterialAdapter(()=>this.scanned?.materials)});}
  update(...args){
-  super.update(...args);
+  super.update(...args);this.transportPresentation?.update();
   // Original stock characters are required. The inherited primitive stand-in
   // must never draw while a character or its exact native pipelines are pending.
   if(!this.scanned||this.scanned.group.visible===false)this.group.visible=false;
  }
+ observeVerifiedTransfer(record,worldId){return this.transportPresentation?.observeVerifiedTransfer(record,worldId)??false;}
+ dispose(){this.transportPresentation?.dispose();super.dispose();}
  async loadCharacter(){
-  await super.loadCharacter();const model=this.scanned;if(!model)return;
+  const work=super.loadCharacter(),version=this.loadVersion;await work;
+  if(this.disposed||version!==this.loadVersion)return;
+  const model=this.scanned;if(!model)return;
   model.group.visible=false;
-  try{await this.prepareResources?.(model.group);if(this.scanned===model&&!this.disposed)model.group.visible=true;}
+  try{await this.prepareResources?.(this.group);if(this.scanned===model&&!this.disposed)model.group.visible=true;}
   catch(error){model.group.visible=false;throw error;}
  }
 }

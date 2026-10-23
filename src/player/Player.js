@@ -136,7 +136,8 @@ export class Player {
 		const inp = this.input;
 		this.query.setPoint( this.slot, this.position.x, this.position.z );
 		this.waterH = this.waterHeight();
-		this.waterMean = this.waterMean === null ? this.waterH : this.waterMean + ( this.waterH - this.waterMean ) * ( 1 - Math.exp( - dt / 4 ) );
+		// Dry query absence must not enter the wave smoothing history.
+		this.waterMean = this.waterMean === null || this.waterMean === -100000 || this.waterH === -100000 ? this.waterH : this.waterMean + ( this.waterH - this.waterMean ) * ( 1 - Math.exp( - dt / 4 ) );
 		if ( this.transit && this.transit.isDryAt( this.position.x, this.position.z, this.position.y ) ) this.waterH = this.waterMean = -100;
 		this.prompt = null;
 

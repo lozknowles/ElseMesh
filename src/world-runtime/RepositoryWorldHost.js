@@ -9,8 +9,8 @@ import { buildRepositoryScene, disposeRepositoryScene } from './RepositoryScene.
 // provide callbacks or alter the controller, physics, session authority or renderer.
 const dryQuery=()=>({cpuValid:true,cpu:new Float32Array([-100000,0,0,0]),allocate:()=>0,setPoint:()=>{}});
 export class RepositoryWorldHost {
- constructor({engine,input,buildCandidate=buildRepositoryScene,checkSourceUpdate=checkWorldSourceUpdate,disposeCandidate=disposeRepositoryScene,buildNeon=buildNativeNeon,convertGeometry=nativeGeometry,prepareResources=async()=>{},beforeActivate=async()=>{},onChange=()=>{},onInteract=()=>{}}){
-  Object.assign(this,{engine,input,buildCandidate,checkSourceUpdate,disposeCandidate,buildNeon,convertGeometry,prepareResources,beforeActivate,onChange,onInteract});this.generation=0;this.active=null;this.overlay=null;this.disposed=false;this.prepared=new Set();
+ constructor({engine,input,buildCandidate=buildRepositoryScene,checkSourceUpdate=checkWorldSourceUpdate,disposeCandidate=disposeRepositoryScene,buildNeon=buildNativeNeon,convertGeometry=nativeGeometry,prepareResources=async()=>{},acquireResources=async()=>null,registerResources=async()=>null,retainResources=()=>false,beforeActivate=async()=>{},onChange=()=>{},onInteract=()=>{}}){
+  Object.assign(this,{engine,input,buildCandidate,checkSourceUpdate,disposeCandidate,buildNeon,convertGeometry,prepareResources,acquireResources,registerResources,retainResources,beforeActivate,onChange,onInteract});this.generation=0;this.active=null;this.overlay=null;this.disposed=false;this.prepared=new Set();
  }
  async load(source,options){this.pendingUpdate=null;const token=++this.generation;const loaded=await loadWorldSource(source,options);return this.activate(loaded,token);}
  async checkUpdate(options){
@@ -28,13 +28,15 @@ export class RepositoryWorldHost {
  }
  async prepare(loaded,{pose}={}){
   if(this.disposed)throw Error('World host is disposed.');
-  const generation=this.generation,descriptor=describeRuntimeWorld(loaded.project);let candidate;
+  const generation=this.generation;let descriptor=null;let candidate,resourceLease;
   try{
    // Asset builders and the player receive an isolated camera until the swap.
    const camera=this.engine.camera.clone();
-   candidate=await this.buildCandidate(descriptor,camera);
-   if(generation!==this.generation||this.disposed){this.disposeCandidate(candidate);return false;}
-   if(!candidate?.root?.isObject3D||candidate.root.parent)throw Error('Prepared world root must be detached.');
+   resourceLease=await this.acquireResources(loaded);
+   descriptor=resourceLease?.candidate.descriptor??describeRuntimeWorld(loaded.project);
+   candidate=resourceLease?.candidate??await this.buildCandidate(descriptor,camera);
+   if(generation!==this.generation||this.disposed){if(resourceLease)resourceLease.release();else this.disposeCandidate(candidate);return false;}
+   if(!candidate?.root?.isObject3D||candidate.root.parent&&!resourceLease)throw Error('Prepared world root must be detached.');
    const player=new Player({camera,input:this.input,terrain:candidate.terrain,colliders:candidate.colliders,query:candidate.query??dryQuery(),boat:null});
    if(pose){
     if(!Array.isArray(pose.position)||pose.position.length!==3||!pose.position.every(Number.isFinite)||
@@ -54,16 +56,16 @@ export class RepositoryWorldHost {
    // Prepare view state directly: Player.update would consume live input and may adjust an arrival.
    camera.position.copy(player.position);camera.position.y+=1.62;
    camera.quaternion.setFromEuler(new Euler(player.pitch,player.yaw,0,'YXZ'));camera.updateMatrixWorld();
-   const prepared={...candidate,loaded,identity:loaded.identity,descriptor,player,project:descriptor.project,generation,preparedState:'preparing'};
-   await this.prepareResources(prepared);
-   if(generation!==this.generation||this.disposed){this.disposeCandidate(candidate);return false;}
+   const prepared={...candidate,loaded,identity:loaded.identity,descriptor,player,project:descriptor.project,generation,resourceLease,preparedState:'preparing'};
+   if(!resourceLease){await this.prepareResources(prepared);prepared.resourceLease=resourceLease=await this.registerResources(prepared);}
+   if(generation!==this.generation||this.disposed){if(resourceLease)resourceLease.release();else this.disposeCandidate(candidate);return false;}
    prepared.preparedState='ready';
    this.prepared.add(prepared);return prepared;
-  }catch(error){this.disposeCandidate(candidate);throw error;}
+  }catch(error){if(resourceLease)resourceLease.release();else this.disposeCandidate(candidate);throw error;}
  }
  discardPrepared(prepared){
   if(!prepared||!this.prepared.has(prepared))return false;
-  this.prepared.delete(prepared);prepared.preparedState='discarded';this.disposeCandidate(prepared);return true;
+  this.prepared.delete(prepared);prepared.preparedState='discarded';if(prepared.resourceLease)prepared.resourceLease.release();else this.disposeCandidate(prepared);return true;
  }
  async activatePrepared(prepared,token){
   if(!prepared)return false;
@@ -79,14 +81,15 @@ export class RepositoryWorldHost {
    if(token!==this.generation||this.disposed){this.discardPrepared(prepared);return false;}
    const previous=this.active,player=prepared.player,camera=player.camera;
    this.input._clearTransientInput();this.overlay=null;
+   prepared.resourceLease?.commit();
    this.engine.scene.add(prepared.root);
    this.prepared.delete(prepared);prepared.preparedState='active';
    player.camera=this.engine.camera;
    this.engine.camera.position.copy(camera.position);this.engine.camera.quaternion.copy(camera.quaternion);this.engine.camera.updateMatrixWorld();
-   this.active=prepared;previous?.root.removeFromParent();
+   this.active=prepared;if(previous?.root!==prepared.root)previous?.root.removeFromParent();
    try{this.onChange(this.active);}catch(error){console.error(error);}
-   try{this.disposeCandidate(previous);}catch(error){console.error(error);}return true;
-  }catch(error){this.discardPrepared(prepared);throw error;}
+   try{if(!this.retainResources(previous))this.disposeCandidate(previous);}catch(error){console.error(error);}return true;
+  }catch(error){if(prepared.resourceLease&&this.prepared.has(prepared)){prepared.generation=this.generation;prepared.preparedState='ready';}else this.discardPrepared(prepared);throw error;}
  }
  async activate(loaded,token=++this.generation){
   this.pendingUpdate=null;
@@ -123,5 +126,5 @@ export class RepositoryWorldHost {
   if(this.input.pressed.has('KeyE')){const computer=this.nearestComputer();if(computer)this.onInteract(computer,this.active);}
  }
  disconnect(){this.pendingUpdate=null;++this.generation;this.setRuntimeOverlay(null);this.input._clearTransientInput();}
- dispose(){this.disconnect();this.disposed=true;for(const prepared of [...this.prepared])this.discardPrepared(prepared);this.disposeCandidate(this.active);this.active=null;}
+ dispose(){this.disconnect();this.disposed=true;for(const prepared of [...this.prepared])this.discardPrepared(prepared);if(!this.retainResources(this.active))this.disposeCandidate(this.active);this.active=null;}
 }

@@ -40,7 +40,7 @@ export function createRepositoryPortalTransition({transport,host,portal,sourceAc
    if(!prepared)prepared=await host.prepare(loaded,{pose:{...spawn,pitch:p.pitch}});
    if(!prepared||!await host.activatePrepared(prepared))throw Error('Committed destination activation failed; reconcile membership');
    prepared=null;freeze(false);
-  },dispose:async()=>{if(prepared)host.discardPrepared(prepared);prepared=null;}};
+  },dispose:async()=>{if(commitAttempted)return;if(prepared)host.discardPrepared(prepared);prepared=null;}};
   return candidate;
  }catch(error){if(prepared)host.discardPrepared(prepared);prepared=null;throw error;}
  }};

@@ -14,5 +14,11 @@ test('fresh presence cannot reveal pending original or proxy; readiness and stal
  layer.update(.016,{},camera);assert.equal(avatar.group.visible,false,'fresh presence cannot override pending-pipeline visibility');
  modelGroup.visible=true;layer.update(.016,{},camera);assert.equal(avatar.group.visible,true,'ready original appears with fresh presence');assert.ok(avatar.proceduralParts.every(part=>!part.visible));
  layer.at=performance.now()-4000;layer.update(.016,{},camera);assert.equal(avatar.group.visible,false,'stale presence hides ready original');
- layer.accept(packet);layer.update(.016,{},camera);assert.equal(avatar.group.visible,true,'freshness recovery restores ready original rather than latching hidden');layer.dispose();
+ layer.accept(packet);layer.update(.016,{},camera);assert.equal(avatar.group.visible,true,'freshness recovery restores ready original rather than latching hidden');layer.accept({players:[]});layer.update(.016,{},camera);assert.equal(layer.avatars.get('remote'),avatar);assert.equal(avatar.group.visible,false);layer.accept(packet);layer.update(.016,{},camera);assert.equal(layer.avatars.get('remote'),avatar);assert.equal(avatar.group.visible,true);layer.dispose();
+});
+
+test('dormant peer model pool is bounded and evicts only inactive entries',()=>{
+ let disposed=0;const layer=new RepositoryPeerLayer(new Group(),'own',undefined,()=>({group:new Group(),update(){this.group.visible=true;},dispose(){disposed++;this.group.removeFromParent();}})),camera=new PerspectiveCamera();
+ for(let id=0;id<40;id++){layer.accept({players:[{nodeId:'p'+id,playerId:'player:p'+id,position:[0,0,0],velocity:[0,0,0],yaw:0}]});layer.update(.016,{},camera);assert.ok(layer.avatars.size<=32);assert.ok(layer.avatars.has('p'+id));}
+ assert.equal(layer.avatars.size,32);assert.equal(disposed,8);layer.dispose();assert.equal(disposed,40);
 });
