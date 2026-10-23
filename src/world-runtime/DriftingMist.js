@@ -15,12 +15,26 @@ export function createDryWorldMedium(depth) {
   const uniforms = new UniformBlock('BuilderMist', {
     density: ['f32', 0.004], speed: ['f32', 2], height: ['f32', 9], base: ['f32', 0],
     storm: ['f32', 0], lightning: ['f32', 0],
+    waterEnabled: ['f32', 0], waterLevel: ['f32', 0], waveAmplitude: ['f32', 0], waveSpeed: ['f32', 0], waterExtent: ['f32', 0],
   }, { label: 'builderMist' });
+  const mediumModule = new ShaderModule({
+    name: 'builder-repository-medium', deps: [commonModule], uniforms, uniformName: 'builderMist',
+    code: /* wgsl */`
+fn bmWaterHeight(p: vec2f) -> f32 {
+  return builderMist.waterLevel + builderMist.waveAmplitude * sin(p.x*0.04 + p.y*0.03 + frame.time*builderMist.waveSpeed);
+}
+fn bmCameraUnderwater() -> bool {
+  return builderMist.waterEnabled > 0.5 && all(abs(frame.cameraPos.xz) <= vec2f(builderMist.waterExtent*0.5))
+    && frame.cameraPos.y < bmWaterHeight(frame.cameraPos.xz);
+}
+fn underwaterMedium(uv: vec2f) -> f32 { return select(0.0,1.0,bmCameraUnderwater()); }
+`,
+  });
   return {
     uniforms,
-    module: new ShaderModule({ name: 'builder-dry-medium', code: 'fn underwaterMedium(uv: vec2f) -> f32 { return 0.0; }' }),
+    module: mediumModule,
     compositeModule: new ShaderModule({
-      name: 'builder-drifting-mist', deps: [commonModule], uniforms, uniformName: 'builderMist',
+      name: 'builder-drifting-mist', deps: [commonModule,mediumModule],
       bindings: { builderDepth: { texture: depth } },
       code: /* wgsl */`
 fn bmHash(p: vec3f) -> f32 { return fract(sin(dot(p, vec3f(127.1,311.7,74.7))) * 43758.5453); }
@@ -31,7 +45,7 @@ fn bmNoise(p: vec3f) -> f32 {
 }
 fn underwaterComposite(uv: vec2f, pixel: vec2f) -> vec4f {
   let source = postSceneSample(uv) * mix(1.0,0.34,builderMist.storm) + vec3f(0.6,0.7,0.9)*builderMist.lightning;
-  if (builderMist.density <= 0.0) { return vec4f(source,1.0); }
+  if (!bmCameraUnderwater() && builderMist.density <= 0.0) { return vec4f(source,1.0); }
   let size = vec2i(textureDimensions(builderDepth));
   let d = textureLoad(builderDepth,clamp(vec2i(uv*vec2f(size)),vec2i(0),size-1),0);
   let clip = vec2f(uv.x*2.0-1.0,1.0-uv.y*2.0);
@@ -39,6 +53,13 @@ fn underwaterComposite(uv: vec2f, pixel: vec2f) -> vec4f {
   let point = wp.xyz / wp.w;
   let ray = normalize(point-frame.cameraPos);
   let distance = select(min(length(point-frame.cameraPos),700.0),700.0,d <= 0.000001);
+  if (bmCameraUnderwater()) {
+    // Absorption and in-scattering are evaluated in linear HDR before native ACES.
+    let waterDistance = min(distance,150.0);
+    let transmittance = exp(-vec3f(0.16,0.055,0.025)*waterDistance);
+    let scattering = vec3f(0.015,0.19,0.24) * (frame.skyIrradiance*0.8 + vec3f(0.15));
+    return vec4f(source*transmittance + scattering*(vec3f(1.0)-transmittance),1.0);
+  }
   let step = distance/24.0;
   var optical = 0.0;
   for (var i=0; i<24; i++) {

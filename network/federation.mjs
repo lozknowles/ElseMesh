@@ -4,7 +4,7 @@ import { ReplayGuard } from './protocol.mjs';
 
 export const FEDERATION_CAPABILITIES = Object.freeze([
   'elsemesh.identity/1', 'elsemesh.region/1', 'elsemesh.portal/1', 'elsemesh.rules/1',
-  'elsemesh.handoff/1', 'elsemesh.asset/1', 'elsemesh.authority/1', 'elsemesh.avatar-control/1',
+  'elsemesh.handoff/1', 'elsemesh.handoff/2', 'elsemesh.asset/1', 'elsemesh.authority/1', 'elsemesh.avatar-control/1',
 ]);
 export const CONTROL_MODES = Object.freeze(['HUMAN', 'AI_ASSISTED', 'AI_AUTONOMOUS']);
 export const AVAILABILITY = Object.freeze(['ONLINE', 'REPLICA_AVAILABLE', 'OFFLINE', 'DEGRADED', 'UNREACHABLE']);
@@ -184,4 +184,57 @@ export function endpointFor(regionId, directory) {
   const location = directory.get(regionId);
   check(location && node(location.authorityNodeId) && typeof location.endpoint === 'string', 'Region unresolved');
   return location;
+}
+
+// Recovered explicit /2 primitives; /1 exports retain their original defaults.
+// Legacy /2 angles are degrees; repository bridges convert authored radians.
+const normalYaw=value=>((value+180)%360+360)%360-180;
+export function mapPortalTransformV2(portalOrEntry, motionOrExit, legacyMotion, legacySpeed=25) {
+  const portal=portalOrEntry?.entry?portalOrEntry:null;
+  const entry=portal?.entry??portalOrEntry,exit=portal?.exit??motionOrExit;
+  const motion=portal?motionOrExit:legacyMotion,maxSpeed=portal?(legacyMotion??25):legacySpeed;
+  const {position,yaw=0,pitch=0,velocity}=motion||{};
+  check(transform(entry)&&transform(exit)&&vector(position)&&Number.isFinite(yaw)&&Math.abs(yaw)<=360&&finiteRange(pitch,-90,90)&&vector(velocity)&&finiteRange(maxSpeed,1,100),'Invalid portal mapping');
+  if(portal&&portal.twoSided!==true){const normal=[Math.sin(entry.yaw*Math.PI/180),Math.cos(entry.yaw*Math.PI/180)];check(velocity[0]*normal[0]+velocity[2]*normal[1]>=0,'Invalid portal crossing side');}
+  const dx=position[0]-entry.position[0],dz=position[2]-entry.position[2],dy=position[1]-entry.position[1];
+  check(Math.hypot(dx,dz)<=5&&Math.abs(dy)<=3,'Portal offset outside entry bounds');
+  const delta=normalYaw(exit.yaw-entry.yaw)*Math.PI/180;
+  const c=Math.cos(delta),s=Math.sin(delta);
+  const clean=n=>Number(n.toFixed(6));
+  const mappedVelocity=[velocity[0]*c+velocity[2]*s,velocity[1],-velocity[0]*s+velocity[2]*c];
+  const speed=Math.hypot(...mappedVelocity);if(speed>maxSpeed)for(let i=0;i<3;i++)mappedVelocity[i]*=maxSpeed/speed;
+  return {position:[clean(exit.position[0]+dx*c+dz*s),clean(exit.position[1]+dy),clean(exit.position[2]-dx*s+dz*c)],yaw:normalYaw(exit.yaw+yaw-entry.yaw),pitch:Math.max(-90,Math.min(90,(exit.pitch??0)+pitch-(entry.pitch??0))),velocity:mappedVelocity.map(clean)};
+}
+
+export function createPortalHandoffV2(identity, { portal, playerId, playerNodeId, destinationAuthority, destinationSessionId, sessionId, sequence, authorityEpoch, avatarAssetId, inventoryHash, position, velocity, yaw=0, pitch=0, controlMode }) {
+  validatePortal(portal);
+  check(id('player', playerId) && node(playerNodeId) && node(destinationAuthority) && typeof destinationSessionId === 'string' && /^[a-zA-Z0-9:_-]{1,128}$/.test(destinationSessionId) && id('elsemesh-session', sessionId) && hash(avatarAssetId) && hash(inventoryHash) && vector(position) && vector(velocity) && Number.isFinite(yaw)&&Math.abs(yaw)<=360&&finiteRange(pitch,-90,90) && CONTROL_MODES.includes(controlMode), 'Invalid handoff data');
+  check(Number.isSafeInteger(sequence) && sequence >= 0 && Number.isSafeInteger(authorityEpoch) && authorityEpoch >= 0, 'Invalid handoff sequence/epoch');
+  return signObject({ kind: 'portal-handoff', protocol: 'elsemesh.handoff/2', handoffId: randomUUID(), portalId: portal.portalId, portalRevision: portal.revision, sourceRegion: portal.sourceRegion, destinationRegion: portal.destinationRegion, playerId, playerNodeId, destinationAuthority, destinationSessionId, sessionId, sequence, authorityEpoch, avatarAssetId, inventoryHash, position, velocity, yaw, pitch, controlMode, sourceAuthority: identity.nodeId, timestamp: Date.now() }, identity);
+}
+
+export function acceptPortalHandoffV2(handoff, { portal, sourceAuthority, sourceEpoch, destinationAuthority, destinationSessionId, playerNodeId, destinationRules, assetCatalog = [], supportedCapabilities, trustedAuthorities, replay, destinationAdmission, now = Date.now() }) {
+  validatePortal(portal);
+  check(verifyObject(handoff, trustedAuthorities) && handoff.kind === 'portal-handoff' && handoff.protocol === 'elsemesh.handoff/2', 'Bad handoff signature');
+  check(handoff.sourceAuthority === handoff.signer && handoff.signer === sourceAuthority && handoff.authorityEpoch === sourceEpoch, 'Wrong handoff authority');
+  check(handoff.portalId === portal.portalId && handoff.portalRevision === portal.revision && handoff.sourceRegion === portal.sourceRegion && handoff.destinationRegion === portal.destinationRegion && portal.enabled, 'Wrong portal');
+  check(id('player', handoff.playerId) && node(handoff.playerNodeId) && handoff.playerNodeId === playerNodeId && node(destinationAuthority) && handoff.destinationAuthority === destinationAuthority && typeof destinationSessionId === 'string' && handoff.destinationSessionId === destinationSessionId && id('elsemesh-session', handoff.sessionId) && hash(handoff.avatarAssetId) && hash(handoff.inventoryHash) && vector(handoff.position) && vector(handoff.velocity) && (handoff.yaw===undefined||(Number.isFinite(handoff.yaw)&&Math.abs(handoff.yaw)<=360)) && (handoff.pitch===undefined||finiteRange(handoff.pitch,-90,90)) && CONTROL_MODES.includes(handoff.controlMode), 'Invalid handoff content');
+  check(Number.isSafeInteger(handoff.sequence) && handoff.sequence >= 0 && Number.isFinite(handoff.timestamp) && Math.abs(now - handoff.timestamp) <= 30_000, 'Expired handoff');
+  const negotiation = negotiateRules(destinationRules, supportedCapabilities);
+  check(negotiation.accepted, `Unsupported rules: ${negotiation.unsupported.join(',')}`);
+  check(portal.access.mode === 'PUBLIC' || portal.access.allowPlayers.includes(handoff.playerId), 'Portal player not allowed');
+  // A valid source signature does NOT authorize entry. This callback must be
+  // implemented by the destination authority using its own admission policy.
+  // Deny by default, and bind its decision to this player/session/region.
+  const admitted = typeof destinationAdmission === 'function' ? destinationAdmission({ handoff, portal, now }) : null;
+  check(admitted?.accepted === true && admitted.playerId === handoff.playerId && admitted.playerNodeId === handoff.playerNodeId && admitted.destinationSessionId === handoff.destinationSessionId &&
+    admitted.sessionId === handoff.sessionId && admitted.destinationRegion === portal.destinationRegion,
+  'Destination admission denied');
+  const spawn=mapPortalTransformV2(portal,{position:handoff.position,yaw:handoff.yaw??portal.entry.yaw,pitch:handoff.pitch??portal.entry.pitch??0,velocity:handoff.velocity},negotiation.rules.maxSpeed??25);
+  const avatarBudget=negotiation.rules.avatarComplexity??negotiation.rules.maxAvatarTriangles??100000;
+  const avatarRecord=Array.isArray(assetCatalog)?assetCatalog.find(asset=>asset?.assetId===handoff.avatarAssetId):null;
+  const avatarFallback=Array.isArray(negotiation.rules.approvedAvatars)&&negotiation.rules.approvedAvatars.length>0&&
+    (!negotiation.rules.approvedAvatars.includes(handoff.avatarAssetId)||!Number.isSafeInteger(avatarRecord?.triangles)||avatarRecord.triangles>avatarBudget);
+  check(replay.accept(handoff.handoffId), 'Replayed handoff');
+  return { playerId: handoff.playerId, regionId: portal.destinationRegion, spawn, avatarFallback, controlMode: handoff.controlMode, rules: negotiation.rules, handoffId: handoff.handoffId };
 }

@@ -2,7 +2,8 @@ import * as N from '../engine/index.js';
 import { Material } from '../engine/render/Material.js';
 import { Colliders } from '../world/Colliders.js';
 import { T, resolveWorldMatrices, effectiveObjectState, buildComputerGeometry, disposeComputerGeometry, inspectAndLoadAsset, disposeAssetScene } from './vendor/world-engine-contract.js';
-import { buildNativeAsset } from './NativeAssets.js';
+import { buildRepositoryAssetBatches } from './RepositoryAssetBatches.js';
+import { repositoryWaterQuery,buildRepositoryWater } from './RepositoryWater.js';
 import { buildNativeNeon } from './NativeNeon.js';
 import { buildNativeFeatures } from './NativeFeatures.js';
 import { buildNativeForest } from './NativeForest.js';
@@ -26,7 +27,7 @@ export function disposeRepositoryScene(candidate) {
  for(const m of materials)if(!m.userData.sharedBuilderTreeMaterial)m.dispose();
 }
 export async function buildRepositoryScene(descriptor,camera) {
- const project=descriptor.project, root=new N.Group(),candidate={root,descriptor,terrain:descriptor.terrain,colliders:new Colliders(),assets:[]};
+ const project=descriptor.project, root=new N.Group(),candidate={root,descriptor,terrain:descriptor.terrain,colliders:new Colliders(),assets:[],query:repositoryWaterQuery(project.water)};
  root.name='repository-world:'+descriptor.worldId;
  try {
   for(const b of descriptor.boxes)candidate.colliders.addBox(new N.Vector3(...b.center),new N.Vector3(...b.half),0,{walkable:b.walkable,solid:b.solid,tag:b.id});
@@ -41,22 +42,19 @@ export async function buildRepositoryScene(descriptor,camera) {
   const matrices=resolveWorldMatrices(project.objects);
   const add=(item,geometry,color)=>{item.add(new N.Mesh(nativeGeometry(geometry),new Material({color,roughness:.85,side:'double'})));geometry.dispose();};
   for(const object of project.objects){
-   if(['group','tree'].includes(object.kind)||!effectiveObjectState(project.objects,object.id).visible)continue;
+   if(['group','tree','glb'].includes(object.kind)||!effectiveObjectState(project.objects,object.id).visible)continue;
    const item=new N.Group();item.userData.editorObjectId=object.id;item.matrixAutoUpdate=false;item.matrix.fromArray(matrices.get(object.id).elements);root.add(item);
    if(object.kind==='computer'){
     const computer=buildComputerGeometry();
     try{for(const part of computer.parts){const color=part.emissive?object.computer.screenColor:part.color;item.add(new N.Mesh(nativeGeometry(part.geometry),new Material({color,emissive:part.emissive?color:'#000000',roughness:.45,side:'double'})));}}finally{disposeComputerGeometry(computer);}
    }else if(object.kind==='neon-sign'){
     const neon=buildNativeNeon(object.neon,nativeGeometry);neon.userData.neonObjectId=object.id;item.add(neon);
-   }else if(object.kind==='glb'){
-    const asset=project.assets.find(a=>a.id===object.assetId);if(!asset)throw Error('Missing asset '+object.assetId);
-    const response=await fetch(asset.dataUrl);if(!response.ok)throw Error('Asset read failed');
-    const loaded=await inspectAndLoadAsset(await response.arrayBuffer());
-    try{const converted=buildNativeAsset(loaded,object,nativeGeometry);item.add(converted.group);candidate.assets.push({objectId:object.id,...converted.diagnostics});}finally{disposeAssetScene(loaded.scene);}
    }else if(object.kind==='building'){
     add(item,new T.BoxGeometry(3.6,2.2,3).translate(0,1.1,0),object.color);add(item,new T.ConeGeometry(2.7,1.1,4).rotateY(Math.PI/4).translate(0,2.55,0),'#574e42');
    }else add(item,object.kind==='sphere'?new T.SphereGeometry(.8,24,16):object.kind==='cylinder'?new T.CylinderGeometry(.65,.65,1.6,24):object.kind==='cone'?new T.ConeGeometry(.8,1.6,24):new T.BoxGeometry(1.6,1.6,1.6),object.color);
   }
+  const assets=await buildRepositoryAssetBatches(project,project.objects.filter(o=>o.kind==='glb'&&effectiveObjectState(project.objects,o.id).visible),matrices,nativeGeometry);root.add(assets.root);candidate.assets=assets.diagnostics;candidate.assetBatchCount=assets.root.userData.assetBatchCount;
+  const water=buildRepositoryWater(project);if(water)root.add(water);
   candidate.forest=buildNativeForest(project.objects,camera.position);root.add(candidate.forest);root.add(buildNativeFeatures(project,nativeGeometry));
   candidate.matrices=matrices;return candidate;
  }catch(error){disposeRepositoryScene(candidate);throw error;}

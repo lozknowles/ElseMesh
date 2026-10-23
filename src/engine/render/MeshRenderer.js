@@ -25,7 +25,6 @@ const opaqueOrder = ( a, b ) => a.renderOrder - b.renderOrder || a.pipeKey - b.p
 const transparentOrder = ( a, b ) => a.renderOrder - b.renderOrder || b.z - a.z;
 const depthBucketOrder = ( a, b ) => a.depthBucket - b.depthBucket || a.pipeKey - b.pipeKey || a.z - b.z;
 
-const _layouts = new WeakMap();
 let _listToken = 0; // one per drawItems call (see BindingSet.getBindGroup)
 
 const DRAW_STRIDE = 256; // minUniformBufferOffsetAlignment
@@ -36,6 +35,8 @@ export class MeshRenderer {
 	constructor() {
 
 		this.pipelines = new Map();
+		this._layouts = new WeakMap();
+		this._materialOwners = new WeakMap();
 		this.geometries = new WeakMap();
 		this.capacity = 8192;
 		this.drawBuffer = null;
@@ -226,11 +227,43 @@ export class MeshRenderer {
 
 	}
 
+	// Material lifetimes own this renderer's pipeline and layout references.
+	// Shared textures, geometry buffers and WebGPU pipeline objects are untouched.
+	_materialOwner( material ) {
+
+		let owner = this._materialOwners.get( material );
+		if ( ! owner ) {
+
+			owner = { disposed: false, pipelines: new Map(), layouts: new Set() };
+			this._materialOwners.set( material, owner );
+			material.addEventListener?.( 'dispose', () => {
+
+				if ( owner.disposed ) return;
+				owner.disposed = true;
+				for ( const [ key, pipeline ] of owner.pipelines ) if ( this.pipelines.get( key ) === pipeline ) this.pipelines.delete( key );
+				for ( const entry of owner.layouts ) {
+
+					entry.vl.pipelines.clear();
+					if ( entry.byMat.get( entry.key ) === entry.value ) entry.byMat.delete( entry.key );
+
+				}
+				owner.pipelines.clear(); owner.layouts.clear();
+				this.stats.pipelines = this.pipelines.size;
+
+			} );
+
+		}
+		if ( owner.disposed ) throw new Error( 'Disposed material cannot create renderer resources' );
+		return owner;
+
+	}
+
 	// cached _layout(): per geometry and material, checked against the attribute objects it used
 	_cachedLayout( object, geometry, material ) {
 
-		let byMat = _layouts.get( geometry );
-		if ( ! byMat ) _layouts.set( geometry, byMat = new Map() );
+		const owner = this._materialOwner( material );
+		let byMat = this._layouts.get( geometry );
+		if ( ! byMat ) this._layouts.set( geometry, byMat = new Map() );
 		const inst = object.isInstancedMesh ? ( object.instanceColor ? 2 : 1 ) : 0;
 		const mkey = inst ? material.id + ':' + inst : material.id;
 		let e = byMat.get( mkey );
@@ -254,6 +287,7 @@ export class MeshRenderer {
 		e = { version: material.version, attrsVersion: geometry.attributesVersion, instanceMatrix: object.instanceMatrix, names, refs: names.map( ( n ) => geometry.attributes[ n ] ), vl };
 		vl.pipelines = new Map();
 		byMat.set( mkey, e );
+		owner.layouts.add( { byMat, key: mkey, value: e, vl } );
 		return vl;
 
 	}
@@ -329,6 +363,8 @@ export class MeshRenderer {
 	// the pipeline of ( material, vertex layout, pass ); the material key is computed once per frame
 	_pipeline( material, vl, pass ) {
 
+		this._materialOwner( material );
+
 		if ( material.__pkFrame !== GPU.frame ) {
 
 			material.__pk = material.pipelineKey() + '|' + SceneLighting.version;
@@ -344,6 +380,16 @@ export class MeshRenderer {
 		if ( ! p ) p = this._createPipeline( material, vl, pass, key );
 		if ( vl.pipelines ) vl.pipelines.set( passKey, { materialKey: material.__pk, p } );
 		return p;
+
+	}
+
+	_cachePipeline( material, key, pipeline ) {
+
+		const owner = this._materialOwner( material );
+		this.pipelines.set( key, pipeline );
+		owner.pipelines.set( key, pipeline );
+		this.stats.pipelines = this.pipelines.size;
+		return pipeline;
 
 	}
 
@@ -390,9 +436,7 @@ export class MeshRenderer {
 		};
 		// compiled in the background: the draw is skipped until it is ready (see GPU.renderPipeline)
 		const p = { handle: GPU.renderPipeline( desc ), bindings: c.bindings, label: desc.label };
-		this.pipelines.set( key, p );
-		this.stats.pipelines = this.pipelines.size;
-		return p;
+		return this._cachePipeline( material, key, p );
 
 	}
 

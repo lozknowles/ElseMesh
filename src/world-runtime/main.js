@@ -1,3 +1,13 @@
+import {prepareNativeRepositoryResources,ReadiedRepositoryAvatar} from './NativeRepositoryReadiness.js';
+import {RepositoryFollowCamera} from './RepositoryFollowCamera.js';
+import {repositoryWorldActions} from './RepositoryWorldActions.js';
+import {WebGLRepositoryAvatar} from './WebGLRepositoryAvatar.js';
+import {createPortalEffects} from './RepositoryPortalEffects.js';
+import {AvatarChooser} from '../player/AvatarChooser.js';
+import {disposeRepositoryScene} from './RepositoryScene.js';
+import {loadAppearance} from '../player/AvatarAppearance.js';
+import {initializeRenderBackend} from '../engine/Backend.js';
+import {createWebGLRepositoryEngine,configureWebGLRepositoryScene,createWebGLRepositoryPeerLayer,addWebGLPortalFrame,updateWebGLRepositoryEnvironment} from './WebGLRepositoryBackend.js';
 import * as N from '../engine/index.js';
 import { Engine } from '../core/Engine.js';
 import { Input } from '../core/Input.js';
@@ -16,27 +26,64 @@ import { hostedRepositorySource } from './HostedRepository.js';
 import { localRepositorySource } from './LocalRepositoryFiles.js';
 import { RepositorySession } from './RepositorySession.js';
 import { RepositoryWorldHost } from './RepositoryWorldHost.js';
+import { RepositoryPortalRuntime } from './RepositoryPortalRuntime.js';
+import { RepositoryRetro } from './RepositoryRetro.js';
 import { parseGitHubWorldLocation, resolveGitHubWorldSource } from './vendor/world-engine-contract.js';
 
 const status=document.querySelector('#status'),hud=document.querySelector('#hud'),terminal=document.querySelector('#terminal');
 const report=message=>status.textContent=message;
 async function init(){
- const engine=new Engine(document.querySelector('#app'));engine.maxOutputPixels=1000000;await engine.init();engine.meshRenderer.syncPipelines=true;
- const input=new Input(engine.canvas,{keyboardLookBlocked:()=>terminal.open});
- const atmosphere=new Atmosphere(engine),sky=new Sky(atmosphere),clouds=new SkyProClouds(engine,atmosphere);await clouds.ready;sky.clouds=clouds;
- const environment=new Environment(engine,engine.scene,sky,128),shadows=new SunShadows({size:1024}),weather=new NativeWeather();engine.scene.add(weather.group);
- const renderer=new SceneRenderer(engine.meshRenderer,engine.scene,engine.camera);renderer.background=sky.background;renderer.waterMaterial={needsSSRDepth:false};
- const medium=createDryWorldMedium(renderer.sceneRT.depthTexture),post=new PostFX(engine,{sceneRenderer:renderer,camera:engine.camera,underwater:medium,clouds});
- if(post.motionBlur.strength)post.motionBlur.strength.value=0;
- const host=new RepositoryWorldHost({engine,input,onChange:active=>{post.taau.resetHistory();medium.uniforms.fields.base.value=terrainMistBase(active.project.terrain);report(active.project.metadata.name+' · '+active.identity.location+' · '+active.identity.contentDigest.slice(0,12));},onInteract:(computer,active)=>{
+ const container=document.querySelector('#app');let attempted;
+ const selected=await initializeRenderBackend({webgpu:async()=>{if(new URLSearchParams(location.search).get('renderer')==='webgl2')throw Error('WebGL2 selected');attempted=new Engine(container);attempted.maxOutputPixels=1000000;await attempted.init();attempted.meshRenderer.syncPipelines=true;attempted.backend='webgpu';return attempted;},webgl2:async()=>{attempted?.stop();attempted?.canvas?.remove();GPU.device?.destroy();return createWebGLRepositoryEngine(container);}});
+ const engine=selected.value,isWebGL=selected.backend==='webgl2';
+ const captureQuality=new URLSearchParams(location.search).get('quality')==='capture';engine.maxOutputPixels=captureQuality?2100000:1000000;engine.resize();
+ const input=new Input(engine.canvas,{keyboardLookBlocked:()=>terminal.open||retro.active});
+ const retro=new RepositoryRetro(input);
+ let atmosphere,sky,clouds,environment,shadows,weather,renderer,medium,post,backendHost={},backendPortals={};
+ if(isWebGL){
+  const {buildWebGLRepositoryScene,disposeWebGLRepositoryScene,buildWebGLNeon}=await import('./WebGLRepositoryScene.js');
+  const {WebGLPortalViews}=await import('./WebGLPortalViews.js');
+  configureWebGLRepositoryScene(engine.scene);
+  backendHost={buildCandidate:buildWebGLRepositoryScene,disposeCandidate:disposeWebGLRepositoryScene,buildNeon:buildWebGLNeon};
+  backendPortals={buildScene:buildWebGLRepositoryScene,disposeCandidate:disposeWebGLRepositoryScene,createPeerLayer:createWebGLRepositoryPeerLayer,addPortalFrame:addWebGLPortalFrame,views:new WebGLPortalViews({engine,mainCamera:engine.camera,configureScene:configureWebGLRepositoryScene})};
+  renderer=engine.renderer;
+ }else{
+  atmosphere=new Atmosphere(engine);sky=new Sky(atmosphere);clouds=new SkyProClouds(engine,atmosphere);await clouds.ready;sky.clouds=clouds;
+  environment=new Environment(engine,engine.scene,sky,128);shadows=new SunShadows({size:1024});weather=new NativeWeather();engine.scene.add(weather.group);
+  renderer=new SceneRenderer(engine.meshRenderer,engine.scene,engine.camera);renderer.background=sky.background;renderer.waterMaterial={needsSSRDepth:false};
+  medium=createDryWorldMedium(renderer.sceneRT.depthTexture);post=new PostFX(engine,{sceneRenderer:renderer,camera:engine.camera,underwater:medium,clouds});
+  if(post.motionBlur.strength)post.motionBlur.strength.value=0;
+ }
+ const followCamera=new RepositoryFollowCamera({camera:engine.camera});followCamera.setEnabled(new URLSearchParams(location.search).get('view')==='follow');
+ const portalEffects=createPortalEffects({engine,isWebGL});backendPortals.addPortalFrame=portalEffects.addFrame;backendPortals.portalEffects=portalEffects;
+ if(!isWebGL){
+  backendHost.disposeCandidate=candidate=>{if(candidate?.root)portalEffects.removeRoot(candidate.root);disposeRepositoryScene(candidate);};
+  engine.prepareRepositoryResources=root=>prepareNativeRepositoryResources({meshRenderer:engine.meshRenderer,camera:engine.camera,root});
+  backendHost.prepareResources=async prepared=>{
+   for(const portal of (prepared.project.portals??[]).slice(0,2))portalEffects.addFrame(prepared.root,portal);
+   prepared.root.userData.repositoryPortalFramesReady=true;
+   prepared.readiness=await engine.prepareRepositoryResources(prepared.root);
+  };
+ }
+
+ const host=new RepositoryWorldHost({engine,input,...backendHost,onChange:active=>{followCamera.reset(active);retro.setWorld(active);post?.taau.resetHistory();if(medium)medium.uniforms.fields.base.value=terrainMistBase(active.project.terrain);report(active.project.metadata.name+' · '+active.identity.location+' · '+active.identity.contentDigest.slice(0,12));},onInteract:(computer,active)=>{
   input._clearTransientInput();document.exitPointerLock?.();document.querySelector('#computer-info').textContent='Computer '+computer.id+' · sign '+(computer.computer.targetSignId??'not assigned');
   document.querySelector('#computer-controls').textContent='Connect an authorised world session for controls.';terminal.showModal();window.dispatchEvent(new CustomEvent('repository-computer',{detail:{computer,active}}));
  }});
  document.querySelector('#terminal-close').onclick=()=>{terminal.close();engine.canvas.focus();};
- const app={engine,input,host,renderer,post,weather,gpu:GPU,session:null,load:async(source,options)=>{report('Validating and building candidate world…');try{return await host.load(source,options);}catch(error){report('World rejected: '+error.message);throw error;}},checkUpdate:options=>host.checkUpdate(options)};
+ const portals=new RepositoryPortalRuntime({engine,host,input,...backendPortals,getAppearance:()=>app.avatarChooser?.value??loadAppearance(),onStatus:s=>{document.querySelector('#portal-status').textContent=s;}});
+ const qualityControl=document.querySelector('#render-quality');qualityControl.value=captureQuality?'capture':'standard';
+ const setQuality=value=>{const high=value==='capture';engine.maxOutputPixels=high?2100000:1000000;portals.views.maxLongEdge=high?1024:512;engine.resize();};qualityControl.onchange=()=>setQuality(qualityControl.value);setQuality(qualityControl.value);
+ const avatar=isWebGL?new WebGLRepositoryAvatar(engine.scene):new ReadiedRepositoryAvatar(engine.scene,{model:{wheelPivot:{position:new N.Vector3()},lines:{deckY:0},group:new N.Group()},getYaw:()=>0},{prepareResources:engine.prepareRepositoryResources});
+ const openingPlayer={avatarAppearance:loadAppearance()};
+ const app={engine,input,host,renderer,post,weather,retro,portals,avatar,followCamera,camera:engine.camera,freeCam:false,get player(){return host.active?.player??openingPlayer;},fly:{yaw:0,pitch:0,velocity:new N.Vector3(),setPose(position,yaw,pitch){this.yaw=yaw;this.pitch=pitch;engine.camera.position.copy(position);engine.camera.quaternion.setFromEuler(new N.Euler(pitch,yaw,0,'YXZ'));engine.camera.updateMatrixWorld();}},thirdIsland:{active:false},monorail:{state:'off'},setFreeCam(value){this.freeCam=!!value;},gpu:isWebGL?null:GPU,backend:selected.backend,fallbackReason:selected.fallbackReason,session:null,...repositoryWorldActions({host,portals,report})};
+ const avatarChooser=new AvatarChooser({app});app.avatarChooser=avatarChooser;
+ window.addEventListener('keydown',event=>{if(event.code==='KeyK'&&!retro.active&&!terminal.open&&!portals.pending)avatarChooser.show();});
+ const followButton=document.querySelector('#follow-player');const setFollow=enabled=>{followCamera.setEnabled(enabled);followButton.textContent=enabled?'First-person view · V':'Follow player · V';post?.taau.resetHistory();engine.canvas.focus();};followButton.onclick=()=>setFollow(!followCamera.enabled);followButton.textContent=followCamera.enabled?'First-person view · V':'Follow player · V';
+ window.addEventListener('keydown',event=>{if(event.code==='KeyV'&&input.enabled&&!retro.active&&!terminal.open&&!avatarChooser.dialog.open)setFollow(!followCamera.enabled);});
  window.__repositoryWorldApp=app;
  const sessionStatus=document.querySelector('#session-status');
- host.beforeActivate=async()=>{document.querySelector('#apply-update').disabled=true;document.querySelector('#update-status').textContent='';app.session?.disconnect();if(terminal.open)terminal.close();};
+ host.beforeActivate=async()=>{if(retro.active)retro.clear();document.querySelector('#apply-update').disabled=true;document.querySelector('#update-status').textContent='';app.session?.disconnect();if(terminal.open)terminal.close();};
  const makeSession=()=>new RepositorySession(host,{trustedOwners:new Set([document.querySelector('#session-url').value.trim()]),onStatus:value=>sessionStatus.textContent=value});
  document.querySelector('#session-identity').onclick=()=>void(async()=>{const session=app.session??makeSession();document.querySelector('#public-identity').textContent=JSON.stringify(await session.publicIdentity(),null,2);})().catch(error=>sessionStatus.textContent=error.message);
  document.querySelector('#session-connect').onclick=()=>void(async()=>{const file=document.querySelector('#admission').files[0];if(!file||file.size>100000)throw Error('Select an operator admission JSON under 100 KB.');const proof=JSON.parse(await file.text());app.session?.disconnect();app.session=makeSession();await app.session.connect(proof);})().catch(error=>sessionStatus.textContent=error.message);
@@ -54,27 +101,39 @@ async function init(){
  });
  const loadFiles=async files=>app.load(localRepositorySource(files));
  document.querySelector('#check-update').onclick=()=>void app.checkUpdate().then(update=>{const apply=document.querySelector('#apply-update');apply.disabled=!update;document.querySelector('#update-status').textContent=update?`Checked revision ${update.fromCommit??update.fromDigest} → ${update.toCommit??update.toDigest}. Apply to reload and disconnect this session.`:'No newer revision found.';}).catch(error=>{document.querySelector('#apply-update').disabled=true;report(error.message);});
- document.querySelector('#apply-update').onclick=()=>{document.querySelector('#apply-update').disabled=true;void host.applyUpdate().catch(error=>report(error.message));};
+ document.querySelector('#apply-update').onclick=()=>void(async()=>{await app.applyUpdate();document.querySelector('#apply-update').disabled=true;})().catch(error=>report(error.message));
  document.querySelector('#folder').onclick=()=>document.querySelector('#files').click();document.querySelector('#files').onchange=e=>void loadFiles(e.target.files).catch(error=>{report('World rejected: '+error.message);console.error(error);});
  document.querySelector('#hosted-open').onclick=()=>void(async()=>{await app.load(hostedRepositorySource(document.querySelector('#hosted-url').value));})().catch(error=>report('World rejected: '+error.message));
  document.querySelector('#remote').onclick=()=>void(async()=>{const source=await resolveGitHubWorldSource(parseGitHubWorldLocation(document.querySelector('#github').value));await app.load(source);})().catch(error=>report(error.message));
  engine.start((dt,time)=>{
   try{
-   GPU.beginFrame();G.time.value=time;G.dt.value=dt;G.exposure.value=.55;
-   if(!terminal.open)host.update(dt,time);input.endFrame();
-   const env=host.environment()??{timeOfDay:14,cloudCoverage:.49,windSpeed:6,sunAzimuth:0};clouds.coverage.value=env.cloudCoverage??.49;G.windSpeed.value=env.windSpeed??6;
+   if(!isWebGL){GPU.beginFrame();G.time.value=time;G.dt.value=dt;G.exposure.value=.55;}
+   if(!terminal.open&&!retro.active&&!portals.pending&&!app.freeCam){host.update(dt,time);const device=retro.nearest(engine.camera.position);if(device&&input.hit('KeyE'))retro.open(device);}
+   if(host.active&&!app.freeCam)followCamera.update(dt,host.active,{suspended:terminal.open||retro.active||portals.pending});
+   if(host.active)avatar.update(dt,host.active.player,engine.camera,app.freeCam||followCamera.enabled);
+   portals.update(dt,time);portalEffects.update(dt,time);input.endFrame();
+   const env=host.environment()??{timeOfDay:14,cloudCoverage:.49,windSpeed:6,sunAzimuth:0};let weatherState;const water=host.active?.project.water;
+   if(isWebGL){weatherState=updateWebGLRepositoryEnvironment(engine,host.active,time);portals.render({width:engine.width,height:engine.height,time});renderer.render(engine.scene,engine.camera);}
+   else{clouds.coverage.value=env.cloudCoverage??.49;G.windSpeed.value=env.windSpeed??6;
+   for(const [key,value]of Object.entries({waterEnabled:water?1:0,waterLevel:water?.level??0,waveAmplitude:water?.waveAmplitude??0,waveSpeed:water?.waveSpeed??0,waterExtent:water?.extent??16}))medium.uniforms.fields[key].value=value;
    medium.uniforms.fields.storm.value=env.weather==='storm'?1:0;medium.uniforms.fields.density.value=env.mistDensity??.004;medium.uniforms.fields.speed.value=env.mistSpeed??2;medium.uniforms.fields.height.value=env.mistHeight??9;
    const dir=sunDirectionFromTime(env.timeOfDay??14).applyAxisAngle(new N.Vector3(0,1,0),env.sunAzimuth??0);atmosphere.sunDir.value.copy(dir);
    const night=N.MathUtils.smoothstep(-dir.y,.02,.18);G.night.value=night;sky.starIntensity.value=night;const moon=new N.Vector3(-dir.x,Math.abs(dir.y)*.8+.25,-dir.z).normalize();sky.moonDir.value.copy(moon);G.sunDir.value.copy(dir.y>-.07?dir:moon);
-   const weatherState=weather.update(time,engine.camera,host.active?.player.yaw??0,env,()=>{});medium.uniforms.fields.lightning.value=weatherState.flash;
+   weatherState=weather.update(time,engine.camera,host.active?.player.yaw??0,env,()=>{});medium.uniforms.fields.lightning.value=weatherState.flash;
    atmosphere.update(dt,engine.camera.position.y);
    if(atmosphere.sunTransmittance){const t=atmosphere.sunTransmittance;if(dir.y>-.07)G.sunColor.value.setRGB(...t).multiplyScalar(SUN_ILLUMINANCE*N.MathUtils.smoothstep(dir.y,-.03,.02));else G.sunColor.value.setRGB(.6,.7,1).multiplyScalar(.12*night);const a=atmosphere.skyIrradiance,k=.012*night;G.skyIrradiance.value.setRGB(a[0]+k*.6,a[1]+k*.7,a[2]+k);G.horizonColor.value.setRGB(...atmosphere.horizon);}
-   clouds.update(dt,engine.camera);environment.update(dt);post.beginFrame();shadows.render(engine.scene,engine.meshRenderer,shadows.update(engine.camera,G.sunDir.value));renderer.render();post.render();post.endFrame();GPU.submit();
-   const active=host.active;hud.textContent=active?`${active.project.metadata.name} · ${active.player.mode} · ${active.player.position.toArray().map(v=>v.toFixed(1)).join(', ')}${host.nearestComputer()?' · E: use computer':''}`:'Open a repository to explore';
-   app.diagnostics={frames:engine.frame,worldId:active?.identity.worldId,contentDigest:active?.identity.contentDigest,position:active?.player.position.toArray(),mode:active?.player.mode,grounded:active?.player.grounded,boxes:active?.colliders.boxes.length,assets:active?.assets,weather:weatherState,environment:env,neons:[]};active?.root.traverse(node=>{if(node.userData.neonState)app.diagnostics.neons.push(node.userData.neonState);});
+   clouds.update(dt,engine.camera);environment.update(dt);post.beginFrame();portals.render({width:renderer.width,height:renderer.height,time});shadows.render(engine.scene,engine.meshRenderer,shadows.update(engine.camera,G.sunDir.value));renderer.render();post.render();post.endFrame();GPU.submit();}
+   const active=host.active;hud.textContent=active?`${active.project.metadata.name} · ${active.player.mode} · ${active.player.position.toArray().map(v=>v.toFixed(1)).join(', ')}${retro.nearest(engine.camera.position)?' · E: use Commodore / retro computer':host.nearestComputer()?' · E: use computer':''}`:'Open a repository to explore';
+   app.diagnostics={backend:selected.backend,fallbackReason:selected.fallbackReason,renderSize:[engine.canvas.width,engine.canvas.height],cameraView:followCamera.state,portalLongEdge:portals.views.maxLongEdge,frames:engine.frame,worldId:active?.identity.worldId,contentDigest:active?.identity.contentDigest,position:active?.player.position.toArray(),mode:active?.player.mode,grounded:active?.player.grounded,boxes:active?.colliders.boxes.length,assets:active?.assets,weather:weatherState,environment:env,water:water??null,assetBatches:active?.assetBatchCount,portals:portals.diagnostics(),portalEffects:portalEffects.diagnostics(),avatar:{appearance:app.player.avatarAppearance??loadAppearance(),loaded:!!(avatar.scanned||avatar.model),model:avatar.characterAsset??avatar.asset??avatar.appearance?.style},retro:{active:retro.active,near:retro.nearest(engine.camera.position)?.kind},neons:[]};active?.root.traverse(node=>{if(node.userData.neonState)app.diagnostics.neons.push(node.userData.neonState);});
   }catch(error){engine.stop();report('Runtime failed: '+error.message);console.error(error);app.error=error.message;}
  });
- window.addEventListener('pagehide',()=>{host.dispose();engine.stop();GPU.device?.destroy();});report('ElseMesh ready. Open a world repository folder or public GitHub source.');
+ document.querySelector('#portal-recover').onclick=()=>void portals.recover().catch(error=>{document.querySelector('#portal-status').textContent=error.message;});
+ document.querySelector('#panel-toggle').onclick=()=>{document.querySelector('#panel').hidden=true;engine.canvas.focus();};
+ window.addEventListener('keydown',event=>{if(event.code==='KeyH'&&!retro.active&&!terminal.open)document.querySelector('#panel').hidden=!document.querySelector('#panel').hidden;});
+ document.querySelector('#portal-connect').onclick=()=>void connectOpening().catch(error=>{document.querySelector('#portal-status').textContent=error.message;});
+ async function connectOpening(){const response=await fetch('/runtime-config',{credentials:'same-origin',cache:'no-store'});if(!response.ok)return false;const config=await response.json();if(config.protocol!=='elsemesh.repository-runtime/1'||!Array.isArray(config.trustedOwners)||config.endpoint!=='/__worlds')throw Error('Unsupported runtime installation configuration');await portals.connect(config);return true;}
+ void connectOpening().catch(error=>{document.querySelector('#portal-status').textContent=error.message;});
+ window.addEventListener('pagehide',()=>{portals.dispose();portalEffects.dispose();retro.dispose();avatar.dispose();host.dispose();engine.stop();if(isWebGL)engine.dispose();else GPU.device?.destroy();});report('ElseMesh '+selected.backend+' ready. Open a world repository folder or public GitHub source.');
  window.dispatchEvent(new CustomEvent('repository-world-ready',{detail:app}));
 }
 init().catch(error=>{console.error(error);report(error.message);});

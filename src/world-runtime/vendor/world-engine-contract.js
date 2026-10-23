@@ -12148,9 +12148,9 @@ var Mesh = class extends Object3D {
   updateMorphTargets() {
     const geometry = this.geometry;
     const morphAttributes = geometry.morphAttributes;
-    const keys = Object.keys(morphAttributes);
-    if (keys.length > 0) {
-      const morphAttribute = morphAttributes[keys[0]];
+    const keys2 = Object.keys(morphAttributes);
+    if (keys2.length > 0) {
+      const morphAttribute = morphAttributes[keys2[0]];
       if (morphAttribute !== void 0) {
         this.morphTargetInfluences = [];
         this.morphTargetDictionary = {};
@@ -16708,9 +16708,9 @@ var Line = class extends Object3D {
   updateMorphTargets() {
     const geometry = this.geometry;
     const morphAttributes = geometry.morphAttributes;
-    const keys = Object.keys(morphAttributes);
-    if (keys.length > 0) {
-      const morphAttribute = morphAttributes[keys[0]];
+    const keys2 = Object.keys(morphAttributes);
+    if (keys2.length > 0) {
+      const morphAttribute = morphAttributes[keys2[0]];
       if (morphAttribute !== void 0) {
         this.morphTargetInfluences = [];
         this.morphTargetDictionary = {};
@@ -16896,9 +16896,9 @@ var Points = class extends Object3D {
   updateMorphTargets() {
     const geometry = this.geometry;
     const morphAttributes = geometry.morphAttributes;
-    const keys = Object.keys(morphAttributes);
-    if (keys.length > 0) {
-      const morphAttribute = morphAttributes[keys[0]];
+    const keys2 = Object.keys(morphAttributes);
+    if (keys2.length > 0) {
+      const morphAttribute = morphAttributes[keys2[0]];
       if (morphAttribute !== void 0) {
         this.morphTargetInfluences = [];
         this.morphTargetDictionary = {};
@@ -18230,7 +18230,7 @@ var Curve = class {
     const tangents = [];
     const normals = [];
     const binormals = [];
-    const vec2 = new Vector3();
+    const vec3 = new Vector3();
     const mat = new Matrix4();
     for (let i = 0; i <= segments; i++) {
       const u = i / segments;
@@ -18253,24 +18253,24 @@ var Curve = class {
     if (tz <= min) {
       normal.set(0, 0, 1);
     }
-    vec2.crossVectors(tangents[0], normal).normalize();
-    normals[0].crossVectors(tangents[0], vec2);
+    vec3.crossVectors(tangents[0], normal).normalize();
+    normals[0].crossVectors(tangents[0], vec3);
     binormals[0].crossVectors(tangents[0], normals[0]);
     for (let i = 1; i <= segments; i++) {
       normals[i] = normals[i - 1].clone();
       binormals[i] = binormals[i - 1].clone();
-      vec2.crossVectors(tangents[i - 1], tangents[i]);
-      if (vec2.length() > Number.EPSILON) {
-        vec2.normalize();
+      vec3.crossVectors(tangents[i - 1], tangents[i]);
+      if (vec3.length() > Number.EPSILON) {
+        vec3.normalize();
         const theta = Math.acos(clamp(tangents[i - 1].dot(tangents[i]), -1, 1));
-        normals[i].applyMatrix4(mat.makeRotationAxis(vec2, theta));
+        normals[i].applyMatrix4(mat.makeRotationAxis(vec3, theta));
       }
       binormals[i].crossVectors(tangents[i], normals[i]);
     }
     if (closed === true) {
       let theta = Math.acos(clamp(normals[0].dot(normals[segments]), -1, 1));
       theta /= segments;
-      if (tangents[0].dot(vec2.crossVectors(normals[0], normals[segments])) > 0) {
+      if (tangents[0].dot(vec3.crossVectors(normals[0], normals[segments])) > 0) {
         theta = -theta;
       }
       for (let i = 1; i <= segments; i++) {
@@ -20077,9 +20077,9 @@ var ExtrudeGeometry = class _ExtrudeGeometry extends BufferGeometry {
         const ahole = holes[h];
         vertices = vertices.concat(ahole);
       }
-      function scalePt2(pt, vec2, size) {
-        if (!vec2) console.error("THREE.ExtrudeGeometry: vec does not exist");
-        return pt.clone().addScaledVector(vec2, size);
+      function scalePt2(pt, vec3, size) {
+        if (!vec3) console.error("THREE.ExtrudeGeometry: vec does not exist");
+        return pt.clone().addScaledVector(vec3, size);
       }
       const vlen = vertices.length;
       function getBevelVec(inPt, inPrev, inNext) {
@@ -41883,6 +41883,83 @@ var WebGLRenderer = class {
   }
 };
 
+// src/domain/portal.ts
+var MAX_PORTALS = 16;
+var PORTAL_PLAYER_RADIUS = 0.28;
+var PORTAL_PLAYER_HEIGHT = 1.75;
+var record = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+var bounded = (v, min, max) => typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
+var vec = (v) => Array.isArray(v) && v.length === 3 && v.every((n) => bounded(n, -2e3, 2e3));
+var identity = (v, prefix) => typeof v === "string" && new RegExp("^" + prefix + "[A-Za-z0-9][A-Za-z0-9._-]{0,159}$").test(v);
+var keys = (v, allowed) => Object.keys(v).every((k) => allowed.includes(k));
+function validateWorldConnections(project) {
+  const errors = [], ids = /* @__PURE__ */ new Set();
+  if (project.portals !== void 0) {
+    if (!Array.isArray(project.portals) || project.portals.length > MAX_PORTALS) errors.push("Worlds may contain at most 16 portals.");
+    for (const p of Array.isArray(project.portals) ? project.portals : []) {
+      if (!record(p) || !keys(p, ["id", "name", "position", "yaw", "width", "height", "destination", "enabled", "view", "traversal", "policyRef", "visual"])) {
+        errors.push("Invalid portal fields.");
+        continue;
+      }
+      if (!identity(p.id, "elsemesh-portal:") || ids.has(p.id)) errors.push("Portal has an invalid or duplicate identity.");
+      ids.add(p.id);
+      if (typeof p.name !== "string" || !p.name.trim() || p.name.length > 120 || !vec(p.position) || !bounded(p.yaw, -Math.PI * 2, Math.PI * 2) || !bounded(p.width, Math.round((PORTAL_PLAYER_RADIUS * 2 + 0.04) * 100) / 100, 20) || !bounded(p.height, PORTAL_PLAYER_HEIGHT + 0.04, 20)) errors.push("Portal geometry must be an upright rectangle large enough for the player capsule.");
+      if (typeof p.enabled !== "boolean" || !record(p.view) || !keys(p.view, ["enabled", "maxDistance"]) || typeof p.view.enabled !== "boolean" || !bounded(p.view.maxDistance, 0.5, 200) || !record(p.traversal) || !keys(p.traversal, ["enabled"]) || typeof p.traversal.enabled !== "boolean") errors.push("Portal view or traversal settings are invalid.");
+      if (!record(p.destination) || !keys(p.destination, ["worldId", "regionId", "portalId"]) || !identity(p.destination.worldId, "elsemesh[.]world:") || !identity(p.destination.regionId, "elsemesh[.]region:") || !identity(p.destination.portalId, "elsemesh-portal:")) errors.push("Portal destination must contain world, region and portal identities.");
+      if (typeof p.policyRef !== "string" || !/^[A-Za-z0-9][A-Za-z0-9:._-]{0,159}$/.test(p.policyRef)) errors.push("Portal policy reference must be a bounded identity, never a URL or credential.");
+      if (!record(p.visual) || !keys(p.visual, ["frameColor", "unavailableColor"]) || ![p.visual.frameColor, p.visual.unavailableColor].every((c) => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c))) errors.push("Portal colors must be hexadecimal RGB.");
+    }
+    for (const p of Array.isArray(project.portals) ? project.portals : []) {
+      if (!record(p) || !record(p.destination)) continue;
+      if (p.destination.worldId === project.metadata?.worldId && (p.destination.regionId !== project.metadata?.regionId || !ids.has(p.destination.portalId))) errors.push("Portal references a missing local region or portal.");
+    }
+  }
+  if (project.water !== void 0) {
+    const w = project.water;
+    if (!record(w) || !keys(w, ["level", "waveAmplitude", "waveSpeed", "extent"]) || !bounded(w.level, -2e3, 2e3) || !bounded(w.waveAmplitude, 0, 3) || !bounded(w.waveSpeed, 0, 10) || !bounded(w.extent, 16, 4096)) errors.push("Water settings are outside supported bounds.");
+  }
+  if (project.terminals !== void 0) {
+    const terminalIds = /* @__PURE__ */ new Set(), objects = new Set((Array.isArray(project.objects) ? project.objects : []).map((o) => o?.id));
+    if (!Array.isArray(project.terminals) || project.terminals.length > 32) errors.push("Worlds may contain at most 32 retro terminals.");
+    for (const t of Array.isArray(project.terminals) ? project.terminals : []) {
+      if (!record(t) || !keys(t, ["id", "objectId", "kind", "screenObjectId", "screenObjectIds", "position", "interactionRadius"]) || typeof t.id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9:._-]{0,159}$/.test(t.id) || terminalIds.has(t.id) || !["c64", "bbc", "sun"].includes(t.kind) || !objects.has(t.objectId) || t.screenObjectId !== void 0 && !objects.has(t.screenObjectId) || t.screenObjectIds !== void 0 && (!Array.isArray(t.screenObjectIds) || t.screenObjectIds.length > 8 || new Set(t.screenObjectIds).size !== t.screenObjectIds.length || t.screenObjectIds.some((id) => !objects.has(id))) || !vec(t.position) || !bounded(t.interactionRadius, 0.5, 5)) errors.push("Retro terminal has invalid settings, duplicate identity or missing object references.");
+      if (record(t) && typeof t.id === "string") terminalIds.add(t.id);
+    }
+  }
+  return errors;
+}
+var rotate = (v, yaw) => [Math.cos(yaw) * v[0] + Math.sin(yaw) * v[2], v[1], -Math.sin(yaw) * v[0] + Math.cos(yaw) * v[2]];
+function portalLocalPoint(portal, point) {
+  return rotate([point[0] - portal.position[0], point[1] - portal.position[1], point[2] - portal.position[2]], -portal.yaw);
+}
+function portalWorldPoint(portal, point) {
+  const v = rotate(point, portal.yaw);
+  return [v[0] + portal.position[0], v[1] + portal.position[1], v[2] + portal.position[2]];
+}
+function mapPortalPoint(source, destination, point) {
+  const v = portalLocalPoint(source, point);
+  return portalWorldPoint(destination, [-v[0], v[1], -v[2]]);
+}
+function mapPortalDirection(source, destination, direction) {
+  return rotate(direction, destination.yaw + Math.PI - source.yaw);
+}
+function portalMappingElements(source, destination) {
+  const x = mapPortalDirection(source, destination, [1, 0, 0]), y = mapPortalDirection(source, destination, [0, 1, 0]), z = mapPortalDirection(source, destination, [0, 0, 1]), p = mapPortalPoint(source, destination, [0, 0, 0]);
+  return [x[0], x[1], x[2], 0, y[0], y[1], y[2], 0, z[0], z[1], z[2], 0, p[0], p[1], p[2], 1];
+}
+function mapPortalYaw(source, destination, yaw) {
+  const angle = yaw + destination.yaw + Math.PI - source.yaw;
+  return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
+function sweepPortalCapsule({ portal, previousFeet, nextFeet, radius = PORTAL_PLAYER_RADIUS, bodyHeight = PORTAL_PLAYER_HEIGHT }) {
+  if (!portal.enabled || !portal.traversal.enabled || ![...previousFeet, ...nextFeet, radius, bodyHeight].every(Number.isFinite) || radius < 0 || bodyHeight <= 0) return null;
+  const a = portalLocalPoint(portal, previousFeet), b = portalLocalPoint(portal, nextFeet);
+  if (a[2] <= 0 || b[2] > 0) return null;
+  const fraction = a[2] / (a[2] - b[2]), x = a[0] + (b[0] - a[0]) * fraction, y = a[1] + (b[1] - a[1]) * fraction;
+  if (Math.abs(x) + radius > portal.width / 2 || y < -portal.height / 2 - 1e-7 || y + bodyHeight > portal.height / 2 + 1e-7) return null;
+  return { fraction, feet: portalWorldPoint(portal, [x, y, 0]) };
+}
+
 // src/domain/computer.ts
 var COMPUTER_SCHEMA = "elsemesh.computer/1";
 var MAX_COMPUTERS = 32;
@@ -42859,7 +42936,7 @@ function treeWindOffset(x, y, z, time, seed = 7319, species = "broadleaf") {
 var MAX_HIERARCHY_DEPTH = 32;
 var MAX_WORLD_TRANSFORM_COMPONENT = 1e7;
 var MAX_WORLD_BOUND_COMPONENT = 1e9;
-var vec = (v) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
+var vec2 = (v) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
 function validateHierarchy(objects) {
   const errors = [], map = /* @__PURE__ */ new Map();
   for (const o of objects) {
@@ -42868,7 +42945,7 @@ function validateHierarchy(objects) {
       continue;
     }
     map.set(o.id, o);
-    if (!vec(o.position) || !vec(o.rotation) || !vec(o.scale) || o.scale.some((n) => n <= 0 || n > 1e3)) errors.push("Hierarchy transforms must be finite positive local TRS.");
+    if (!vec2(o.position) || !vec2(o.rotation) || !vec2(o.scale) || o.scale.some((n) => n <= 0 || n > 1e3)) errors.push("Hierarchy transforms must be finite positive local TRS.");
     if (o.parentId !== void 0 && (typeof o.parentId !== "string" || !o.parentId)) errors.push("Invalid parent ID.");
     if (o.locked !== void 0 && typeof o.locked !== "boolean") errors.push("Invalid object lock.");
     if (o.description !== void 0 && (typeof o.description !== "string" || o.description.length > 2e3)) errors.push("Description exceeds 2000 characters.");
@@ -43083,7 +43160,7 @@ function getGroupBounds(project, id) {
 function resizeGroup(project, id, dimensions, uniform = false) {
   editable(project.objects, [id]);
   const group = project.objects.find((o) => o.id === id);
-  if (group?.kind !== "group" || !vec(dimensions) || dimensions.some((n) => n <= 0)) throw new Error("Dimensions must be finite and positive.");
+  if (group?.kind !== "group" || !vec2(dimensions) || dimensions.some((n) => n <= 0)) throw new Error("Dimensions must be finite and positive.");
   const size = getGroupBounds(project, id).dimensions;
   if (size.some((n) => n < 1e-8)) throw new Error("Cannot resize a group with a zero extent.");
   const scales = dimensions.map((n, i) => n / size[i]);
@@ -43123,9 +43200,9 @@ function parseAsciiGrid(input) {
   if (input.length > 64 * 1024 * 1024) fail("ASCII grid exceeds the 64 MiB text limit.");
   const tokens = input.trim().split(/\s+/);
   const header = /* @__PURE__ */ new Map();
-  const keys = /* @__PURE__ */ new Set(["ncols", "nrows", "xllcorner", "yllcorner", "xllcenter", "yllcenter", "cellsize", "nodata_value"]);
+  const keys2 = /* @__PURE__ */ new Set(["ncols", "nrows", "xllcorner", "yllcorner", "xllcenter", "yllcenter", "cellsize", "nodata_value"]);
   let cursor = 0;
-  while (cursor < tokens.length && keys.has(tokens[cursor].toLowerCase())) {
+  while (cursor < tokens.length && keys2.has(tokens[cursor].toLowerCase())) {
     const key = tokens[cursor++].toLowerCase();
     if (header.has(key)) fail(`Duplicate ASCII grid header ${key}.`);
     const raw = tokens[cursor++];
@@ -43370,6 +43447,7 @@ function validateWorld(value) {
     errors.push("Projects may contain at most 2,000 scene objects.");
   if (p.geography !== void 0) errors.push(...validateGeography(p.geography, p.terrain));
   if (p.terrainImagery !== void 0) errors.push(...validateTerrainImagery(p.terrainImagery, p.geography));
+  errors.push(...validateWorldConnections(p));
   const assetIds = new Set(Array.isArray(p.assets) ? p.assets.map((asset) => asset?.id) : []);
   const ids = /* @__PURE__ */ new Set();
   for (const [index, object2] of (Array.isArray(p.objects) ? p.objects : []).entries()) {
@@ -43579,13 +43657,15 @@ function paintTerrain(terrain, x, z, radius, material) {
 
 // src/domain/world-repository.ts
 var LEGACY_WORLD_REPOSITORY_SCHEMA = "elsemesh.world-repository/1";
-var WORLD_REPOSITORY_SCHEMA = "elsemesh.world-repository/2";
+var PREVIOUS_WORLD_REPOSITORY_SCHEMA = "elsemesh.world-repository/2";
+var WORLD_REPOSITORY_SCHEMA = "elsemesh.world-repository/3";
 var WORLD_ENGINE_CONTRACT = "elsemesh.worlds.runtime/1";
-var WORLD_CAPABILITIES = ["project/2", "terrain", "objects", "hierarchy", "features", "neon-sign", "computer", "geography", "terrain-imagery", "weather"];
+var WORLD_CAPABILITIES = ["project/2", "terrain", "objects", "hierarchy", "features", "neon-sign", "computer", "geography", "terrain-imagery", "weather", "portal/1", "water/1", "retro-terminal/1"];
 var WORLD_REPOSITORY_MANIFEST = "world.json";
 var WORLD_REPOSITORY_MANIFEST_LIMIT = 64 * 1024;
 var ENGINE_REFERENCE = "95719848d5ffa4428b57c75c272483e1c2113a72";
-var roles = ["metadata", "terrain", "objects", "features", "environment", "spawn", "geography", "assets"];
+var legacyRoles = ["metadata", "terrain", "objects", "features", "environment", "spawn", "geography", "assets"];
+var roles = [...legacyRoles, "connections"];
 var encoder = new TextEncoder();
 var decoder = new TextDecoder("utf-8", { fatal: true });
 var hashPattern = /^[a-f0-9]{64}$/;
@@ -43607,7 +43687,7 @@ function reference(value, expectedPath) {
   return { path: value.path, sha256: value.sha256, bytes: value.bytes };
 }
 async function snapshotDigest(components) {
-  return repositoryDigest(json(Object.fromEntries(roles.map((role) => [role, { sha256: components[role].sha256, bytes: components[role].bytes }]))));
+  return repositoryDigest(json(Object.fromEntries(roles.filter((role) => components[role]).map((role) => [role, { sha256: components[role].sha256, bytes: components[role].bytes }]))));
 }
 function validateProject(value) {
   rejectExecutableFields(value);
@@ -43645,20 +43725,22 @@ async function packWorldRepository(project, options = {}) {
     geography: project.geography ?? null,
     terrainImagery: imagery ? { ...imagery, dataUrl: void 0, file: await binary(imagery.dataUrl, "imagery", imagery.dataUrl.startsWith("data:image/png;") ? "png" : "jpg") } : null
   };
-  const values = { metadata: project.metadata, terrain: project.terrain, objects: project.objects, features: project.features ?? [], environment: project.environment, spawn: project.spawn, geography, assets };
+  const extended = project.portals !== void 0 || project.water !== void 0 || project.terminals !== void 0;
+  const activeRoles = extended ? roles : legacyRoles;
+  const values = { metadata: project.metadata, terrain: project.terrain, objects: project.objects, features: project.features ?? [], environment: project.environment, spawn: project.spawn, geography, assets, connections: { ...project.portals !== void 0 ? { portals: project.portals } : {}, ...project.water !== void 0 ? { water: project.water } : {}, ...project.terminals !== void 0 ? { terminals: project.terminals } : {} } };
   const components = {};
   const contents = /* @__PURE__ */ new Map();
-  for (const role of roles) {
+  for (const role of activeRoles) {
     const bytes = json(values[role]);
     contents.set(role, bytes);
     components[role] = { path: "", sha256: await repositoryDigest(bytes), bytes: bytes.byteLength };
   }
   const snapshot = await snapshotDigest(components);
-  for (const role of roles) {
+  for (const role of activeRoles) {
     components[role].path = `snapshots/${snapshot}/${role}.json`;
     files.set(components[role].path, contents.get(role));
   }
-  const manifest = { schema: WORLD_REPOSITORY_SCHEMA, version: 2, projectSchema: PROJECT_SCHEMA, engine: { commit: ENGINE_REFERENCE, contract: WORLD_ENGINE_CONTRACT, requires: requiredWorldCapabilities(project) }, snapshot, components, world: project.metadata, regions: [{ regionId: project.metadata.regionId, name: project.metadata.name, scene: { snapshot } }], attribution: options.attribution ?? { authors: [] }, ...options.provenance ? { provenance: options.provenance } : {} };
+  const manifest = { schema: extended ? WORLD_REPOSITORY_SCHEMA : PREVIOUS_WORLD_REPOSITORY_SCHEMA, version: extended ? 3 : 2, projectSchema: PROJECT_SCHEMA, engine: { commit: ENGINE_REFERENCE, contract: WORLD_ENGINE_CONTRACT, requires: requiredWorldCapabilities(project) }, snapshot, components, world: project.metadata, regions: [{ regionId: project.metadata.regionId, name: project.metadata.name, scene: { snapshot } }], attribution: options.attribution ?? { authors: [] }, ...options.provenance ? { provenance: options.provenance } : {} };
   validateManifestMetadata(manifest);
   files.set("README.md", encoder.encode("# Player world content repository\n\nOpen this folder in ElseMesh Worlds using Open world repository. The builder validates hashes and hydrated content before loading. world.json selects an immutable snapshot; previous snapshots are retained. To edit JSON by hand, import the edited content through tooling that recomputes the snapshot and file hashes.\n\nThe engine reference is " + ENGINE_REFERENCE + ". This is provenance only: loading this repository in the original game runtime is unverified. No engine source is included.\n\nAsset source and licence metadata are preserved in the assets and geography JSON. This repository grants no new rights to those assets. Choose a licence appropriate to your own content before publishing.\n\nUse ordinary Git for this bounded repository. Git LFS pointer files are not supported by the folder importer; actual binary content must be present.\n"));
   files.set(".gitattributes", encoder.encode("* text=auto\n*.json text eol=lf\n*.glb binary\n*.png binary\n*.jpg binary\n"));
@@ -43674,7 +43756,8 @@ async function unpackWorldRepository(read) {
   validateManifestMetadata(raw);
   const manifest = raw;
   const components = {};
-  for (const role of roles) components[role] = reference(manifest.components[role], `snapshots/${manifest.snapshot}/${role}.json`);
+  const activeRoles = manifest.version === 3 ? roles : legacyRoles;
+  for (const role of activeRoles) components[role] = reference(manifest.components[role], `snapshots/${manifest.snapshot}/${role}.json`);
   if (await snapshotDigest(components) !== manifest.snapshot) throw new Error("Snapshot identifier does not match its components.");
   let total = manifestBytes.byteLength;
   const cache2 = /* @__PURE__ */ new Map();
@@ -43694,7 +43777,7 @@ async function unpackWorldRepository(read) {
     return bytes;
   };
   const values = {};
-  for (const role of roles) values[role] = parse(await verified(components[role]));
+  for (const role of activeRoles) values[role] = parse(await verified(components[role]));
   if (!Array.isArray(values.assets) || values.assets.length > 128 || !object(values.geography)) throw new Error("Invalid repository asset/geography components.");
   const assetPlans = [];
   let glbBytes = 0;
@@ -43715,7 +43798,10 @@ async function unpackWorldRepository(read) {
     if (!ref.path.startsWith("imagery/")) throw new Error("Terrain imagery must use an imagery path.");
     imageryPlan = { metadata, ref, mediaType: ref.path.endsWith(".png") ? "image/png" : "image/jpeg" };
   }
+  const connections = manifest.version === 3 ? values.connections : {};
+  if (!object(connections) || Object.keys(connections).some((key) => !["portals", "water", "terminals"].includes(key))) throw new Error("Invalid repository connections component.");
   const candidate = {
+    ...connections,
     schema: manifest.projectSchema,
     metadata: values.metadata,
     terrain: values.terrain,
@@ -43746,7 +43832,7 @@ async function unpackWorldRepository(read) {
   }
   if (imageryPlan && candidate.terrainImagery) candidate.terrainImagery.dataUrl = await hydrate(imageryPlan.ref, imageryPlan.mediaType);
   const project = validateProject(candidate);
-  if (manifest.version === 2) {
+  if (manifest.version >= 2) {
     if (Object.keys(project.metadata).some((key) => manifest.world?.[key] !== project.metadata[key]) || manifest.regions[0].regionId !== project.metadata.regionId) throw new Error("Manifest identity does not match scene metadata.");
     if (requiredWorldCapabilities(project).some((capability) => !manifest.engine.requires.includes(capability))) throw new Error("Manifest omits a capability required by scene content.");
   }
@@ -43756,6 +43842,9 @@ function requiredWorldCapabilities(project) {
   const capabilities = /* @__PURE__ */ new Set(["project/2", "terrain", "objects"]);
   if (project.objects.some((o) => o.kind === "group" || o.parentId)) capabilities.add("hierarchy");
   for (const kind of ["neon-sign", "computer"]) if (project.objects.some((o) => o.kind === kind)) capabilities.add(kind);
+  if (project.portals?.length) capabilities.add("portal/1");
+  if (project.water) capabilities.add("water/1");
+  if (project.terminals?.length) capabilities.add("retro-terminal/1");
   if (project.features?.length) capabilities.add("features");
   if (project.geography) capabilities.add("geography");
   if (project.terrainImagery) capabilities.add("terrain-imagery");
@@ -43764,13 +43853,13 @@ function requiredWorldCapabilities(project) {
 }
 function validateManifestMetadata(raw) {
   rejectExecutableFields(raw);
-  if (!object(raw) || ![WORLD_REPOSITORY_SCHEMA, LEGACY_WORLD_REPOSITORY_SCHEMA].includes(raw.schema) || ![PROJECT_SCHEMA, LEGACY_PROJECT_SCHEMA].includes(raw.projectSchema) || !object(raw.engine) || typeof raw.snapshot !== "string" || !hashPattern.test(raw.snapshot) || !object(raw.components) || Object.keys(raw.components).length !== roles.length) throw new Error("Unsupported or invalid world repository manifest.");
+  if (!object(raw) || ![WORLD_REPOSITORY_SCHEMA, PREVIOUS_WORLD_REPOSITORY_SCHEMA, LEGACY_WORLD_REPOSITORY_SCHEMA].includes(raw.schema) || ![PROJECT_SCHEMA, LEGACY_PROJECT_SCHEMA].includes(raw.projectSchema) || !object(raw.engine) || typeof raw.snapshot !== "string" || !hashPattern.test(raw.snapshot) || !object(raw.components) || Object.keys(raw.components).length !== (raw.schema === WORLD_REPOSITORY_SCHEMA ? roles.length : legacyRoles.length)) throw new Error("Unsupported or invalid world repository manifest.");
   if (raw.schema === LEGACY_WORLD_REPOSITORY_SCHEMA) {
     if (raw.version !== 1 || typeof raw.engine.commit !== "string" || !/^[a-f0-9]{40}$/.test(raw.engine.commit) || raw.engine.compatibility !== "reference-only-runtime-unverified") throw new Error("Invalid legacy engine provenance.");
     return;
   }
   if (Object.keys(raw).some((k) => !["schema", "version", "projectSchema", "engine", "snapshot", "components", "world", "regions", "attribution", "provenance"].includes(k)) || Object.keys(raw.engine).some((k) => !["commit", "contract", "requires"].includes(k))) throw new Error("Unknown manifest field or engine requirement.");
-  if (raw.version !== 2 || raw.projectSchema !== PROJECT_SCHEMA || raw.engine.contract !== WORLD_ENGINE_CONTRACT || typeof raw.engine.commit !== "string" || !/^[a-f0-9]{40}$/.test(raw.engine.commit) || !Array.isArray(raw.engine.requires) || raw.engine.requires.length > WORLD_CAPABILITIES.length || new Set(raw.engine.requires).size !== raw.engine.requires.length || raw.engine.requires.some((c) => !WORLD_CAPABILITIES.includes(c))) throw new Error("Unsupported engine contract or required capability.");
+  if ((raw.schema === WORLD_REPOSITORY_SCHEMA ? raw.version !== 3 : raw.version !== 2) || raw.projectSchema !== PROJECT_SCHEMA || raw.engine.contract !== WORLD_ENGINE_CONTRACT || typeof raw.engine.commit !== "string" || !/^[a-f0-9]{40}$/.test(raw.engine.commit) || !Array.isArray(raw.engine.requires) || raw.engine.requires.length > WORLD_CAPABILITIES.length || new Set(raw.engine.requires).size !== raw.engine.requires.length || raw.engine.requires.some((c) => !WORLD_CAPABILITIES.includes(c))) throw new Error("Unsupported engine contract or required capability.");
   if (!object(raw.world) || !["worldId", "regionId", "name", "description"].every((k) => typeof raw.world[k] === "string") || !Array.isArray(raw.regions) || raw.regions.length !== 1 || !object(raw.regions[0]) || raw.regions[0].regionId !== raw.world.regionId || raw.regions[0].name !== raw.world.name || !object(raw.regions[0].scene) || raw.regions[0].scene.snapshot !== raw.snapshot) throw new Error("Invalid world or region identity/scene. This engine supports one region per repository.");
   if (Object.keys(raw.world).some((k) => !["worldId", "regionId", "name", "description"].includes(k)) || ["worldId", "regionId"].some((k) => !raw.world[k]?.trim() || raw.world[k].length > 200)) throw new Error("World and region identifiers must be nonempty bounded strings.");
   if (!object(raw.attribution) || !Array.isArray(raw.attribution.authors) || raw.attribution.authors.length > 64 || raw.attribution.authors.some((a) => typeof a !== "string" || a.length > 200) || [raw.attribution.license, raw.attribution.source].some((v) => v !== void 0 && (typeof v !== "string" || v.length > 2e3))) throw new Error("Invalid attribution metadata.");
@@ -43946,9 +44035,9 @@ function describeRuntimeWorld(input) {
 }
 
 // src/domain/runtime-admission.ts
-var record = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+var record2 = (v) => !!v && typeof v === "object" && !Array.isArray(v);
 function admitFederatedRuntimeWorld(project, contentDigest, binding, regionProof, verifiers) {
-  if (!/^[a-f0-9]{64}$/.test(contentDigest) || !record(binding) || !verifiers.verifyBinding(binding)) throw new Error("World content admission signature is not trusted.");
+  if (!/^[a-f0-9]{64}$/.test(contentDigest) || !record2(binding) || !verifiers.verifyBinding(binding)) throw new Error("World content admission signature is not trusted.");
   const region = verifiers.verifyRegion(regionProof);
   if (binding.kind !== "elsemesh.world-content-admission/1" || binding.authoredWorldId !== project.metadata.worldId || binding.authoredRegionId !== project.metadata.regionId || binding.contentDigest !== contentDigest || binding.federationWorldId !== region.worldId || binding.federationRegionId !== region.regionId || binding.authorityNodeId !== region.authority.nodeId || binding.authorityEpoch !== region.authority.epoch || binding.signer !== region.ownerNodeId) throw new Error("World content admission does not match this content, region or authority.");
   return { runtime: describeRuntimeWorld(project), region, contentDigest };
@@ -44180,20 +44269,20 @@ async function privateNeonIdentity() {
       r.onerror = () => reject(r.error);
     });
     if (existing) return existing;
-    const keys = await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]);
-    const der = new Uint8Array(await crypto.subtle.exportKey("spki", keys.publicKey));
+    const keys2 = await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]);
+    const der = new Uint8Array(await crypto.subtle.exportKey("spki", keys2.publicKey));
     const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", der));
     const nodeId = "elsemesh-node:" + Array.from(digest, (x) => x.toString(16).padStart(2, "0")).join("");
     const encoded = base64(der);
-    const identity = { nodeId, publicKey: "-----BEGIN PUBLIC KEY-----\n" + encoded.match(/.{1,64}/g).join("\n") + "\n-----END PUBLIC KEY-----\n", privateKey: keys.privateKey };
+    const identity2 = { nodeId, publicKey: "-----BEGIN PUBLIC KEY-----\n" + encoded.match(/.{1,64}/g).join("\n") + "\n-----END PUBLIC KEY-----\n", privateKey: keys2.privateKey };
     try {
       await new Promise((resolve, reject) => {
         const tx = db.transaction("keys", "readwrite");
-        tx.objectStore("keys").add(identity, "identity");
+        tx.objectStore("keys").add(identity2, "identity");
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
       });
-      return identity;
+      return identity2;
     } catch (error) {
       if (!(error instanceof DOMException) || error.name !== "ConstraintError") throw error;
       return await new Promise((resolve, reject) => {
@@ -45576,9 +45665,9 @@ function createPrimitiveKey(primitiveDef) {
 }
 function createAttributesKey(attributes) {
   let attributesKey = "";
-  const keys = Object.keys(attributes).sort();
-  for (let i = 0, il = keys.length; i < il; i++) {
-    attributesKey += keys[i] + ":" + attributes[keys[i]] + ";";
+  const keys2 = Object.keys(attributes).sort();
+  for (let i = 0, il = keys2.length; i < il; i++) {
+    attributesKey += keys2[i] + ":" + attributes[keys2[i]] + ";";
   }
   return attributesKey;
 }
@@ -46985,6 +47074,7 @@ function assetPrimitiveGroups(child) {
   });
 }
 export {
+  GLTFLoader as BuiltinCharacterGLTFLoader,
   COMPUTER_BOUNDS,
   COMPUTER_SCHEMA,
   ENGINE_REFERENCE,
@@ -46994,6 +47084,7 @@ export {
   MAX_HIERARCHY_DEPTH,
   MAX_IMAGERY_BYTES,
   MAX_NEON_TRIANGLES,
+  MAX_PORTALS,
   MAX_PROJECT_BYTES,
   MAX_TERRAIN_RESOLUTION,
   MAX_WORLD_BOUND_COMPONENT,
@@ -47005,6 +47096,9 @@ export {
   NEON_PRESETS,
   NEON_SIGN_SCHEMA,
   PLAYER_WORLD_SCHEMA,
+  PORTAL_PLAYER_HEIGHT,
+  PORTAL_PLAYER_RADIUS,
+  PREVIOUS_WORLD_REPOSITORY_SCHEMA,
   PRIVATE_NEON_PROTOCOL,
   PROJECT_SCHEMA,
   PrivateNeonClient,
@@ -47056,6 +47150,9 @@ export {
   isSimpleOutline,
   loadWorldSource,
   localMatrix,
+  mapPortalDirection,
+  mapPortalPoint,
+  mapPortalYaw,
   migrateWorldProject,
   neonGeometryCacheStats,
   neonGeometryKey,
@@ -47066,6 +47163,9 @@ export {
   parseAsciiGrid,
   parseGitHubWorldLocation,
   parseNeonPrefab,
+  portalLocalPoint,
+  portalMappingElements,
+  portalWorldPoint,
   privateNeonIdentity,
   privateNeonMatchesWorld,
   pruneSelection,
@@ -47084,6 +47184,7 @@ export {
   sculptTerrain,
   stormState,
   subtreeIds,
+  sweepPortalCapsule,
   treeWindOffset,
   ungroupObjects,
   unpackWorldRepository,
@@ -47095,6 +47196,7 @@ export {
   validateTerrainImagery,
   validateWorld,
   validateWorldBounds,
+  validateWorldConnections,
   weatherHash,
   writeLightningQuad,
   writeRainQuads

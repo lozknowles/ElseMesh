@@ -1,0 +1,20 @@
+import './headless.mjs';
+import assert from 'node:assert/strict';
+import * as N from '../src/engine/index.js';
+import {GPU} from '../src/engine/gpu/GPU.js';
+import {Texture,RenderTarget} from '../src/engine/gpu/Texture.js';
+import {readTexture} from '../src/engine/gpu/Readback.js';
+import {MeshRenderer} from '../src/engine/render/MeshRenderer.js';
+import {FrameUniforms,setFrameCamera} from '../src/engine/render/Frame.js';
+import {setShadowMap} from '../src/engine/render/wgsl/lighting.js';
+import {fromHalfFloat} from '../src/engine/math/DataUtils.js';
+import {createPortalEffects} from '../src/world-runtime/RepositoryPortalEffects.js';
+await GPU.init({headless:true});const errors=[];GPU.device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const shadow=new Texture({width:1,height:1,depth:1,dimension:'2d-array',format:'depth32float',usage:['sample']});setShadowMap(shadow);
+const scene=new N.Scene(),camera=new N.PerspectiveCamera(60,1,.05,100);camera.position.z=4;camera.lookAt(0,0,0);
+const effects=createPortalEffects({isWebGL:false});effects.addFrame(scene,{id:'gpu',position:[0,0,0],yaw:0,width:2,height:3,visual:{frameColor:'#33ddff'}});effects.transition('handoff-pending');
+const target=new RenderTarget(128,128,{colors:['rgba16float'],depth:'depth32float'}),renderer=new MeshRenderer();
+for(let i=0;i<3;i++){GPU.beginFrame();FrameUniforms.fields.time.value=i*.05;setFrameCamera(camera,128,128);effects.update(.05,i*.05);renderer.render(scene,{kind:'color',camera,frameBlock:FrameUniforms,colorViews:[target.texture.view()],colorFormats:target.formats,clearColors:[[0,0,0,1]],depthView:target.depthTexture.view(),depthFormat:'depth32float',clearDepth:0});GPU.submit();await GPU.pipelinesReady();}
+const pixels=Float32Array.from(new Uint16Array((await readTexture(target.texture)).data),fromHalfFloat);let bright=0;for(let i=0;i<128*128;i++)if(pixels[i*4+2]>.2)bright++;
+assert.ok(bright>100,'animated electrical rim rasterizes');assert.deepEqual(errors,[]);console.log(JSON.stringify({fixture:'native restored portal storm',brightPixels:bright,errors}));
+effects.dispose();shadow.destroy();target.texture.destroy();target.depthTexture.destroy();GPU.device.destroy();process.exit(0);
