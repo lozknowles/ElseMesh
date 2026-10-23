@@ -1,7 +1,14 @@
 {
-  "source": "f91cabbd4bac784076095b73ac45ec1ffc5da9f0",
-  "main": "95b49d0f1364483efd1a78207bc547a544f62d8a",
-  "rollbackArtifact": "8b40e675ca928930749a9286e7fc9258d69eedae",
+  "source": "36e6706a5fcb3036640d0d9ec8943a83f104c5b0",
+  "editorContract": "f96c7029cbcc8dafcace92bde61ff138b923fca9",
+  "openingWorld": {
+    "schema": "elsemesh.opening-world/1",
+    "repository": "https://github.com/lozknowles/elsemesh-world-loz-opening-island/tree/7713a89cd22749e7598e2e0a1db2a540970c0d19",
+    "worldId": "elsemesh.world:2842c4f2-93a0-4492-b942-e53e524de319",
+    "contentDigest": "462d95c9f0444db1a3e8c6a4954d9355bd956cf5eabfd7f1fa98230cfbc19db7"
+  },
+  "rollbackArtifact": "e2e42a032ff562d3e8118a8d74b2e9d32136682f",
   "builtLocally": true,
-  "weather": "mist, rain, terrain-occluded lightning and synchronised thunder"
+  "entry": "repository-world",
+  "legacyEntry": "legacy.html"
 }
