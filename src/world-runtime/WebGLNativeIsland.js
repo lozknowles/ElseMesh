@@ -44,7 +44,7 @@ vec3 nativePlantPosition(vec3 P){
  vec3 disp=vec3(wd.x,0,wd.y)*bend+vec3(0,sin(nativeTime*(ph+2.1)+ph*41.0)*s*s*w*.1-bend*.3,0);vec3 moved=normalize(crown+disp+vec3(0,.00001,0))*length(crown);return aMat.x<.5?stem:centre+moved;
 }`;
 function plantMaterial(kind,time,wind,gust,detail,bark){
- const material=new T.MeshStandardMaterial({color:'#ffffff',side:T.DoubleSide,roughness:.86});material.alphaTest=.35;
+ const material=new T.MeshStandardMaterial({color:'#ffffff',side:T.DoubleSide,roughness:.86});material.alphaTest=.35;material.userData.nativeWindStrength=1;material.userData.nativeWindVector=wind.value;
  material.onBeforeCompile=shader=>{Object.assign(shader.uniforms,{nativeTime:time,nativeWind:wind,nativeGust:gust,nativeWindStrength:{value:1},nativeDetail:{value:detail},nativeBark:{value:bark.map},nativeBarkNormal:{value:bark.normalMap},nativeOrm:{value:bark.orm}});
  shader.vertexShader=PLANT_VERTEX+'\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
  vNativePart=aMat;vNativeUv=uv;transformed=nativePlantPosition(transformed);`);
@@ -70,7 +70,7 @@ function buildPlants(source,time,detail,materials){
    const original=species==='bananas'?factory(variant?23:9):factory();const native=canopy?Plants.lobeVariantGeometry(original.geometry,Plants.LOBE_TABLE,(variant+(species==='shrubs'?Plants.TREE_VARIANTS:0))*8):original.geometry;
    for(const distant of near?[false,true]:[false]){
     const farPalm=species==='palms'&&distant?Plants.buildPalmFar().geometry:null;const geometry=convertNativePlantGeometry(farPalm??native,{leafStride:distant?(canopy?12:1):1}),count=records.length;if(farPalm)farPalm.dispose();geometry.setAttribute('iPlant',new T.InstancedBufferAttribute(new Float32Array(count*4),4));geometry.setAttribute('iRecord',new T.InstancedBufferAttribute(new Float32Array(count*4),4));
-    const mesh=new T.InstancedMesh(geometry,materials[canopy?'tree':'palm'],count);mesh.count=0;mesh.frustumCulled=false;root.add(mesh);batches.push({mesh,records,species,canopy,distant,near,far});
+    const mesh=new T.InstancedMesh(geometry,materials[canopy?'tree':'palm'],count);mesh.count=0;mesh.frustumCulled=false;mesh.userData.mediaOcclusionPlant=canopy?'native-canopy-v1':'native-palm-v1';mesh.userData.nativePlantSpecies=species;root.add(mesh);batches.push({mesh,records,species,canopy,distant,near,far});
    }
    if(native!==original.geometry)native.dispose();original.geometry.dispose();
   }

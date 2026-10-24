@@ -27,8 +27,9 @@ test('nested offline package reads its own world and never requests GitHub',asyn
   app.host.active={identity:{worldId,contentDigest:digest}};
   activation=true;return true;
  }};
- const active=await loadOpeningWorld(app,config,{fetcher,baseURL:root+'index.html'});
+ const stages=[];const active=await loadOpeningWorld(app,config,{fetcher,baseURL:root+'index.html',onProgress:stage=>stages.push(stage)});
  assert.equal(active,app.host.active);assert.equal(activation,true);
+ assert.deepEqual(stages,['manifest-verified','world-ready']);
  assert.deepEqual(urls,[root+'opening-world.json',root+'worlds/loz-opening/world.json',root+'worlds/loz-opening/world.json']);
 });
 

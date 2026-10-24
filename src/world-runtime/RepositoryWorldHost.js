@@ -13,9 +13,10 @@ export class RepositoryWorldHost {
   Object.assign(this,{engine,input,buildCandidate,checkSourceUpdate,disposeCandidate,buildNeon,convertGeometry,prepareResources,acquireResources,registerResources,retainResources,beforeActivate,onChange,onInteract});this.generation=0;this.active=null;this.overlay=null;this.disposed=false;this.prepared=new Set();
  }
  async load(source,options={}){this.pendingUpdate=null;const token=++this.generation;const loaded=await loadWorldSource(source,options);
+  try{options.onProgress?.('world-validated');}catch(error){console.warn('Opening progress callback failed',error);}
   if(options.expectedWorldId!==undefined&&loaded.identity.worldId!==options.expectedWorldId)throw Error('World identity does not match the deployment pin.');
   if(options.expectedContentDigest!==undefined&&loaded.identity.contentDigest!==options.expectedContentDigest)throw Error('World content does not match the deployment pin.');
-  return this.activate(loaded,token);
+  return this.activate(loaded,token,options);
  }
  async checkUpdate(options){
   if(!this.active)throw Error('Open a world first.');
@@ -30,7 +31,7 @@ export class RepositoryWorldHost {
   if(!pending||pending.current!==this.active||pending.token!==this.generation||this.disposed)throw Error('Check for an update again before applying it.');
   return this.activate(pending.candidate,pending.token);
  }
- async prepare(loaded,{pose}={}){
+ async prepare(loaded,{pose,onProgress}={}){
   if(this.disposed)throw Error('World host is disposed.');
   const generation=this.generation;let descriptor=null;let candidate,resourceLease;
   try{
@@ -41,6 +42,7 @@ export class RepositoryWorldHost {
    candidate=resourceLease?.candidate??await this.buildCandidate(descriptor,camera,{loaded});
    if(generation!==this.generation||this.disposed){if(resourceLease)resourceLease.release();else this.disposeCandidate(candidate);return false;}
    if(!candidate?.root?.isObject3D||candidate.root.parent&&!resourceLease)throw Error('Prepared world root must be detached.');
+   try{onProgress?.('scene-built');}catch(error){console.warn('Opening progress callback failed',error);}
    if(candidate.nativeIsland)await candidate.nativeIsland.ensureArrival(pose?.position??descriptor.spawn.position);
    const player=new Player({camera,input:this.input,terrain:candidate.terrain,colliders:candidate.colliders,query:candidate.query??dryQuery(),boat:null});
    if(pose){
@@ -64,6 +66,7 @@ export class RepositoryWorldHost {
    const prepared={...candidate,loaded,identity:loaded.identity,descriptor,player,project:descriptor.project,generation,resourceLease,preparedState:'preparing'};
    if(!resourceLease){await this.prepareResources(prepared);prepared.resourceLease=resourceLease=await this.registerResources(prepared);}
    if(generation!==this.generation||this.disposed){if(resourceLease)resourceLease.release();else this.disposeCandidate(candidate);return false;}
+   try{onProgress?.('resources-ready');}catch(error){console.warn('Opening progress callback failed',error);}
    prepared.preparedState='ready';
    this.prepared.add(prepared);return prepared;
   }catch(error){if(resourceLease)resourceLease.release();else this.disposeCandidate(candidate);throw error;}
@@ -96,9 +99,9 @@ export class RepositoryWorldHost {
    try{if(!this.retainResources(previous))this.disposeCandidate(previous);}catch(error){console.error(error);}return true;
   }catch(error){if(prepared.resourceLease&&this.prepared.has(prepared)){prepared.generation=this.generation;prepared.preparedState='ready';}else this.discardPrepared(prepared);throw error;}
  }
- async activate(loaded,token=++this.generation){
+ async activate(loaded,token=++this.generation,options={}){
   this.pendingUpdate=null;
-  const prepared=await this.prepare(loaded);
+  const prepared=await this.prepare(loaded,options);
   if(!prepared)return false;
   if(token!==this.generation||this.disposed){this.discardPrepared(prepared);return false;}
   return this.activatePrepared(prepared,token);

@@ -1,5 +1,6 @@
+import {OpeningProgress} from './OpeningProgress.js';
 import { repositoryWeatherShelters, setMistShelters } from './WeatherShelter.js';
-import {MediaScreen,collectMediaScreenOccluders,mediaScreenUnobstructed} from './MediaScreen.js';
+import {MediaScreen,collectMediaScreenOccluders,mediaScreenCellVisibility} from './MediaScreen.js';
 import {RepositoryPortalSky} from './RepositoryPortalSky.js';
 import {readOpeningWorld,loadOpeningWorld,validateOpeningWorld} from './OpeningWorld.js';
 import {webGLRepositoryReadinessSignature} from './WebGLRepositoryReadiness.js';
@@ -47,13 +48,16 @@ import { effectiveObjectState,parseGitHubWorldLocation, resolveGitHubWorldSource
 
 const status=document.querySelector('#status'),hud=document.querySelector('#hud'),terminal=document.querySelector('#terminal');
 const openingSplash=document.querySelector('#opening-splash');
-const report=message=>{status.textContent=message;const label=document.querySelector('#opening-splash-status');if(label)label.textContent=message;};
+const openingProgress=new OpeningProgress({root:openingSplash,label:document.querySelector('#opening-splash-status'),bar:document.querySelector('#opening-splash-progress'),percent:document.querySelector('#opening-splash-percent')});
+const report=message=>{status.textContent=message;};
 const hideOpeningSplash=()=>{if(openingSplash)openingSplash.hidden=true;};
 document.querySelector('#opening-recover')?.addEventListener('click',hideOpeningSplash);
 async function init(){
  const container=document.querySelector('#app');let attempted;
  const selected=await initializeRenderBackend({webgpu:async()=>{if(new URLSearchParams(location.search).get('renderer')==='webgl2')throw Error('WebGL2 selected');attempted=new Engine(container);attempted.maxOutputPixels=1000000;await attempted.init();attempted.meshRenderer.syncPipelines=true;attempted.backend='webgpu';return attempted;},webgl2:async()=>{attempted?.stop();attempted?.canvas?.remove();GPU.device?.destroy();return createWebGLRepositoryEngine(container);}});
  const engine=selected.value,isWebGL=selected.backend==='webgl2';
+ openingProgress.advance('renderer-ready');
+ let openingLoading=false,pendingOpeningReady=null,openingTargetWorldId=null,openingTargetDigest=null,openingExpectedGeneration=null;
  const captureQuality=new URLSearchParams(location.search).get('quality')==='capture';engine.maxOutputPixels=captureQuality?2100000:1000000;engine.resize();
  let media,mediaContext=null,objectAccess,accessPanel,controlsHelp,worldWelcome,welcomeView,activeComputerId=null,interactionPending=false,interactionContext=null;
  const input=new Input(engine.canvas,{keyboardLookBlocked:()=>terminal.open||retro.active||!!media?.controlsOpen||controlsHelp?.open||accessPanel?.root.open});
@@ -93,7 +97,7 @@ async function init(){
   };
  }
 
- const host=new RepositoryWorldHost({engine,input,...backendHost,onChange:active=>{hideOpeningSplash();document.querySelector('#panel h1').textContent=active.project.metadata.name;followCamera.reset(active);retro.setWorld(active);post?.taau.resetHistory();if(medium)medium.uniforms.fields.base.value=terrainMistBase(active.project.terrain);report(active.project.metadata.name+' · '+active.identity.location+' · '+active.identity.contentDigest.slice(0,12));},onInteract:(computer,active)=>{
+ const host=new RepositoryWorldHost({engine,input,...backendHost,onChange:active=>{if(!openingLoading||openingTargetWorldId&&(active.identity.worldId!==openingTargetWorldId||active.identity.contentDigest!==openingTargetDigest||host.generation!==openingExpectedGeneration)){openingLoading=false;pendingOpeningReady=null;hideOpeningSplash();}document.querySelector('#panel h1').textContent=active.project.metadata.name;followCamera.reset(active);retro.setWorld(active);post?.taau.resetHistory();if(medium)medium.uniforms.fields.base.value=terrainMistBase(active.project.terrain);report(active.project.metadata.name+' · '+active.identity.location+' · '+active.identity.contentDigest.slice(0,12));},onInteract:(computer,active)=>{
   void openComputer(computer,active);
  }});
  document.querySelector('#terminal-close').onclick=()=>{terminal.close();engine.canvas.focus();};
@@ -118,7 +122,7 @@ async function init(){
   }catch(error){report(error.message);}finally{interactionPending=false;}
  }
  const mediaReady=()=>!!host.active&&!portals.pending&&!portals.authorityOffline&&(!ownerMode()||(portals.connected&&!portals.transport.closed&&!portals.transport.frozen&&portals.transport.worldId===host.active.identity.worldId));
- media=new MediaScreen({describeObstruction:()=>app.mediaOcclusion?.reasons?.join('; ')||'Scene geometry overlaps the TV sightline.',getContext:()=>({ready:mediaReady(),active:host.active,key:[host.generation,host.active?.identity.contentDigest,portals.transport.connectionEpoch,portals.transport.membership?.sessionId,portals.transport.generation].join('|'),camera:engine.camera,viewport:engine.canvas.getBoundingClientRect(),objectMatrix:id=>host.active?.matrices.get(id)}),isAuthorized:(id,action)=>!ownerMode()||objectAccess.valid(id,action),isUnobstructed:(projection,c,object)=>{const avatarRoots=[avatar.group,portals.activeLayer?.group].filter(Boolean),proof=collectMediaScreenOccluders(c.active,{camera:c.camera,projection,screenObjectId:object.id,avatarRoots});app.mediaOcclusion=proof;return mediaScreenUnobstructed(projection,c.camera,proof.bounds,{...proof,onBlocked:detail=>{proof.blocker=detail;}});},onEnter:()=>input.suspend(),onExit:()=>{resumeUI(mediaContext);mediaContext=null;engine.canvas.focus();}});
+ media=new MediaScreen({describeObstruction:()=>app.mediaOcclusion?.reasons?.join('; ')||'Scene geometry overlaps the TV sightline.',getContext:()=>({ready:mediaReady(),active:host.active,key:[host.generation,host.active?.identity.contentDigest,portals.transport.connectionEpoch,portals.transport.membership?.sessionId,portals.transport.generation].join('|'),camera:engine.camera,viewport:engine.canvas.getBoundingClientRect(),objectMatrix:id=>host.active?.matrices.get(id)}),isAuthorized:(id,action)=>!ownerMode()||objectAccess.valid(id,action),isUnobstructed:(projection,c,object)=>{const avatarRoots=[avatar.group,portals.activeLayer?.group].filter(Boolean),proof=collectMediaScreenOccluders(c.active,{camera:c.camera,projection,screenObjectId:object.id,avatarRoots});app.mediaOcclusion=proof;return mediaScreenCellVisibility(projection,c.camera,proof.bounds,proof);},onEnter:()=>input.suspend(),onExit:()=>{resumeUI(mediaContext);mediaContext=null;engine.canvas.focus();}});
  function nearestMedia(){const active=host.active;if(!active)return null;let found=null,best=Infinity;const feet=active.player.position;
   for(const o of active.project.objects){if(o.kind!=='media-screen'||!effectiveObjectState(active.project.objects,o.id).visible)continue;const m=active.matrices.get(o.id);if(!m)continue;const d=Math.hypot(m.elements[12]-feet.x,m.elements[13]-(feet.y+1.65),m.elements[14]-feet.z);if(d<Math.min(8,Math.max(3,o.mediaScreen.width))&&d<best){found=o;best=d;}}return found;}
  async function openMedia(object,active){if(interactionPending||terminal.open||retro.active||media.controlsOpen)return;interactionPending=true;try{
@@ -189,9 +193,10 @@ async function init(){
    if(atmosphere.sunTransmittance){const t=atmosphere.sunTransmittance;if(dir.y>-.07)G.sunColor.value.setRGB(...t).multiplyScalar(SUN_ILLUMINANCE*N.MathUtils.smoothstep(dir.y,-.03,.02));else G.sunColor.value.setRGB(.6,.7,1).multiplyScalar(.12*night);const a=atmosphere.skyIrradiance,k=.012*night;G.skyIrradiance.value.setRGB(a[0]+k*.6,a[1]+k*.7,a[2]+k);G.horizonColor.value.setRGB(...atmosphere.horizon);}
    clouds.update(dt,engine.camera);environment.update(dt);post.beginFrame();portals.render({width:renderer.width,height:renderer.height,time});host.active?.nativeIsland?.bindView(engine.camera);renderer.waterMaterial=host.active?.nativeIsland?.waterMaterial??{needsSSRDepth:false};shadows.render(engine.scene,engine.meshRenderer,shadows.update(engine.camera,G.sunDir.value));renderer.render();post.render();post.endFrame();GPU.submit();}
    media.update();worldWelcome.tick();
+   if(openingLoading&&pendingOpeningReady&&pendingOpeningReady===host.active){const activeOpeningFrame=host.active;openingProgress.advance('first-frame');pendingOpeningReady=null;openingLoading=false;requestAnimationFrame(()=>{if(host.active===activeOpeningFrame)hideOpeningSplash();});}
    const active=host.active;hud.textContent=active?`${active.project.metadata.name} · ${active.player.mode} · ${active.player.position.toArray().map(v=>v.toFixed(1)).join(', ')}${retro.nearest(engine.camera.position)?' · E: use Commodore / retro computer':host.nearestComputer()?' · E: use computer':nearestMedia()?' · E: turn on or control TV (Play, then Return to game)':''}`:'Open a repository to explore';
    app.diagnostics={media:media.diagnostics(),mediaOcclusion:app.mediaOcclusion&&{complete:app.mediaOcclusion.complete,reasons:app.mediaOcclusion.reasons,stats:app.mediaOcclusion.stats},backend:selected.backend,fallbackReason:selected.fallbackReason,renderSize:[engine.canvas.width,engine.canvas.height],cameraView:followCamera.state,portalLongEdge:portals.views.maxLongEdge,frames:engine.frame,worldId:active?.identity.worldId,contentDigest:active?.identity.contentDigest,position:active?.player.position.toArray(),mode:active?.player.mode,grounded:active?.player.grounded,boxes:active?.colliders.boxes.length,assets:active?.assets,weather:weatherState,environment:env,water:water??null,nativeIsland:nativeIslandDiagnostics(active,selected.backend),assetBatches:active?.assetBatchCount,portals:portals.diagnostics(),portalEffects:portalEffects.diagnostics(),avatar:{appearance:app.player.avatarAppearance??loadAppearance(),loaded:!!(avatar.scanned||avatar.model),model:avatar.characterAsset??avatar.asset??avatar.appearance?.style},retro:{active:retro.active,near:retro.nearest(engine.camera.position)?.kind},neons:[]};active?.root.traverse(node=>{if(node.userData.neonState)app.diagnostics.neons.push(node.userData.neonState);});
-  }catch(error){engine.stop();report('Runtime failed: '+error.message);console.error(error);app.error=error.message;}
+  }catch(error){engine.stop();if(openingLoading)openingProgress.fail('Rendering failed: '+error.message);report('Runtime failed: '+error.message);console.error(error);app.error=error.message;}
  });
  document.querySelector('#portal-recover').onclick=()=>void portals.recover().catch(error=>{document.querySelector('#portal-status').textContent=error.message;});
  document.querySelector('#panel-toggle').onclick=()=>{document.querySelector('#panel').hidden=true;engine.canvas.focus();};
@@ -202,14 +207,17 @@ async function init(){
  const openingGeneration=host.generation;
  void (async()=>{
   if(await connectOpening())return;
+  openingProgress.advance('reading-world');
   const config=await readOpeningWorld();if(!config){hideOpeningSplash();return;}if(host.generation!==openingGeneration)return;
+  openingLoading=true;openingTargetWorldId=config.worldId;openingTargetDigest=config.contentDigest;openingExpectedGeneration=openingGeneration+1;
   report('Loading published opening island…');
-  const active=await loadOpeningWorld(app,config);if(!active)return;
+  const active=await loadOpeningWorld(app,config,{onProgress:stage=>{if(openingLoading&&host.generation<=openingExpectedGeneration)openingProgress.advance(stage);}});if(!active)return;
+  pendingOpeningReady=active;
   document.querySelector('#repository-tools').hidden=true;document.querySelector('#choose-world').hidden=false;document.querySelector('#coordinator-controls').hidden=true;
   document.querySelector('#panel h1').textContent=active.project.metadata.name;
   report('Published island · revision '+(active.identity.resolvedCommit??validateOpeningWorld(config).source.ref).slice(0,12)+' · '+selected.backend);
- })().catch(error=>{if(openingSplash)openingSplash.dataset.failed='';report('Opening world could not load: '+error.message);document.querySelector('#portal-status').textContent='Opening world unavailable. Retry by reloading, or choose a repository.';});
+ })().catch(error=>{openingProgress.fail(error.message);report('Opening world could not load: '+error.message);document.querySelector('#portal-status').textContent='Opening world unavailable. Retry by reloading, or choose a repository.';});
  window.addEventListener('pagehide',()=>{media.dispose();refraction?.dispose();objectAccess.invalidate();worldWelcome.dispose();welcomeView.dispose();controlsHelp.dispose();portals.dispose();portalEffects.dispose();retro.dispose();avatar.dispose();host.dispose();engine.stop();if(isWebGL)engine.dispose();else GPU.device?.destroy();});report('ElseMesh '+selected.backend+' ready. Open a world repository folder or public GitHub source.');
  window.dispatchEvent(new CustomEvent('repository-world-ready',{detail:app}));
 }
-init().catch(error=>{console.error(error);if(openingSplash)openingSplash.dataset.failed='';report(error.message);});
+init().catch(error=>{console.error(error);openingProgress.fail(error.message);report(error.message);});

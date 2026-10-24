@@ -79,6 +79,23 @@ export function mediaScreenUnobstructed(projection,camera,bounds,{complete=false
  }
  return true;
 }
+/** Reveal only TV cells whose entire camera sight volume is proven clear. */
+export function mediaScreenCellVisibility(projection,camera,bounds,{complete=false,columns=6,rows=4}={}){
+ const hidden={visible:false,partial:false,mask:null,clearCells:0,totalCells:columns*rows};
+ if(!complete||!projection||!Number.isInteger(columns)||!Number.isInteger(rows)||columns<1||rows<1||columns*rows>48)return hidden;
+ if(mediaScreenUnobstructed(projection,camera,bounds,{complete:true}))return {visible:true,partial:false,mask:null,clearCells:columns*rows,totalCells:columns*rows};
+ const point=(u,v)=>{const [a,b,c,d]=projection.world;return a.map((n,i)=>n*(1-u)*(1-v)+b[i]*u*(1-v)+c[i]*u*v+d[i]*(1-u)*v);};
+ const clear=[];
+ for(let y=0;y<rows;y++)for(let x=0;x<columns;x++){
+  const u0=x/columns,u1=(x+1)/columns,v0=y/rows,v1=(y+1)/rows;
+  const cell={world:[point(u0,v0),point(u1,v0),point(u1,v1),point(u0,v1)]};
+  if(mediaScreenUnobstructed(cell,camera,bounds,{complete:true}))clear.push({x,y});
+ }
+ if(!clear.length)return hidden;
+ const rectangles=clear.map(({x,y})=>'<rect x="'+(1280*x/columns)+'" y="'+(720*y/rows)+'" width="'+(1280/columns)+'" height="'+(720/rows)+'" fill="white"/>').join('');
+ const svg='<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">'+rectangles+'</svg>';
+ return {visible:true,partial:true,mask:'url("data:image/svg+xml,'+encodeURIComponent(svg)+'")',clearCells:clear.length,totalCells:columns*rows};
+}
 export function mediaScreenSurfaceExcluded(nativeIsland,projection,camera,{margin=.025}={}){
  const water=nativeIsland?.water;if(water?.surfaceExclusionsEnforced!==true||!projection?.world||!Number.isFinite(margin)||margin<0)return false;
  const volumes=water.getSurfaceExclusions?.()??water.surfaceExclusions;if(!Array.isArray(volumes)||volumes.length>16)return false;
@@ -92,11 +109,49 @@ function geometryBounds(geometry){
  result={min,max,radius:Math.hypot(...min.map((n,i)=>Math.max(Math.abs(n),Math.abs(max[i]))))};geometryBoundsCache.set(geometry,result);return result;
 }
 function transformedBounds(local,matrix,pad=0){const points=[];for(const x of [local.min[0],local.max[0]])for(const y of [local.min[1],local.max[1]])for(const z of [local.min[2],local.max[2]])points.push(transform(matrix,[x,y,z]));return{min:[0,1,2].map(i=>Math.min(...points.map(p=>p[i]))-pad),max:[0,1,2].map(i=>Math.max(...points.map(p=>p[i]))+pad)};}
+/** Bound the installed non-canopy WebGL plant shader without adding height below its base. */
+export function webGLPalmOcclusionBounds(local,matrix,{height,lean,windStrength,windLength}){
+ if(!local||![height,lean,windStrength,windLength].every(Number.isFinite)||height<0||lean<0||windLength<0)return null;
+ const w=Math.abs(windStrength),sway=Math.hypot(.0168*w*w+.009425*w,.0028*w)*windLength;
+ const radius=local.radius??Math.hypot(...local.min.map((n,i)=>Math.max(Math.abs(n),Math.abs(local.max[i]))));
+ if(!Number.isFinite(radius))return null;
+ const horizontal=radius+height*(lean+sway);
+ return transformedBounds({min:[-horizontal,-radius,-horizontal],max:[horizontal,height+radius,horizontal]},matrix);
+}
+/** Conservative per-triangle bounds for the installed non-canopy palm vertex shader. */
+export function webGLPalmTriangleBounds(geometry,matrix,{height,lean,angle,windStrength,windLength}){
+ const position=geometry?.attributes?.position,veg=geometry?.attributes?.aVeg,part=geometry?.attributes?.aMat,index=geometry?.index;
+ if(!position?.count||!veg||!part||!index?.count||index.count>15000||![height,lean,angle,windStrength,windLength].every(Number.isFinite))return null;
+ const w=Math.abs(windStrength),sway=Math.hypot(.0168*w*w+.009425*w,.0028*w)*windLength,leanX=Math.cos(angle)*lean,leanZ=Math.sin(angle)*lean;
+ const boxes=[];
+ for(let i=0;i<position.count;i++){
+  const P=[0,1,2].map(k=>position.getComponent(i,k)),u=veg.getX(i),leaf=veg.getY(i),isStem=part.getX(i)<.5;
+  if(!P.every(Number.isFinite)||!Number.isFinite(u)||!Number.isFinite(leaf))return null;
+  let local;
+  if(isStem){
+   const fc0=u,fc1=u*(2-u),lo=Math.min(fc0,fc1),hi=Math.max(fc0,fc1),mid=(lo+hi)/2;
+   const r=Math.hypot(P[0],P[2])+Math.abs(lean)*height*(hi-lo)/2+sway*u*u*height;
+   local={min:[leanX*mid*height-r,u*height-r,leanZ*mid*height-r],max:[leanX*mid*height+r,u*height+r,leanZ*mid*height+r]};
+  }else{
+   const magnitude=Math.hypot(...P),tilt=magnitude*.5*Math.atan(Math.abs(lean)+2*sway);
+   const bend=leaf*leaf*(.828*w*w+.43875*w),disp=Math.hypot(bend*windLength,.3*bend+.1*w*leaf*leaf);
+   const pad=sway*height+tilt+2*disp+.02,centre=[P[0]+leanX*height,P[1]+height,P[2]+leanZ*height];
+   local={min:centre.map(n=>n-pad),max:centre.map(n=>n+pad)};
+  }
+  boxes.push(transformedBounds(local,matrix));
+ }
+ const triangles=[];
+ for(let k=0;k<index.count;k+=3){
+  const vertices=[0,1,2].map(n=>boxes[index.getX(k+n)]);if(vertices.some(v=>!v))return null;
+  triangles.push({min:[0,1,2].map(axis=>Math.min(...vertices.map(v=>v.min[axis]))),max:[0,1,2].map(axis=>Math.max(...vertices.map(v=>v.max[axis])))});
+ }
+ return triangles;
+}
 function boxIntersects(a,b){return [0,1,2].every(k=>a.min[k]<=b.max[k]&&a.max[k]>=b.min[k]);}
 function multiply(a,b){const ae=a.elements??a,be=b.elements??b,out=new Float32Array(16);for(let c=0;c<4;c++)for(let r=0;r<4;r++)for(let k=0;k<4;k++)out[c*4+r]+=ae[k*4+r]*be[c*4+k];return out;}
 /** Fine cell extrema bound every bilinear terrain height over the complete camera/screen cone. */
 export function nativeMediaGroundProof(active,projection,camera){
- const data=active.nativeIsland?.data;if(!data?.isNativeIsland)return {clear:true};const all=[camera.position.toArray(),...projection.world],min=all[0].map((_,k)=>Math.min(...all.map(p=>p[k]))),max=all[0].map((_,k)=>Math.max(...all.map(p=>p[k]))),i0=Math.max(0,Math.floor((min[0]-data.origin)/data.texel)-2),i1=Math.min(data.res-1,Math.ceil((max[0]-data.origin)/data.texel)+2),j0=Math.max(0,Math.floor((min[2]-data.origin)/data.texel)-2),j1=Math.min(data.res-1,Math.ceil((max[2]-data.origin)/data.texel)+2);
+ const data=active.nativeIsland?.data;if(!data?.isNativeIsland)return {clear:true};const all=[camera.position.toArray(),...projection.world],{min,max,i0,i1,j0,j1}=mediaSightCellRange(all,data);
  if(min[0]<data.origin||min[2]<data.origin||max[0]>=data.origin+data.size||max[2]>=data.origin+data.size)return {clear:false,reason:'TV sight cone is outside captured terrain'};
  let highest=-Infinity,cells=0;for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const x=data.origin+(i+.5)*data.texel,z=data.origin+(j+.5)*data.texel;if(!data.cache?.readyAt(x,z))return {clear:false,reason:'Fine terrain visibility cells unavailable'};const h=data.heights[j*data.res+i];if(!Number.isFinite(h))return {clear:false,reason:'Invalid terrain visibility height'};highest=Math.max(highest,h);cells++;}
  if(highest+.15>=min[1])return {clear:false,reason:'Terrain may intersect the complete TV sight cone',highest,cells};
@@ -144,11 +199,27 @@ export function collectMediaScreenOccluders(active,{camera,projection,screenObje
     else if(!local)reasons.push('Rendered geometry bounds unavailable');
     else if(node.isSkinnedMesh){if(typeof node.computeBoundingBox!=='function')reasons.push('Animated mesh bounds unavailable');else{node.computeBoundingBox();const b=node.boundingBox;if(!b)reasons.push('Animated mesh bounds unavailable');else bounds.push(transformedBounds({min:b.min.toArray(),max:b.max.toArray()},node.matrixWorld));}}
     else if(node.isInstancedMesh||node.instanceMatrix){const count=node.count??0,matrices=node.instanceMatrix?.array;if(!matrices)reasons.push('Instance transforms unavailable');else{
-     const stamp=[node.instanceMatrix.version,count,active.project?.environment.windSpeed??6,...node.matrixWorld.elements].join(','),plant=node.geometry.attributes?.iPlant;let cached=instanceBoundsCache.get(node);
+     const plant=node.geometry.attributes?.iPlant,record=node.geometry.attributes?.iRecord,windMeta=node.material?.userData,windVector=windMeta?.nativeWindVector;
+     const stamp=[node.instanceMatrix.version,plant?.version,record?.version,count,windMeta?.nativeWindStrength,windVector?.x,windVector?.y,...node.matrixWorld.elements].join(',');let cached=instanceBoundsCache.get(node);
      if(cached?.stamp!==stamp){const entries=[],grid=new Map(),cell=32,w=Math.max((active.project?.environment.windSpeed??6)*.1,.03);let radius=0;
-      for(let i=0;i<count;i++){const matrix=multiply(node.matrixWorld,matrices.subarray(i*16,i*16+16)),scale=Math.max(Math.hypot(...matrix.slice(0,3)),Math.hypot(...matrix.slice(4,7)),Math.hypot(...matrix.slice(8,11))),pad=plant?Math.abs(plant.getZ(i))*scale*(1+Math.abs(plant.getY(i))+.017*w*w+.013*w)+.2:0,b=transformedBounds(local,matrix,pad),x=(b.min[0]+b.max[0])/2,z=(b.min[2]+b.max[2])/2;radius=Math.max(radius,(b.max[0]-b.min[0])/2,(b.max[2]-b.min[2])/2);entries.push(b);const key=Math.floor(x/cell)+':'+Math.floor(z/cell);let bucket=grid.get(key);if(!bucket)grid.set(key,bucket=[]);bucket.push(i);}
-      cached={stamp,entries,grid,cell,radius};instanceBoundsCache.set(node,cached);}
-     for(let z=Math.floor((cone.min[2]-cached.radius)/cached.cell);z<=Math.floor((cone.max[2]+cached.radius)/cached.cell);z++)for(let x=Math.floor((cone.min[0]-cached.radius)/cached.cell);x<=Math.floor((cone.max[0]+cached.radius)/cached.cell);x++)for(const i of cached.grid.get(x+':'+z)??[]){stats.instances++;const b=cached.entries[i];if(boxIntersects(b,cone))bounds.push(b);}
+      for(let i=0;i<count;i++){
+       const matrix=multiply(node.matrixWorld,matrices.subarray(i*16,i*16+16)),scale=Math.max(Math.hypot(...matrix.slice(0,3)),Math.hypot(...matrix.slice(4,7)),Math.hypot(...matrix.slice(8,11)));
+       const palm=node.userData?.mediaOcclusionPlant==='native-palm-v1'&&record?.getZ(i)<=.5&&/native-source-plants-webgl\/1:palm/.test(key);
+       const tight=palm?webGLPalmOcclusionBounds(local,matrix,{height:Math.abs(plant.getZ(i)),lean:Math.abs(plant.getY(i)),windStrength:windMeta?.nativeWindStrength,windLength:Math.hypot(windVector?.x??NaN,windVector?.y??NaN)}):null;
+       const pad=plant?Math.abs(plant.getZ(i))*scale*(1+Math.abs(plant.getY(i))+.017*w*w+.013*w)+.2:0,b=tight??transformedBounds(local,matrix,pad);
+       const x=(b.min[0]+b.max[0])/2,z=(b.min[2]+b.max[2])/2;radius=Math.max(radius,(b.max[0]-b.min[0])/2,(b.max[2]-b.min[2])/2);entries.push(b);
+       const cellKey=Math.floor(x/cell)+':'+Math.floor(z/cell);let bucket=grid.get(cellKey);if(!bucket)grid.set(cellKey,bucket=[]);bucket.push(i);
+      }
+      cached={stamp,entries,grid,cell,radius,details:new Map()};instanceBoundsCache.set(node,cached);}
+     for(let z=Math.floor((cone.min[2]-cached.radius)/cached.cell);z<=Math.floor((cone.max[2]+cached.radius)/cached.cell);z++)for(let x=Math.floor((cone.min[0]-cached.radius)/cached.cell);x<=Math.floor((cone.max[0]+cached.radius)/cached.cell);x++)for(const i of cached.grid.get(x+':'+z)??[]){stats.instances++;const b=cached.entries[i];if(boxIntersects(b,cone)){
+       const palm=node.userData?.mediaOcclusionPlant==='native-palm-v1'&&record?.getZ(i)<=.5&&/native-source-plants-webgl\/1:palm/.test(key);
+       if(palm){
+        let details=cached.details.get(i);
+        if(!details){const matrix=multiply(node.matrixWorld,matrices.subarray(i*16,i*16+16));details=webGLPalmTriangleBounds(node.geometry,matrix,{height:Math.abs(plant.getZ(i)),lean:plant.getY(i),angle:plant.getX(i),windStrength:windMeta?.nativeWindStrength,windLength:Math.hypot(windVector?.x??NaN,windVector?.y??NaN)});if(details){details.forEach((piece,triangle)=>piece.source={kind:'palm-triangle',species:node.userData?.nativePlantSpecies,index:i,triangle});cached.details.set(i,details);}}
+        if(details){for(const piece of details)if(boxIntersects(piece,cone))bounds.push(piece);continue;}
+       }
+       bounds.push(b);b.source??={kind:'instance',mesh:node.name||node.userData?.nativePlantSpecies||'unnamed',program:node.material?.customProgramCacheKey?.()??'',index:i,canopy:record?.getZ(i),height:plant?.getZ(i),lean:plant?.getY(i)};
+      }}
     }}
     else{const b=transformedBounds(local,node.matrixWorld);stats.meshes++;if(boxIntersects(b,cone))bounds.push(b);}
    }
@@ -165,14 +236,48 @@ export function youtubeEmbedURL(config,origin,start=0){
 }
 const errors={2:'YouTube rejected this video ID.',5:'YouTube playback is unavailable in this browser.',100:'This YouTube video is unavailable or private.',101:'The video owner does not allow embedding.',150:'The video owner does not allow embedding.',153:'YouTube did not receive the required client identification.'};
 /** Local playback only. An active-world lease and conservative visibility proof are injected by the runtime. */
+function mediaSightCellRange(points,{origin,res,texel}){
+ const min=[0,1,2].map(k=>Math.min(...points.map(p=>p[k]))),max=[0,1,2].map(k=>Math.max(...points.map(p=>p[k])));
+ return {min,max,i0:Math.max(0,Math.floor((min[0]-origin)/texel)-2),i1:Math.min(res-1,Math.ceil((max[0]-origin)/texel)+2),j0:Math.max(0,Math.floor((min[2]-origin)/texel)-2),j1:Math.min(res-1,Math.ceil((max[2]-origin)/texel)+2)};
+}
+export function mediaSightTiles(projection,camera,cache,{maxTiles=16}={}){
+ if(!cache?.tiles||!projection?.world||!camera?.position)return null;
+ const points=[camera.position.toArray(),...projection.world];if(!points.every(finitePoint))return null;
+ const origin=projection.terrainOrigin,res=projection.terrainResolution,texel=projection.terrainTexel;
+ if(!Number.isFinite(origin)||!Number.isInteger(res)||res<1||!Number.isFinite(texel)||texel<=0)return null;
+ const {i0,i1,j0,j1}=mediaSightCellRange(points,{origin,res,texel});
+ const x0=origin+(i0+.5)*texel,x1=origin+(i1+.5)*texel,z0=origin+(j0+.5)*texel,z1=origin+(j1+.5)*texel;
+ const tiles=cache.tiles.filter(t=>t.bounds[0]<=x1&&t.bounds[2]>x0&&t.bounds[1]<=z1&&t.bounds[3]>z0);
+ return tiles.length&&tiles.length<=maxTiles?tiles:null;
+}
+/** The same verified fine terrain bytes used by the renderer remain resident for the TV sightline. */
 export class MediaScreen {
  constructor({getContext,isAuthorized,isUnobstructed=()=>false,describeObstruction=()=>null,onEnter=()=>{},onExit=()=>{},document:doc=globalThis.document,window:win=globalThis.window}){
   Object.assign(this,{getContext,isAuthorized,isUnobstructed,describeObstruction,onEnter,onExit,doc,win});
-  this.active=null;this.iframe=null;this.controlsOpen=false;this.screenVisible=false;
+  this.active=null;this.iframe=null;this.controlsOpen=false;this.screenVisible=false;this.screenPartial=false;this.sightToken=0;this.sightKey=null;this.sightRelease=null;this.sightPending=false;this.sightError=null;
   this.status={state:'closed',playerState:null,currentTime:null,advancedSeconds:0,error:null};
   this.message=e=>this.receive(e);win.addEventListener('message',this.message);
-  this.visibility=()=>{if(doc.visibilityState==='hidden'){this.destroyPlayer();this.status.state='hidden-stopped';}};
+  this.visibility=()=>{if(doc.visibilityState==='hidden'){this.destroyPlayer();this.releaseSightTiles();this.status.state='hidden-stopped';}};
   doc.addEventListener('visibilitychange',this.visibility);
+ }
+ releaseSightTiles(){
+  ++this.sightToken;this.sightRelease?.();this.sightRelease=null;this.sightKey=null;this.sightPending=false;this.sightError=null;
+ }
+ ensureSightTiles(projection,active){
+  const cache=active.nativeIsland?.data?.cache;
+  if(!cache)return true;
+  if(!projection){this.releaseSightTiles();return false;}
+  const data=active.nativeIsland.data,tiles=mediaSightTiles({...projection,terrainTexel:data.texel,terrainOrigin:data.origin,terrainResolution:data.res},this.getContext().camera,cache);
+  if(!tiles){this.releaseSightTiles();this.sightError='TV visibility area is outside the verified terrain tile limit.';return false;}
+  const key=tiles.map(t=>t.id).sort().join('|');
+  if(this.sightKey===key&&this.sightCache===cache)return !!this.sightRelease;
+  this.releaseSightTiles();this.sightKey=key;this.sightCache=cache;this.sightPending=true;
+  const token=this.sightToken;
+  cache.retain(tiles).then(release=>{
+   if(this.sightToken!==token||this.active?.active!==active){release();return;}
+   this.sightRelease=release;this.sightPending=false;
+  }).catch(error=>{if(this.sightToken!==token)return;this.sightPending=false;this.sightError='TV visibility resources unavailable: '+error.message;});
+  return false;
  }
  enter(object,active){
   mediaLayout(object.mediaScreen);
@@ -191,7 +296,7 @@ export class MediaScreen {
   this.controls=this.doc.createElement('div');
   this.controls.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:10000;background:#14212bee;color:white;padding:12px;border-radius:10px;display:flex;gap:12px;align-items:center';
   this.play=this.doc.createElement('button');
-  this.play.textContent=this.iframe?'Restart TV':'Play on TV';
+  this.play.textContent=this.iframe?'Restart TV':this.sightError?'Retry TV':'Play on TV';
   this.play.onclick=()=>this.startPlayback();
   this.note=this.doc.createElement('span');
   this.note.textContent=this.iframe?(this.status.state==='playing'?'Playing on TV. Return to the game to keep watching while you walk.':'TV player is starting. Use the player controls if needed.'):'Playback uses YouTube. Click Play to turn on the TV.';
@@ -199,7 +304,7 @@ export class MediaScreen {
   const stop=this.doc.createElement('button');stop.textContent='Stop TV';stop.onclick=()=>this.exit();
   this.controls.append(this.play,this.note,back,stop);
   this.doc.body.append(this.controls);
-  if(this.iframe)this.iframe.style.pointerEvents=this.screenVisible?'auto':'none';
+  if(this.iframe)this.iframe.style.pointerEvents=this.screenVisible&&!this.screenPartial?'auto':'none';
   this.doc.exitPointerLock?.();
   this.onEnter();
  }
@@ -208,7 +313,7 @@ export class MediaScreen {
   this.controls?.remove();this.controls=null;this.controlsOpen=false;
   if(this.iframe)this.iframe.style.pointerEvents='none';
   this.onExit();
-  if(!this.iframe){this.active=null;this.status.state='closed';}
+  if(!this.iframe){this.releaseSightTiles();this.active=null;this.status.state='closed';}
  }
  current(){
   const c=this.getContext(),a=this.active;
@@ -216,9 +321,13 @@ export class MediaScreen {
   const matrix=c.objectMatrix?.(a.object.id)??a.active.matrices?.get(a.object.id);
   if(!matrix)return null;
   const projection=projectMediaScreen(c.camera,matrix,a.object.mediaScreen,c.viewport);
-  return {c,projection,visible:!!projection&&this.isUnobstructed(projection,c,a.object)===true};
+  const ready=this.ensureSightTiles(projection,a.active);
+  const result=projection&&ready?this.isUnobstructed(projection,c,a.object):false;
+  const visibility=result===true?{visible:true,partial:false,mask:null}:result&&typeof result==='object'?result:{visible:false,partial:false,mask:null};
+  return {c,projection,...visibility};
  }
  startPlayback(){
+  if(this.sightError)this.releaseSightTiles();
   const current=this.current();
   if(!current){this.exit();return false;}
   this.destroyPlayer();
@@ -230,9 +339,10 @@ export class MediaScreen {
   frame.style.cssText='position:fixed;top:0;left:0;width:1280px;height:720px;border:0;transform-origin:0 0;z-index:25;background:#000';
   frame.style.transform=current.projection?screenQuadTransform(current.projection.quad):'translate(-2000px,-2000px)';
   frame.style.opacity=current.visible?'1':'0';
-  frame.style.pointerEvents=current.visible&&this.controlsOpen?'auto':'none';
+  frame.style.maskImage=current.mask??'none';frame.style.webkitMaskImage=current.mask??'none';
+  frame.style.pointerEvents=current.visible&&!current.partial&&this.controlsOpen?'auto':'none';
   frame.src=youtubeEmbedURL(this.active.object.mediaScreen,this.win.location.origin,this.status.currentTime??0);
-  this.iframe=frame;this.doc.body.append(frame);this.screenVisible=current.visible;
+  this.iframe=frame;this.doc.body.append(frame);this.screenVisible=current.visible;this.screenPartial=!!current.partial;
   this.status.state='player-requested';this.status.error=null;this.status.playerState=null;this.status.advancedSeconds=0;
   if(this.note)this.note.textContent=current.visible?'TV player is starting. Use the player controls if autoplay is blocked.':'TV player is starting behind an obstruction; the picture will reappear when visible.';
   this.poll=setInterval(()=>{this.update();this.send({event:'listening',id:'elsemesh-tv',channel:'elsemesh-tv'});this.send({event:'command',func:'addEventListener',args:['onStateChange']});this.send({event:'command',func:'addEventListener',args:['onError']});},500);
@@ -258,23 +368,27 @@ export class MediaScreen {
  }
  update(){
   if(!this.active)return;
+  if(this.doc.visibilityState==='hidden'){this.destroyPlayer();this.releaseSightTiles();this.status.state='hidden-stopped';return;}
   const current=this.current();
   if(!current){this.exit();return;}
   if(!this.iframe)return;
-  this.screenVisible=current.visible;
+  if(this.sightError){if(this.note)this.note.textContent=this.sightError+' Use the TV play control to retry.';if(this.play)this.play.textContent=this.iframe?'Restart TV':'Retry TV';}
+  this.screenVisible=current.visible;this.screenPartial=!!current.partial;
   this.iframe.style.opacity=current.visible?'1':'0';
-  this.iframe.style.pointerEvents=current.visible&&this.controlsOpen?'auto':'none';
+  this.iframe.style.maskImage=current.mask??'none';this.iframe.style.webkitMaskImage=current.mask??'none';
+  this.iframe.style.pointerEvents=current.visible&&!current.partial&&this.controlsOpen?'auto':'none';
   if(current.projection)this.iframe.style.transform=screenQuadTransform(current.projection.quad);
  }
  destroyPlayer(){
-  clearInterval(this.poll);this.poll=null;this.screenVisible=false;
+  clearInterval(this.poll);this.poll=null;this.screenVisible=false;this.screenPartial=false;
   if(this.iframe){this.send({event:'command',func:'pauseVideo',args:[]});this.iframe.src='about:blank';this.iframe.remove();this.iframe=null;}
  }
  exit(){
   this.destroyPlayer();
+  this.releaseSightTiles();
   this.closeControls();
   this.active=null;this.status.state='closed';
  }
- diagnostics(){return {...this.status,activeObjectId:this.active?.object.id??null,iframePresent:!!this.iframe,controlsOpen:this.controlsOpen,screenVisible:this.screenVisible,playbackScope:'local active world only',occlusion:'whole-screen conservative hide; playback continues through obstruction',audioHeard:false};}
+ diagnostics(){return {...this.status,activeObjectId:this.active?.object.id??null,iframePresent:!!this.iframe,controlsOpen:this.controlsOpen,screenVisible:this.screenVisible,screenPartial:this.screenPartial,visibilityLoading:this.sightPending,visibilityError:this.sightError,playbackScope:'local active world only',occlusion:'proven clear TV cells shown; playback continues behind obstructions',audioHeard:false};}
  dispose(){this.exit();this.win.removeEventListener('message',this.message);this.doc.removeEventListener('visibilitychange',this.visibility);}
 }

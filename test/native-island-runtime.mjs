@@ -16,6 +16,31 @@ test('disposal rejects queued and late reads without retaining bytes',async()=>{
  let resolve;const cache=new NativeIslandTiles({tiles,maxConcurrency:1,readTile:()=>new Promise(r=>resolve=r)});
  const running=cache.request(tiles[0]),queued=cache.request(tiles[1]);const checks=Promise.all([assert.rejects(running,/disposed/),assert.rejects(queued,/disposed/)]);await Promise.resolve();cache.dispose();resolve({heights:new Float32Array(4)});await checks;assert.equal(cache.stats().bytes,0);
 });
+test('view streaming caps its background backlog and gradually fills visible tiles',async()=>{
+ const many=Array.from({length:20},(_,i)=>({id:'v'+i,bounds:[i*2,0,i*2+2,2]}));
+ const cache=new NativeIslandTiles({tiles:many,maxConcurrency:2,maxBytes:1024,readTile:async()=>({heights:new Float32Array(4)})});
+ cache.requestView(0,0,100);assert.equal(cache.entries.size,8);assert(cache.queue.length+cache.running<=8);
+ await Promise.all([...cache.entries.values()].map(e=>e.promise));await new Promise(resolve=>setImmediate(resolve));
+ cache.requestView(0,0,100);assert.equal(cache.entries.size,16);
+ await Promise.all([...cache.entries.values()].map(e=>e.promise));await new Promise(resolve=>setImmediate(resolve));
+ cache.requestView(0,0,100);assert.equal(cache.entries.size,20);
+ cache.dispose();
+});
+test('view streaming retains nearest resident tile under a tight LRU budget',async()=>{
+ const cache=new NativeIslandTiles({tiles,maxConcurrency:1,maxBytes:32,readTile:async()=>({heights:new Float32Array(4)})});
+ await cache.request(tiles[0]);await cache.request(tiles[1]);
+ cache.requestView(0,0,100);
+ await cache.request(tiles[2]);
+ assert(cache.readyAt(.5,.5),'nearest resident terrain must survive a farther tile load');
+ cache.dispose();
+});
+test('retained sight tiles are promoted ahead of queued scenery tiles',async()=>{
+ let finish;const order=[],cache=new NativeIslandTiles({tiles,maxConcurrency:1,maxBytes:128,readTile:tile=>new Promise(resolve=>{order.push(tile.id);if(tile.id==='0')finish=resolve;else resolve({heights:new Float32Array(4)});})});
+ const running=cache.request(tiles[0]);await Promise.resolve();
+ const background=cache.request(tiles[1]);const another=cache.request(tiles[2]);
+ const lease=cache.retain([tiles[3]]);finish({heights:new Float32Array(4)});await Promise.all([running,background,another]);
+ const release=await lease;assert.deepEqual(order,['0','3','1','2']);release();cache.dispose();
+});
 test('cell-centred height matches captured values and gates unready physics',()=>{
  const coarse={res:4,heights:Float32Array.from({length:16},(_,i)=>i)};assert.equal(sampleNativeField(coarse.heights,4,0,4,1.5,1.5),5);
  const data=new NativeIslandTerrain({res:4,size:4,origin:0,coarse});assert.ok(Number.isNaN(data.heightAt(1.5,1.5)));data.cache={readyAt:()=>true};assert.equal(data.heightAt(1.5,1.5),5);assert.deepEqual(data.boundsFor(),[-92,12]);

@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {T} from '../src/world-runtime/vendor/world-engine-contract.js';
 import * as N from '../src/engine/index.js';
 import {Material} from '../src/engine/render/Material.js';
-import {mediaLayout,buildMediaScreenHousing,projectMediaScreen,screenQuadTransform,mediaScreenUnobstructed,collectMediaScreenOccluders,mediaScreenSurfaceExcluded,youtubeEmbedURL,MediaScreen} from '../src/world-runtime/MediaScreen.js';
+import {buildPalmNear} from '../src/world/vegetation/PlantGeometry.js';
+import {convertNativePlantGeometry} from '../src/world-runtime/WebGLNativeIsland.js';
+import {mediaLayout,buildMediaScreenHousing,projectMediaScreen,screenQuadTransform,mediaScreenUnobstructed,mediaScreenCellVisibility,mediaSightTiles,webGLPalmOcclusionBounds,webGLPalmTriangleBounds,collectMediaScreenOccluders,mediaScreenSurfaceExcluded,youtubeEmbedURL,MediaScreen} from '../src/world-runtime/MediaScreen.js';
 const config={schema:'elsemesh.media-screen/1',provider:'youtube',videoId:'N-V7VpmoPkU',width:6.4},volume={id:'warehouse:surface:interior-01',min:[-14.5,3.1,-90.5],max:[14.5,8.5,-63.5]};
 function fixture(){const camera=new T.PerspectiveCamera(65,16/9,.1,1000);camera.position.set(6.5,4.65,-82);camera.lookAt(6.5,5.2,-89.8);camera.updateMatrixWorld();camera.matrixWorldInverse.copy(camera.matrixWorld).invert();const matrix=new T.Matrix4().makeTranslation(6.5,5.2,-89.8),viewport={left:0,top:0,width:1280,height:720},projection=projectMediaScreen(camera,matrix,config,viewport),root=new T.Group(),active={root,matrices:new Map([['tv',matrix]]),project:{environment:{windSpeed:5}}};return{camera,matrix,viewport,projection,root,active};}
 test('TV geometry faces +Z in both original renderer APIs; strict IDs and private embed origin',()=>{for(const [api,material]of [[T,p=>new T.MeshStandardMaterial(p)],[N,p=>new Material(p)]]){const housing=buildMediaScreenHousing(config,{api,material});assert.equal(housing.children.length,3);assert(housing.children[1].position.z>0);for(const mesh of housing.children){mesh.geometry.dispose();mesh.material.dispose();}}assert.equal(mediaLayout(config).height,3.6);assert.throws(()=>youtubeEmbedURL({...config,videoId:'https://evil.test'},'http://localhost:18893'));const url=new URL(youtubeEmbedURL(config,'http://localhost:18893'));assert.equal(url.origin,'https://www.youtube-nocookie.com');assert.equal(url.searchParams.get('origin'),'http://localhost:18893');assert.throws(()=>youtubeEmbedURL(config,'https://user:pass@evil.test/path'));});
@@ -83,4 +85,82 @@ test('offscreen TV and world change retain then close the exact player',()=>{
  key='new-world';manager.update();
  assert.equal(manager.iframe,null);assert.equal(manager.active,null);assert.equal(iframe.src,'about:blank');
  manager.dispose();
+});
+
+test('partly blocked TV reveals proven cells without restarting playback; full wall and unknown bounds hide',()=>{
+ const f=fixture(),dom=fakeDOM(),prop={min:[6.2,4.6,-86.3],max:[6.8,5.3,-85.7]},wall={min:[0,0,-86.3],max:[13,10,-85.7]};
+ const visibility=bounds=>mediaScreenCellVisibility(f.projection,f.camera,bounds,{complete:true});
+ const partial=visibility([prop]);assert.equal(partial.visible,true);assert.equal(partial.partial,true);assert(partial.clearCells>0&&partial.clearCells<partial.totalCells);assert.match(partial.mask,/data:image\/svg\+xml/);
+ assert.equal(visibility([wall]).visible,false);
+ assert.equal(visibility([{min:[0,0,-91],max:[13,10,-90]}]).partial,false);
+ assert.equal(visibility([prop,prop]).clearCells,partial.clearCells,'overlapping occluders cannot reveal a hole');
+ assert.equal(mediaScreenCellVisibility(f.projection,f.camera,[prop],{complete:false}).visible,false);
+ assert.equal(mediaScreenCellVisibility(f.projection,f.camera,[{min:[NaN,0,0],max:[1,1,1]}],{complete:true}).visible,false);
+ let bounds=[prop];
+ const manager=new MediaScreen({getContext:()=>({ready:true,active:f.active,key:'session',camera:f.camera,viewport:f.viewport}),isAuthorized:()=>true,isUnobstructed:()=>visibility(bounds),document:dom.doc,window:dom.win});
+ manager.enter({id:'tv',mediaScreen:config},f.active);assert(manager.startPlayback());const frame=manager.iframe;manager.closeControls();
+ assert.equal(manager.diagnostics().screenPartial,true);assert.equal(frame.style.opacity,'1');assert.equal(frame.style.maskImage,partial.mask);
+ manager.receive({source:frame.contentWindow,origin:'https://www.youtube-nocookie.com',data:{event:'infoDelivery',info:{playerState:1,currentTime:4}}});
+ bounds=[wall];manager.update();assert.equal(manager.iframe,frame);assert.equal(frame.style.opacity,'0');
+ bounds=[];manager.update();assert.equal(manager.iframe,frame);assert.equal(frame.style.opacity,'1');assert.equal(frame.style.maskImage,'none');
+ manager.receive({source:frame.contentWindow,origin:'https://www.youtube-nocookie.com',data:{event:'infoDelivery',info:{playerState:1,currentTime:9}}});
+ assert.equal(manager.diagnostics().advancedSeconds,5);manager.dispose();
+});
+
+test('TV holds bounded fine terrain tiles while visible and releases them on exit',async()=>{
+ const f=fixture(),dom=fakeDOM(),tiles=[{id:'near',bounds:[0,-100,32,-64]},{id:'far',bounds:[100,100,132,132]}];
+ let held=0,released=0;const cache={tiles,retain:async selected=>{assert.deepEqual(selected.map(t=>t.id),['near']);held++;return()=>{released++;};}};
+ f.active.nativeIsland={data:{cache,texel:1,origin:-128,res:256}};
+ assert.deepEqual(mediaSightTiles({...f.projection,terrainTexel:1,terrainOrigin:-128,terrainResolution:256},f.camera,cache).map(t=>t.id),['near']);
+ const manager=new MediaScreen({getContext:()=>({ready:true,active:f.active,key:'session',camera:f.camera,viewport:f.viewport}),isAuthorized:()=>true,isUnobstructed:()=>true,document:dom.doc,window:dom.win});
+ manager.enter({id:'tv',mediaScreen:config},f.active);assert(manager.startPlayback());assert.equal(manager.diagnostics().screenVisible,false);
+ await Promise.resolve();manager.update();assert.equal(manager.diagnostics().screenVisible,true);assert.equal(held,1);
+ manager.update();assert.equal(held,1,'same tile footprint does not create leases every frame');
+ manager.exit();assert.equal(released,1);manager.dispose();
+});
+
+test('TV releases unused sight leases and retries a failed lease from the play control',async()=>{
+ const f=fixture(),dom=fakeDOM(),tiles=[{id:'near',bounds:[0,-100,32,-64]}];let attempts=0,releases=0;
+ const cache={tiles,retain:async()=>{if(++attempts===2)throw Error('temporary read failure');return()=>{releases++;};}};
+ f.active.nativeIsland={data:{cache,texel:1,origin:-128,res:256}};
+ const manager=new MediaScreen({getContext:()=>({ready:true,active:f.active,key:'session',camera:f.camera,viewport:f.viewport}),isAuthorized:()=>true,isUnobstructed:()=>true,document:dom.doc,window:dom.win});
+ manager.enter({id:'tv',mediaScreen:config},f.active);manager.current();await Promise.resolve();assert.equal(attempts,1);
+ manager.closeControls();assert.equal(releases,1,'closing without Play releases the already loaded terrain');
+ manager.enter({id:'tv',mediaScreen:config},f.active);manager.current();await new Promise(setImmediate);assert.match(manager.sightError,/temporary read failure/);
+ assert(manager.startPlayback());assert.equal(attempts,3,'the play control retries a rejected lease');
+ await Promise.resolve();manager.update();assert.equal(manager.diagnostics().screenVisible,true);
+ dom.doc.visibilityState='hidden';dom.listeners.get('visibilitychange')();assert.equal(releases,2,'hidden tab releases the lease');
+ manager.dispose();
+});
+test('TV sight lease includes every fine cell at tile boundaries',()=>{
+ const cache={tiles:[{id:'a',bounds:[0,0,128,128]},{id:'b',bounds:[128,0,256,128]}]};
+ const camera={position:new T.Vector3(125.1,5,4)};
+ const projection={world:[[125.1,5,4],[125.1,5,6],[125.1,4,6],[125.1,4,4]],terrainTexel:1,terrainOrigin:0,terrainResolution:256};
+ assert.deepEqual(mediaSightTiles(projection,camera,cache).map(t=>t.id),['a','b']);
+});
+test('source palm triangles use fine shader bounds rather than whole-plant boxes',()=>{
+ const source=buildPalmNear(),geometry=convertNativePlantGeometry(source.geometry);
+ const matrix=new T.Matrix4().makeTranslation(4,2,-86);
+ const boxes=webGLPalmTriangleBounds(geometry,matrix,{height:8,lean:.12,angle:.7,windStrength:1,windLength:1});
+ assert.equal(boxes.length,geometry.index.count/3);
+ assert(boxes.every(b=>b.min.every((n,k)=>Number.isFinite(n)&&n<=b.max[k])));
+ const whole=webGLPalmOcclusionBounds({min:[-5,0,-5],max:[5,12,5],radius:13},matrix,{height:8,lean:.12,windStrength:1,windLength:1});
+ assert(boxes.some(b=>b.max[1]<whole.max[1]-2),'some geometry is bounded more tightly than the entire palm');
+ geometry.dispose();source.geometry.dispose();
+});
+test('renderer-owned WebGL palms use shader-aligned bounds without false below-floor occlusion',()=>{
+ const f=fixture(),local={min:[-.5,-.5,-.5],max:[.5,.5,.5],radius:Math.sqrt(.75)};
+ const distant=new T.Matrix4().makeTranslation(25,3,-100);
+ const tight=webGLPalmOcclusionBounds(local,distant,{height:15,lean:.3,windStrength:1,windLength:1});
+ assert(tight.min[1]>1,'plant bounds stay near the real base height');
+ assert(tight.max[2]<-90,'distant palm cannot overreach the TV');
+ const geometry=new T.BoxGeometry(1,1,1);geometry.setAttribute('iPlant',new T.InstancedBufferAttribute(Float32Array.from([0,.3,15,1]),4));geometry.setAttribute('iRecord',new T.InstancedBufferAttribute(Float32Array.from([0,1,0,0]),4));
+ const material=new T.MeshStandardMaterial();material.customProgramCacheKey=()=> 'native-source-plants-webgl/1:palm|weather-shelter-v1';material.userData.nativeWindStrength=1;material.userData.nativeWindVector=new T.Vector2(1,0);
+ const plant=new T.InstancedMesh(geometry,material,1);plant.userData.mediaOcclusionPlant='native-palm-v1';plant.setMatrixAt(0,distant);f.root.add(plant);
+ let proof=collectMediaScreenOccluders(f.active,{camera:f.camera,projection:f.projection,screenObjectId:'tv'});
+ assert.equal(proof.bounds.length,0,'far palm does not black out warehouse TV');
+ plant.setMatrixAt(0,new T.Matrix4().makeTranslation(6.5,3,-86));plant.instanceMatrix.needsUpdate=true;
+ proof=collectMediaScreenOccluders(f.active,{camera:f.camera,projection:f.projection,screenObjectId:'tv'});
+ assert(proof.bounds.length>0,'a real palm in the sightline still blocks the TV');
+ plant.geometry.dispose();plant.material.dispose();
 });

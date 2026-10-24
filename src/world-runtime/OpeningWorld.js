@@ -40,7 +40,8 @@ export async function readOpeningWorld({fetcher=fetch,baseURL=location.href}={})
   throw error;
  }
 }
-export async function loadOpeningWorld(app,config,{fetcher=fetch,baseURL=location.href}={}){
+export async function loadOpeningWorld(app,config,{fetcher=fetch,baseURL=location.href,onProgress=()=>{}}={}){
+ const progress=stage=>{try{onProgress(stage);}catch(error){console.warn('Opening progress callback failed',error);}};
  const generation=app.host.generation;
  const {source,bundled}=validateOpeningWorld(config);
  const pinned=bundled?hostedRepositorySource(config.bundlePath,{baseURL,origin:new URL(baseURL).origin,fetch:fetcher}):await resolveGitHubWorldSource(source);
@@ -49,11 +50,13 @@ export async function loadOpeningWorld(app,config,{fetcher=fetch,baseURL=locatio
  if(await repositoryDigest(bytes)!==config.contentDigest)throw Error('World manifest does not match the deployment pin.');
  const manifest=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
  if(manifest.world?.worldId!==config.worldId)throw Error('World identity does not match the deployment pin.');
+ progress('manifest-verified');
  if(app.host.generation!==generation)return null;
- const options={expectedWorldId:config.worldId,expectedContentDigest:config.contentDigest};
+ const options={expectedWorldId:config.worldId,expectedContentDigest:config.contentDigest,onProgress:progress};
  if(!bundled)options.fetch=(request,requestOptions)=>request===manifestURL?Promise.resolve(new Response(bytes)):fetcher(request,requestOptions);
  const activated=await app.load(pinned,options),active=app.host.active;
  if(!activated||!active||active.identity.worldId!==config.worldId||active.identity.contentDigest!==config.contentDigest||!bundled&&active.identity.resolvedCommit!==pinned.commit)return null;
  if(!await app.portals.activateOffline(active)||app.host.active!==active)return null;
+ progress('world-ready');
  return active;
 }
