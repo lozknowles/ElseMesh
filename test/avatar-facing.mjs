@@ -1,7 +1,7 @@
 import {createWebGLRepositoryPeerLayer} from '../src/world-runtime/WebGLRepositoryBackend.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {avatarMotionFacing,repositoryPeerFacing} from '../src/player/AvatarFacing.js';
+import {avatarMotionFacing,repositoryPeerFacing,alignAvatarToPlayerView} from '../src/player/AvatarFacing.js';
 import {PlayerAvatar} from '../src/player/PlayerAvatar.js';
 import {WebGLRepositoryAvatar} from '../src/world-runtime/WebGLRepositoryAvatar.js';
 import {RepositoryPeerLayer} from '../src/world-runtime/RepositoryPortalRuntime.js';
@@ -73,4 +73,10 @@ test('sparse peer packet deltas follow wall sliding; repeats and small jitter ho
  pose.velocity=[-1,0,0];for(let i=0;i<20;i++)close(repositoryPeerFacing(a,pose,'w'),0);
  pose.position=[.001,0,.199];close(repositoryPeerFacing(a,pose,'w'),0);
  pose.position=[.201,0,.199];close(repositoryPeerFacing(a,pose,'w'),Math.PI/2);
+});
+
+test('revealing local avatar aligns idle body to the current gaze, then accepted movement takes over',()=>{
+ const avatar={},player={position:{x:1,z:2},yaw:Math.PI/2,mode:'walk',velocity:{x:0,z:0}};assert.equal(alignAvatarToPlayerView(avatar,player),true);
+ close(avatarMotionFacing(avatar.facingState,{position:player.position,velocity:player.velocity,context:player,mode:'walk',fallbackYaw:0}),player.yaw+Math.PI);
+ player.position={x:1,z:1.5};close(avatarMotionFacing(avatar.facingState,{position:player.position,velocity:player.velocity,context:player,mode:'walk',fallbackYaw:0}),Math.PI);
 });

@@ -1,14 +1,11 @@
 # Find and run repository worlds
 
-ElseMesh separates the engine/editor application from each world's data
-repository. Opening the legacy exploration game or its room server does not
-select a repository world.
+ElseMesh loads authored worlds from independent repositories. The repository-world player is the default game entry. The retired combined-island entry is no longer built or distributed.
 
 ## Open the public warehouse
 
 **[Play Loz's warehouse island](https://lozknowles.github.io/ElseMesh/)** is the
-public warehouse snapshot. **[The original exploration game](https://lozknowles.github.io/ElseMesh/legacy.html)**
-is the separate legacy game.
+public warehouse snapshot. Download the complete bundled island from the [GitHub Releases page](https://github.com/lozknowles/ElseMesh/releases/latest).
 
 Warehouse data lives in [the independent opening-island repository](https://github.com/lozknowles/elsemesh-world-loz-opening-island).
 The public warehouse is single-player. It does not connect to private owner
@@ -19,10 +16,9 @@ an unavailable portal aperture remains opaque.
 
 1. Install dependencies and start the development server as described in the
    [main README](../README.md).
-2. Open `worlds.html` at the local address printed by Vite. Source `index.html`
-   starts the original exploration game.
+2. Open `index.html` at the local address printed by Vite. `worlds.html` remains an owner-application alias.
 3. Expand **Public GitHub world**.
-4. Paste [this pinned opening-island version](https://github.com/lozknowles/elsemesh-world-loz-opening-island/tree/7713a89cd22749e7598e2e0a1db2a540970c0d19)
+4. Paste [this pinned opening-island version](https://github.com/lozknowles/elsemesh-world-loz-opening-island/tree/ebeea605c39df2b528b68588f2909358bb28e46d)
    and click **Open pinned world**.
 5. Wait for the warehouse name and status. WASD walks; mouse drag or arrows look.
 

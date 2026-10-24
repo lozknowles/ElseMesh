@@ -1,71 +1,22 @@
-# Public opening world
+# Public opening world and complete release package
 
-The engine remains reusable. A deployment may supply `opening-world.json` beside
-its HTML entry point. No authored world is copied into engine source, and the
-engine contains no owner-specific default repository.
+The reusable engine reads a validated, pinned world through its common repository loader. The source build's `public/opening-world.json` selects a published public commit. Its world ID is independent of the repository URL. The engine and authoring repository remain separate.
 
-The bounded configuration has exactly these fields:
+For a downloadable release, `tools/package-opening-world.mjs` verifies a **clean public world checkout at the exact configured commit**, the manifest SHA-256 digest, world identity, schema, asset hashes, paths and capability requirements. It copies that immutable world content under `worlds/loz-opening/` and writes an `elsemesh.opening-world/2` configuration. The version 2 `bundlePath` is a restricted same-origin relative directory. Its repository URL records provenance; startup reads the bundled files, not GitHub. The shared loader validates them again. The public copy cannot grant private VIEW/ENTER permissions or alter an owner ledger.
 
-```json
-{
-  "schema": "elsemesh.opening-world/1",
-  "repository": "https://github.com/example/world/tree/0000000000000000000000000000000000000000",
-  "worldId": "elsemesh.world:example",
-  "contentDigest": "0000000000000000000000000000000000000000000000000000000000000000"
-}
-```
+## Reproduce the downloadable archive
 
-Replace the example commit and SHA-256 digest with the published commit and exact
-`world.json` byte digest. Branches/tags are rejected. The loader uses the existing
-credential-free, bounded GitHub adapter without a GitHub API request. Before
-hydrating assets it checks manifest identity and digest. The shared loader then
-validates schema, capabilities, hashes, paths, referenced sizes and content, and
-the host checks identity/digest again before detached scene activation. Errors
-leave an explicit unavailable status and repository selection controls.
+Build on the development host using Node.js 22.15 or newer:
 
-An installed coordinator at `/runtime-config` takes precedence, including existing
-membership and player defaults. Only HTTP 404 selects the public opening config;
-a broken coordinator is never silently replaced. The opening config is resolved
-relative to the document, including project deployments under a URL subdirectory.
-If neither configuration exists the ordinary repository selector remains available.
-
-The published data is an offline single-player replica, not a signed authority.
-It grants no VIEW or ENTER admission, makes no destination discovery requests and
-renders existing portal apertures explicitly unavailable. It contains no server
-credentials or signing keys. Personal avatar and computer session state remain
-local runtime state. A same-world-ID public replica is not an independent fork;
-editing the private source or pushing its branch does not change this deployment.
-Publish and select another immutable commit deliberately to update it.
-
-## Packaging and release
-
-Build on the development host, then run:
-
-```
+```sh
+npm ci
 npm run build
-node tools/package-opening-world.mjs dist /outside/source/opening-world.json /new/staging/output
+node tools/package-opening-world.mjs dist /path/to/clean/public-opening-world-checkout /path/to/new/output
+(cd /path/to/new/output && zip -qr ../Loz-Warehouse-Island.zip .)
 ```
 
-The tool requires an existing output parent, refuses an existing output directory,
-output inside the build, symbolic links in build contents, and reserved packaging
-paths. It reserves the new staging directory atomically; a failed copy leaves a
-partial directory that must not be published. It maps the built repository
-runtime to `index.html`, preserves the original game at `legacy.html`, and leaves
-`worlds.html` available with its original-game link also pointing to legacy.html.
-The packaged play-online and network-demo pages select legacy.html through
-HTML entry metadata, preserving room invitations and network demo query/fragment
-parameters. Source/dev installations retain the usual index.html game target.
-No compiled JavaScript is rewritten. All build assets are retained. The public config is
-operator deployment data, not a committed owner-specific engine default.
+The checkout must be the exact full Git commit in `public/opening-world.json`, with no uncommitted or untracked files. The output directory must not already exist. The package copies only the compiled repository-world runtime, its splash, clouds, antialiasing textures, two stock character models and their portraits, relevant licence notices, credits, and pinned world dependency files. It omits the retired combined game entry, vehicle and unrelated scene assets. It contains `start-local.mjs`, a loopback-only static server; launch it with `node start-local.mjs` and browse `http://127.0.0.1:18888/`. The YouTube TV is external media and cannot play offline.
 
-Review the exact allowlisted world dependency closure and its attribution before
-publishing to a fresh public repository without private history. Preserve stable
-IDs only for a read-only replica. Save engine SHA, world commit, manifest digest,
-artifact commit and previous Pages artifact SHA as the reproducible release and
-rollback boundary. Direct publication to the existing Pages branch needs no
-GitHub Actions build. Roll back by publishing the previous artifact tree as a new
-commit, without rewriting history or changing the private authored world.
+The world `world.json` digest pins authored content. The game revision, exact world commit, digest and archive SHA-256 identify a reproducible release. To change the opening world deliberately, update the public world repository, verify and publish its immutable revision, then update the engine distribution pin and rebuild. A remote branch changing does not update a running copy.
 
-The entry uses the existing repository gameplay runtime: walking, collision,
-avatars, weather and supported interactions. Original procedural game systems
-remain accessible in `legacy.html`; this is not a migration of every legacy scene.
+GitHub's generated source ZIP is for development and may contain compatibility modules and archived tests. The named Release ZIP is the complete fast play download. Directly publishing this prepared static tree to GitHub Pages uses no Actions build. A nested Pages path works because built assets and the bundle are relative to the entry page.

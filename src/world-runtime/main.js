@@ -1,7 +1,7 @@
 import { repositoryWeatherShelters, setMistShelters } from './WeatherShelter.js';
 import {MediaScreen,collectMediaScreenOccluders,mediaScreenUnobstructed} from './MediaScreen.js';
 import {RepositoryPortalSky} from './RepositoryPortalSky.js';
-import {readOpeningWorld,loadOpeningWorld} from './OpeningWorld.js';
+import {readOpeningWorld,loadOpeningWorld,validateOpeningWorld} from './OpeningWorld.js';
 import {webGLRepositoryReadinessSignature} from './WebGLRepositoryReadiness.js';
 import {repositoryMediumWaterSettings} from './RepositoryWater.js';
 import {PortalArrivalController} from './PortalArrivalController.js';
@@ -15,6 +15,7 @@ import {AvatarChooser} from '../player/AvatarChooser.js';
 import {nativeIslandSceneOptions,nativeIslandDiagnostics} from './NativeIslandIntegration.js';
 import {buildRepositoryScene,disposeRepositoryScene} from './RepositoryScene.js';
 import {loadAppearance} from '../player/AvatarAppearance.js';
+import {alignAvatarToPlayerView} from '../player/AvatarFacing.js';
 import {initializeRenderBackend} from '../engine/Backend.js';
 import {createWebGLRepositoryEngine,configureWebGLRepositoryScene,createWebGLRepositoryPeerLayer,addWebGLPortalFrame,updateWebGLRepositoryEnvironment} from './WebGLRepositoryBackend.js';
 import * as N from '../engine/index.js';
@@ -45,7 +46,10 @@ import { RepositoryRetro } from './RepositoryRetro.js';
 import { effectiveObjectState,parseGitHubWorldLocation, resolveGitHubWorldSource } from './vendor/world-engine-contract.js';
 
 const status=document.querySelector('#status'),hud=document.querySelector('#hud'),terminal=document.querySelector('#terminal');
-const report=message=>status.textContent=message;
+const openingSplash=document.querySelector('#opening-splash');
+const report=message=>{status.textContent=message;const label=document.querySelector('#opening-splash-status');if(label)label.textContent=message;};
+const hideOpeningSplash=()=>{if(openingSplash)openingSplash.hidden=true;};
+document.querySelector('#opening-recover')?.addEventListener('click',hideOpeningSplash);
 async function init(){
  const container=document.querySelector('#app');let attempted;
  const selected=await initializeRenderBackend({webgpu:async()=>{if(new URLSearchParams(location.search).get('renderer')==='webgl2')throw Error('WebGL2 selected');attempted=new Engine(container);attempted.maxOutputPixels=1000000;await attempted.init();attempted.meshRenderer.syncPipelines=true;attempted.backend='webgpu';return attempted;},webgl2:async()=>{attempted?.stop();attempted?.canvas?.remove();GPU.device?.destroy();return createWebGLRepositoryEngine(container);}});
@@ -89,7 +93,7 @@ async function init(){
   };
  }
 
- const host=new RepositoryWorldHost({engine,input,...backendHost,onChange:active=>{document.querySelector('#panel h1').textContent=active.project.metadata.name;followCamera.reset(active);retro.setWorld(active);post?.taau.resetHistory();if(medium)medium.uniforms.fields.base.value=terrainMistBase(active.project.terrain);report(active.project.metadata.name+' · '+active.identity.location+' · '+active.identity.contentDigest.slice(0,12));},onInteract:(computer,active)=>{
+ const host=new RepositoryWorldHost({engine,input,...backendHost,onChange:active=>{hideOpeningSplash();document.querySelector('#panel h1').textContent=active.project.metadata.name;followCamera.reset(active);retro.setWorld(active);post?.taau.resetHistory();if(medium)medium.uniforms.fields.base.value=terrainMistBase(active.project.terrain);report(active.project.metadata.name+' · '+active.identity.location+' · '+active.identity.contentDigest.slice(0,12));},onInteract:(computer,active)=>{
   void openComputer(computer,active);
  }});
  document.querySelector('#terminal-close').onclick=()=>{terminal.close();engine.canvas.focus();};
@@ -135,7 +139,7 @@ async function init(){
  app.worldWelcome=worldWelcome;
  const avatarChooser=new AvatarChooser({app});app.avatarChooser=avatarChooser;
  window.addEventListener('keydown',event=>{if(event.code==='KeyK'&&!retro.active&&!terminal.open&&!media?.active&&!portals.pending)avatarChooser.show();});
- const followButton=document.querySelector('#follow-player');const setFollow=enabled=>{followCamera.setEnabled(enabled);followButton.textContent=enabled?'First-person view · V':'Follow player · V';post?.taau.resetHistory();engine.canvas.focus();};followButton.onclick=()=>setFollow(!followCamera.enabled);followButton.textContent=followCamera.enabled?'First-person view · V':'Follow player · V';
+ const followButton=document.querySelector('#follow-player');const setFollow=enabled=>{if(enabled)alignAvatarToPlayerView(avatar,host.active?.player);followCamera.setEnabled(enabled);followButton.textContent=enabled?'First-person view · V':'Follow player · V';post?.taau.resetHistory();engine.canvas.focus();};followButton.onclick=()=>setFollow(!followCamera.enabled);followButton.textContent=followCamera.enabled?'First-person view · V':'Follow player · V';
  window.addEventListener('keydown',event=>{if(event.code==='KeyV'&&input.enabled&&!retro.active&&!terminal.open&&!media?.active&&!avatarChooser.dialog.open)setFollow(!followCamera.enabled);});
  window.__repositoryWorldApp=app;
  const sessionStatus=document.querySelector('#session-status');
@@ -198,14 +202,14 @@ async function init(){
  const openingGeneration=host.generation;
  void (async()=>{
   if(await connectOpening())return;
-  const config=await readOpeningWorld();if(!config||host.generation!==openingGeneration)return;
+  const config=await readOpeningWorld();if(!config){hideOpeningSplash();return;}if(host.generation!==openingGeneration)return;
   report('Loading published opening island…');
   const active=await loadOpeningWorld(app,config);if(!active)return;
   document.querySelector('#repository-tools').hidden=true;document.querySelector('#choose-world').hidden=false;document.querySelector('#coordinator-controls').hidden=true;
   document.querySelector('#panel h1').textContent=active.project.metadata.name;
-  report('Published island · revision '+active.identity.resolvedCommit.slice(0,12)+' · '+selected.backend);
- })().catch(error=>{report('Opening world could not load: '+error.message);document.querySelector('#portal-status').textContent='Opening world unavailable. Retry by reloading, or choose a repository.';});
+  report('Published island · revision '+(active.identity.resolvedCommit??validateOpeningWorld(config).source.ref).slice(0,12)+' · '+selected.backend);
+ })().catch(error=>{if(openingSplash)openingSplash.dataset.failed='';report('Opening world could not load: '+error.message);document.querySelector('#portal-status').textContent='Opening world unavailable. Retry by reloading, or choose a repository.';});
  window.addEventListener('pagehide',()=>{media.dispose();refraction?.dispose();objectAccess.invalidate();worldWelcome.dispose();welcomeView.dispose();controlsHelp.dispose();portals.dispose();portalEffects.dispose();retro.dispose();avatar.dispose();host.dispose();engine.stop();if(isWebGL)engine.dispose();else GPU.device?.destroy();});report('ElseMesh '+selected.backend+' ready. Open a world repository folder or public GitHub source.');
  window.dispatchEvent(new CustomEvent('repository-world-ready',{detail:app}));
 }
-init().catch(error=>{console.error(error);report(error.message);});
+init().catch(error=>{console.error(error);if(openingSplash)openingSplash.dataset.failed='';report(error.message);});

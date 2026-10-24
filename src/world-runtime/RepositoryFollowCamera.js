@@ -11,11 +11,8 @@ export class RepositoryFollowCamera{
  }
  setEnabled(value){const enabled=!!value;if(enabled!==this.enabled){this.enabled=enabled;this.reset();}this.state.enabled=enabled;}
  reset(active){this.active=null;this.mode=null;this.distance=null;if(active)this.initialize(active);}
- initialize(active,arrivalPortal){
-  const p=active.player.position,portals=active.project?.portals??[];
-  const near=arrivalPortal??portals.filter(v=>v.enabled!==false&&portalDistance(v,p)<3).sort((a,b)=>portalDistance(a,p)-portalDistance(b,p))[0];
+ initialize(active){
   this.offset.set(...DEFAULT_OFFSET);
-  if(near){const n=front(near),right=new Vector3(n.z,0,-n.x);this.offset.copy(n.multiplyScalar(4.5)).addScaledVector(right,3.2);this.offset.y=2.4;}
   this.active=active;this.mode=active.player.mode;this.distance=null;
  }
  planeClearance(){
@@ -48,6 +45,8 @@ export class RepositoryFollowCamera{
   if(!this.enabled||!active?.player||suspended)return false;
   const player=active.player;if(!finite(player.position))return false;
   if(this.active!==active||this.mode!==player.mode)this.initialize(active,arrivalPortal);
+  const yaw=Number.isFinite(player.yaw)?player.yaw:0;
+  this.offset.set(DEFAULT_OFFSET[0]*Math.cos(yaw)+DEFAULT_OFFSET[2]*Math.sin(yaw),DEFAULT_OFFSET[1],-DEFAULT_OFFSET[0]*Math.sin(yaw)+DEFAULT_OFFSET[2]*Math.cos(yaw));
   const target=player.position.clone();target.y+=1.15;
   const anchor=target.clone(),desired=target.clone().add(this.offset),clearance=this.planeClearance();
   const planes=(active.project?.portals??[]).filter(portal=>{

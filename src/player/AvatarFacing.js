@@ -29,3 +29,12 @@ export function repositoryPeerFacing(avatar, pose, worldId) {
   minimumDistance:.005,
  });
 }
+
+
+// When V reveals the local avatar, start from the player's current gaze.
+// Once they move, accepted displacement again determines the body heading.
+export function alignAvatarToPlayerView(avatar,player){
+ if(!avatar||!player||!Number.isFinite(player.yaw))return false;
+ avatar.facingState={context:player,mode:player.mode,x:player.position.x,z:player.position.z,yaw:player.yaw+Math.PI};
+ return true;
+}

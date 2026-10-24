@@ -11,7 +11,7 @@ test('disabled camera retains first person camera and tracking never mutates pla
  const a=world(),camera=new PerspectiveCamera(),follow=newRepositoryFollowCamera({camera}),before=JSON.stringify(a.player);camera.position.set(9,8,7);const position=camera.position.toArray(),quaternion=camera.quaternion.toArray();
  assert.equal(follow.update(.016,a),false);assert.deepEqual(camera.position.toArray(),position);assert.deepEqual(camera.quaternion.toArray(),quaternion);
  follow.setEnabled(true);follow.update(.016,a);assert.equal(JSON.stringify(a.player),before);assert.equal(follow.state.avatarClear,true);
- const fixed=camera.position.toArray();a.player.yaw=Math.PI;follow.update(.016,a);assert.deepEqual(camera.position.toArray(),fixed);
+ const fixed=camera.position.toArray();a.player.yaw=Math.PI;follow.update(.016,a);assert.ok(camera.position.x<0&&camera.position.z<0);assert.notDeepEqual(camera.position.toArray(),fixed);assert.deepEqual(a.player.position.toArray(),[0,0,0]);
 });
 test('wall obstruction snaps inward and removing it eases outward without intersecting wall',()=>{
  const a=world(),follow=setup();follow.update(.016,a);const full=follow.state.distance;
@@ -39,4 +39,8 @@ for(const [kind,Camera]of [['native',PerspectiveCamera],['three',T.PerspectiveCa
 });
 test('suspension holds the current render camera until authority and activation are resolved',()=>{
  const a=world(),follow=setup();follow.update(.016,a);const position=follow.camera.position.toArray(),state=follow.state;a.player.position.x=100;assert.equal(follow.update(.016,a,{suspended:true}),false);assert.deepEqual(follow.camera.position.toArray(),position);assert.equal(follow.state,state);
+});
+
+test('V follow camera stays behind the direction the player was looking',()=>{
+ const a=world(),follow=setup();for(const yaw of [0,Math.PI/2,Math.PI,-Math.PI/2]){a.player.yaw=yaw;follow.update(.016,a);const back=new Vector3(Math.sin(yaw),0,Math.cos(yaw)),fromPlayer=follow.camera.position.clone().sub(a.player.position);assert.ok(fromPlayer.dot(back)>2,'camera is behind gaze');}
 });

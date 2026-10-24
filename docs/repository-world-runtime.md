@@ -1,6 +1,6 @@
 # Repository worlds in the installed ElseMesh engine
 
-Open `worlds.html` from the same ElseMesh installation as `index.html`. The latter remains the default game entry and still calls `App.init()`. Repository mode constructs the actual `Engine`, `SceneRenderer`, `Input`, `Player` and native `Colliders`. It does not instantiate the default islands, boat or NetworkDemo.
+Open `index.html` for the repository-world runtime. `worlds.html` remains an alias used by existing owner applications. Repository mode constructs the actual `Engine`, `SceneRenderer`, `Input`, `Player` and native `Colliders`. It does not instantiate the default islands, boat or NetworkDemo.
 
 Use **Open world folder** to select an external repository containing `world.json`, its content addressed snapshot and assets. Public GitHub URLs are resolved once and all data is read from the resulting full commit. Check for update stages a validated revision and displays old/new commit identifiers without replacing the running world. Apply checked update is a separate deliberate action and disconnects the previous session; stale candidates cannot apply. No Git token is requested. `host.active.identity` records world ID, source location, commit when remote, content digest and session ID. External repositories remain content data and do not enter the engine source tree.
 

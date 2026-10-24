@@ -1,9 +1,7 @@
 # Owner-world implementation status
 
 This records the current prototype boundary. The public
-[warehouse snapshot](https://lozknowles.github.io/ElseMesh/) and the
-[legacy exploration game](https://lozknowles.github.io/ElseMesh/legacy.html) remain
-separate from connected private owner applications.
+[warehouse snapshot](https://lozknowles.github.io/ElseMesh/) is separate from connected private owner applications. The combined-island game is retired from current downloads.
 
 ## Architecture in use
 
