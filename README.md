@@ -6,7 +6,7 @@ The default game opens Loz's warehouse island: beaches, sea, mountains, the ware
 
 ## Download and play
 
-On the GitHub **Releases** page, download the **Loz-Warehouse-Island.zip** asset. It includes the built game, a pinned copy of the public opening world, its terrain and asset files, the splash, the two built-in player avatars and a tiny local web server. It does not need a GitHub connection to load the world. Extract it, run `node start-local.mjs` with Node.js 22.15 or newer, and open `http://127.0.0.1:18888/`. Browsers do not reliably run this game by double-clicking `index.html`.
+On the GitHub **Releases** page, download the **Loz-Warehouse-Island-Exit-TV.zip** asset. It includes the built game, a pinned copy of the public opening world, its terrain and asset files, the splash, the two built-in player avatars and a tiny local web server. It does not need a GitHub connection to load the world. Extract it, run `node start-local.mjs` with Node.js 22.15 or newer, and open `http://127.0.0.1:18888/`. Browsers do not reliably run this game by double-clicking `index.html`.
 
 WASD walks, mouse drag or arrow keys look, Shift runs, Space jumps, E uses nearby computers or the TV, V switches first-person/follow view, K designs your avatar and H shows or hides controls. Visiting another player's live world requires that player's separate owner application and permission; this downloadable copy is a single-player public snapshot.
 
