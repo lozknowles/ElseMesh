@@ -42,7 +42,8 @@ export class OwnerWorldTransport extends PortalTransport {
   this.ownerCorrections.add(requestId);if(this.ownerCorrections.size>256)this.ownerCorrections.delete(this.ownerCorrections.values().next().value);
   this.events.stateCorrection(result);return true;
  }
- async request(type,data={}){
+ async request(type,data={}, {nonfatal=false}={}){
+  if(nonfatal&&!['world-welcome-read','world-welcome-ack'].includes(type))throw Error('Optional request mode is limited to welcome delivery');
   if(data.reservationId&&this.recoveryContext?.reservation?.id===data.reservationId)data={...data,sourceWorldId:this.recoveryContext.reservation.sourceWorldId};
   const target=data.worldId??data.sourceWorldId??this.worldId,connection=this.connectionEpoch;
   try{
@@ -52,7 +53,7 @@ export class OwnerWorldTransport extends PortalTransport {
    if(result?.type==='pose-corrected'||result?.rejectedSequence!==undefined||result?.acceptedSequence!==undefined)await this.verifyStateCorrection(result,{type,requestId,state,connection,context});
    if(type==='presence')this.markWorldLive(target,epoch,connection);
    return result;
-  }catch(error){if(connection===this.connectionEpoch)this.markWorldOffline(target);throw error;}
+  }catch(error){if(!nonfatal&&connection===this.connectionEpoch)this.markWorldOffline(target);throw error;}
  }
  async authenticatedRequest(operation,data={},action,worldId=data.worldId??this.worldId){
   const challenge=await this.request('owner-challenge',{worldId,action,sessionId:this.membership?.sessionId,portalId:data.portalId});

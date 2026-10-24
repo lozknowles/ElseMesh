@@ -17,9 +17,9 @@ class ScreenConsole {
 
 export class C64Computer {
   constructor(app) {
-    this.app=app; this.lines=[]; this.active=false; this.loggedIn=false; this.username=''; this.commandQueue=Promise.resolve();
+    this.app=app; this.lines=[]; this.active=false; this.loggedIn=false; this.username=''; this.commandQueue=Promise.resolve(); this.commandGeneration=0;
     this.console=new ScreenConsole((text,newline)=>this.write(text,newline));
-    this.interpreter=new Interpreter(this.console);
+    this.interpreter=this.createInterpreter();
     this.dialog=document.createElement('dialog'); this.dialog.className='elsemesh-c64-terminal';
     this.dialog.setAttribute('aria-label','Commodore 64 computer');
     this.dialog.innerHTML=`<style>
@@ -34,10 +34,24 @@ export class C64Computer {
     </style><div class="elsemesh-c64-shell"><section class="elsemesh-c64-monitor"><div class="elsemesh-c64-screen" role="log" aria-live="polite"></div><form class="elsemesh-c64-form"><input class="elsemesh-c64-input" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="C64 command"><button>RETURN</button><button type="button" class="elsemesh-c64-exit">LEAVE</button></form><div class="elsemesh-c64-meta"><span>COMMODORE 64 · MICROSOFT 6502 BASIC 1.1</span><span>ENTER PROGRAM LINES · RUN · LIST · SAVE "NAME" · ESC LEAVES</span></div></section></div>`;
     document.body.append(this.dialog);
     this.screen=this.dialog.querySelector('.elsemesh-c64-screen'); this.input=this.dialog.querySelector('.elsemesh-c64-input');
-    this.dialog.querySelector('form').addEventListener('submit',event=>{event.preventDefault();const command=this.input.value;this.input.value='';this.commandQueue=this.commandQueue.then(()=>this.submit(command));});
+    this.dialog.querySelector('form').addEventListener('submit',event=>{event.preventDefault();const command=this.input.value;this.input.value='';this.enqueue(command);});
     this.dialog.querySelector('.elsemesh-c64-exit').onclick=()=>this.close();
     this.dialog.addEventListener('cancel',event=>{event.preventDefault();this.close();});
     this.write('ELSEMESH WAREHOUSE NETWORK',true); this.write('COMMODORE 64 TERMINAL 01',true); this.write('',true); this.write('LOGIN:',true);
+  }
+  createInterpreter() {
+    const generation=this.commandGeneration;
+    const output=new ScreenConsole((text,newline)=>{if(this.active&&generation===this.commandGeneration)this.write(text,newline);});
+    return new Interpreter(output,{executionControl:{isAuthorized:()=>{
+      if(!this.active||generation!==this.commandGeneration)return false;
+      if(this.app.canExecute?.()===false){this.close();return false;}
+      return true;
+    }}});
+  }
+  enqueue(command) {
+    const generation=this.commandGeneration;
+    this.commandQueue=this.commandQueue.then(()=>{if(this.active&&generation===this.commandGeneration)return this.submit(command,generation);}).catch(error=>{if(this.active&&generation===this.commandGeneration)this.write(error?.message??'?ERROR',true);});
+    return this.commandQueue;
   }
   write(text,newline=true) {
     if(text==='\f')this.lines=[];
@@ -46,13 +60,20 @@ export class C64Computer {
     else this.lines.push(text);
     this.lines=this.lines.slice(-MAX_LINES); this.screen.textContent=this.lines.slice(-25).join('\n'); this.screen.scrollTop=this.screen.scrollHeight;
   }
-  async submit(raw) {
+  async submit(raw,generation=this.commandGeneration) {
+    if(this.active===false||generation!==this.commandGeneration)return;
+    if(this.app.canCommand&&!await this.app.canCommand()){this.close({resume:false});return;}
+    if(this.active===false||generation!==this.commandGeneration)return;
     const command=raw.trim(); if(!command)return;
     this.write((this.loggedIn?']':'LOGIN: ')+command,true);
     if(!this.loggedIn){this.username=command.replace(/[^A-Z0-9_-]/gi,'').slice(0,16)||'GUEST';this.loggedIn=true;this.write('',true);this.write(`WELCOME ${this.username.toUpperCase()}`,true);this.write('MICROSOFT BASIC 1.1',true);this.write('FOR THE 6502 MICROPROCESSOR',true);this.write('',true);this.write('READY.',true);return;}
     try { await this.interpreter.processInput(command); }
-    catch(error) { this.write(error?.toString?.()||'?ERROR',true); this.write('READY.',true); }
+    catch(error) { if(this.active&&generation===this.commandGeneration){this.write(error?.toString?.()||'?ERROR',true); this.write('READY.',true);} }
   }
-  open(){if(this.active)return;this.active=true;this.app.input.suspend();document.exitPointerLock?.();this.dialog.showModal();this.input.focus();}
-  close(){if(!this.active)return;this.active=false;this.dialog.close();this.app.input.resume();this.app.input.requestLock();}
+  open(){if(this.active)return;
+    const lines=this.interpreter?.program.list()??[];
+    this.commandGeneration++;this.active=true;this.commandQueue=Promise.resolve();this.interpreter=this.createInterpreter();
+    for(const line of lines){const match=line.match(/^(\d+)\s*(.*)/);if(match)this.interpreter.program.addLine(Number(match[1]),match[2]);}
+this.app.input.suspend();document.exitPointerLock?.();this.dialog.showModal();this.input.focus();}
+  close({resume=true}={}){this.commandGeneration=(this.commandGeneration??0)+1;this.commandQueue=Promise.resolve();this.interpreter?.cancelExecution();if(!this.active)return;this.active=false;this.dialog.close();if(resume&&(this.app.canResume?.()??true)){this.app.input.resume();this.app.input.requestLock();}}
 }

@@ -36,11 +36,14 @@ LOAD "DEMO"
 
 The interpreter is the MIT-licensed BASIC-M6502-TS browser build derived from Microsoft's open-source 6502 BASIC. The integration does not ship proprietary Commodore ROMs. `SAVE` and `LOAD` use browser local storage. **Leave** or **Escape** returns to the game.
 
-## Esmie
+## First-arrival welcome
 
-After one uninterrupted minute of play, Esmie from Edinburgh gives a faint, 29.6-second account of the islands' wrecks, hidden treasure and connected past. Her voice belongs to the entire game rather than this warehouse: a different childhood memory is selected about every five minutes wherever the player is, with immediate repeats prevented. The memory pool mentions the Royal Mile, Calton Hill, Edinburgh Castle, the Water of Leith, Greyfriars Kirkyard, Arthur's Seat and Waverley Station.
-
-The user-selected Alba voice (`en_GB-alba-medium.onnx`) was generated through a private Agent Control speech service. The eight qualified WAV files and a hash/provenance manifest with infrastructure details redacted are bundled under `public/audio/esmie/`, so no speech credential or provider endpoint is exposed to the browser. Playback is deliberately quiet, non-spatial and heard as an internal voice. There is no character, caption, speech bubble, toast or dialogue panel. Audio respects the game mute setting and pauses while the browser tab is hidden.
+The random Esmie ambient voice and its exclusive bundled audio have been removed.
+Worlds can instead author a Welcome greeting in the editor. The repository runtime
+shows that text and offers native local-voice speech after the first acknowledged
+arrival. Private visit records stay outside world repositories. See
+[the welcome authority contract](owner-world-welcome.md). Browser speech availability
+and audible client playback require separate qualification.
 
 ## Agent Control reference-detail operation
 
@@ -48,4 +51,7 @@ The second reference pass adds arched window transoms, roof plates and rivets, m
 
 ## Verification
 
-`test/portal-warehouse.mjs` validates the retained circulation zones, reference details, programmable BASIC execution, queued terminal input, Esmie timing/content, the absence of popup code, redacted Alba provenance, WAV structure and the 28–32 second introductory duration. Runtime evidence is captured on a Windows WebGPU browser; the capture camera and accelerated Esmie timer are evidence fixtures and do not alter production timing.
+`test/portal-warehouse.mjs` checks retained circulation zones, reference detail,
+programmable BASIC execution, queued terminal input and removal of ambient voice
+initialization/assets. Welcome authority and client delivery have separate focused
+tests; their programmatic speech checks do not establish audible playback.

@@ -27,8 +27,8 @@ for(const reserved of ['legacy.html','opening-world.json','.nojekyll']){
   try{await fs.lstat(path.join(build,reserved));throw Error('Build contains reserved packaging path: '+reserved);}catch(error){if(error.code!=='ENOENT')throw error;}
 }
 const legacy=await fs.readFile(path.join(build,'index.html'),'utf8'),runtime=await fs.readFile(path.join(build,'worlds.html'),'utf8');
-if(!runtime.includes('id="legacy-game"')||!runtime.includes('href="./index.html"'))throw Error('Repository runtime entry is missing its legacy link.');
-const publicRuntime=runtime.replace('href="./index.html"','href="./legacy.html"');
+if(runtime.includes('id="legacy-game"'))throw Error('Repository runtime must not link to the retired combined-map game.');
+const publicRuntime=runtime;
 const entryPages=new Map();
 for(const name of ['play-online.html','network-demo.html']){
   const html=await fs.readFile(path.join(build,name),'utf8');

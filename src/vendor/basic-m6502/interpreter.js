@@ -46,7 +46,12 @@ export class Interpreter {
             tokenIndex: 0,
         },
     };
-    constructor(console) {
+    executionGeneration = 0;
+    executionCancelled = false;
+    executionSteps = 0;
+    executionLastYield = 0;
+    constructor(console, { executionControl = {} } = {}) {
+        this.executionControl = executionControl;
         if (!console)
             throw new Error('A browser ConsoleIO adapter is required');
         this.console = console;
@@ -55,6 +60,33 @@ export class Interpreter {
         this.evaluator.setUserFunctionLookup((name) => {
             return this.userFunctions.get(name);
         });
+    }
+    /** Cancel the current generation, including CONT, without authorizing future work. */
+    cancelExecution() {
+        this.executionGeneration++;
+        this.executionCancelled = true;
+        this.state.running = false;
+        this.state.interrupted = false;
+        this.state.continueState.canContinue = false;
+    }
+    executionAllowed(generation) {
+        if (generation !== this.executionGeneration || this.executionCancelled) return false;
+        if (this.executionControl.isAuthorized?.() === false) {
+            this.cancelExecution();
+            return false;
+        }
+        return true;
+    }
+    /** Yield to a browser task so input, lease renewal and revocation timers can run. */
+    async executionCheckpoint(generation) {
+        if (!this.executionAllowed(generation)) return false;
+        const now = performance.now();
+        if (++this.executionSteps >= 128 || now - this.executionLastYield >= 8) {
+            this.executionSteps = 0;
+            this.executionLastYield = now;
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+        return this.executionAllowed(generation);
     }
     /**
      * Load a BASIC program from source text
@@ -152,6 +184,7 @@ export class Interpreter {
      * Process a line of input
      */
     async processInput(line) {
+        if (!this.executionAllowed(this.executionGeneration)) return;
         const trimmed = line.trim();
         if (trimmed === '') {
             return;
@@ -175,17 +208,19 @@ export class Interpreter {
      * Execute a direct mode command
      */
     async executeDirect(line) {
+        const execution = this.executionGeneration;
         const tokens = this.tokenizer.tokenize(line);
         this.state.currentLine = null;
         this.state.tokenIndex = 0;
         await this.executeTokens(tokens);
-        this.printReady();
+        if (this.executionAllowed(execution)) this.printReady();
     }
     /**
      * Execute tokenized statement(s)
      * Returns ExecutionResult if control flow change, undefined for normal continuation
      */
     async executeTokens(tokens) {
+        const execution = this.executionGeneration;
         this.state.tokenIndex = 0;
         while (this.state.tokenIndex < tokens.length) {
             const token = tokens[this.state.tokenIndex];
@@ -198,8 +233,10 @@ export class Interpreter {
                 this.state.tokenIndex++;
                 continue;
             }
-            // Execute statement
+            // Authorization and cancellation apply to every statement, including loops.
+            if (!await this.executionCheckpoint(execution)) return { type: 'end' };
             const result = await this.executeStatement(tokens);
+            if (!this.executionAllowed(execution)) return { type: 'end' };
             if (result && result.type !== 'continue') {
                 return result;
             }
@@ -326,9 +363,11 @@ export class Interpreter {
      * Run program starting from a specific line
      */
     async runFromLine(startLine) {
+        const execution = this.executionGeneration;
         let currentLineNum = startLine;
         this.state.interrupted = false;
         while (currentLineNum !== undefined && this.state.running) {
+            if (!await this.executionCheckpoint(execution)) return;
             // Check for Ctrl+C interrupt
             if (this.state.interrupted) {
                 this.state.interrupted = false;
@@ -348,6 +387,7 @@ export class Interpreter {
             this.state.tokenIndex = 0;
             try {
                 const result = await this.executeTokens(line.tokens);
+                if (!this.executionAllowed(execution)) return;
                 // Handle control flow results
                 if (result) {
                     switch (result.type) {

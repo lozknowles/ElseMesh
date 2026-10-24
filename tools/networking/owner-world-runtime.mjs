@@ -11,7 +11,9 @@ import {OwnerWorldAuthority,playerIdForNode} from '../../network/owner-world-aut
 import {createOwnerPeerRpc} from '../../network/owner-peer-rpc.mjs';
 import {canonical,nodeId,signObject,verifyObject} from '../../network/identity.mjs';
 import {validateAppearance} from '../../src/player/AvatarAppearance.js';
-import {portalLocalPoint} from '../../src/world-runtime/vendor/world-engine-contract.js';
+import {OwnerWorldWelcome} from '../../network/owner-world-welcome.mjs';
+import {OwnerObjectAccess} from '../../network/owner-object-access.mjs';
+import {loadWorldSource,portalLocalPoint} from '../../src/world-runtime/vendor/world-engine-contract.js';
 const check=(v,m)=>{if(!v)throw Error(m);},MAX=128*1024*1024;
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css','.json':'application/json','.png':'image/png','.jpg':'image/jpeg','.svg':'image/svg+xml','.glb':'model/gltf-binary','.woff2':'font/woff2'};
 /** Local native owner facade: immutable local content and a single local authority. */
@@ -22,7 +24,7 @@ export async function createOwnerWorldRuntime({root,config,identity,host='127.0.
  const security=roomSecurity({host,publicOrigin:null,production:false});root=await realpath(root);
  const prepared=await prepareRepositoryConfig(config,identity),world=prepared.worlds[0],contacts=new Map(config.contacts.map(c=>[c.worldId,c]));
  check(contacts.has(world.worldId)&&contacts.get(world.worldId).authorityNodeId===identity.nodeId,'Local contact authority mismatch');
- const sessions=new Map(),routes=new Map(),replay=new Map();let authority,rpc;
+ const sessions=new Map(),routes=new Map(),replay=new Map();let authority,rpc,objectAccess,worldWelcome;
  const descriptor=id=>{const c=contacts.get(id);check(c,'Unknown owner world');return c.descriptor;};
  const localDescriptor=descriptor(world.worldId);
  check(canonical(localDescriptor.binding)===canonical(world.binding)&&canonical(localDescriptor.published)===canonical(world.published)&&localDescriptor.contentDigest===world.contentDigest,'Local descriptor/content mismatch');
@@ -39,6 +41,8 @@ export async function createOwnerWorldRuntime({root,config,identity,host='127.0.
   if(op==='owner-challenge'){check(p.worldId===world.worldId,'Wrong challenge owner');return invoke('challenge',{playerId:s.playerId,playerNodeId:s.nodeId,action:p.action,sessionId:p.sessionId??s.sessionId,portalId:p.portalId??null});}
   if(op==='subscribe'){check(p.worldId===world.worldId&&p.proof?.signer===s.nodeId,'Wrong VIEW subject');const grant=await invoke('subscribe',{proof:p.proof});s.grants.set(world.worldId,grant);s.sessionId=grant.sessionId;const member=authority.state({grantId:grant.grantId});if(member){s.worldId=world.worldId;s.motion=member.motion;s.generation=member.generation;s.sequence=member.sequence;s.sessionId=member.sessionId;}return {...localDescriptor,viewExpiresAt:grant.expiresAt};}
   const grant=s.grants.get(world.worldId);
+  if(op.startsWith('world-welcome-'))return worldWelcome.handle(envelope,s,grant);
+  if(op.startsWith('object-'))return objectAccess.handle(envelope,s,grant);
   if(op==='owner-enter-local'){
    check(s.worldId===world.worldId,'Player membership belongs to a remote owner; recover original transfer');
    check(p.proof?.signer===s.nodeId,'Wrong ENTER subject');const existing=grant&&authority.state({grantId:grant.grantId,playerId:s.playerId});
@@ -84,6 +88,7 @@ export async function createOwnerWorldRuntime({root,config,identity,host='127.0.
  }
  rpc=rpcFactory({identity,contacts:config.contacts.filter(c=>c.authorityNodeId!==identity.nodeId).map(c=>({nodeId:c.authorityNodeId,publicKeyPem:c.publicKeyPem})),relayUrl,handler:({callerNodeId,operation,payload})=>{authority.peer(callerNodeId);if(operation==='owner-browser')return receive(payload);if(operation==='owner-presentation'){const t=authority.ledger.snapshot().transfers[payload.transferId];check(t?.role==='DESTINATION'&&t.status==='COMMITTED'&&t.binding.sourceAuthority===callerNodeId&&contacts.get(payload.sourceWorldId)?.authorityNodeId===callerNodeId&&payload.destinationWorldId===world.worldId&&payload.generation===t.binding.generation+1,'Arrival presentation transfer mismatch');const committedAt=t.receipt.committedAt??Date.now();return signObject({protocol:'elsemesh.portal-presentation/1',type:'portal-arrival',transferId:payload.transferId,playerNodeId:t.binding.playerNodeId,playerId:t.binding.playerId,sourceWorldId:payload.sourceWorldId,destinationWorldId:world.worldId,destinationGeneration:payload.generation,authorityEpoch:localDescriptor.epoch,committedAt,expiresAt:committedAt+3000},identity);}return authority.dispatch(operation,payload,{callerNodeId});}});
  authority=await OwnerWorldAuthority.open({identity,published:world.published,delegation:world.delegation,trustedOwners:new Set(config.trustedOwners),peers:config.peers,ledgerPath:config.ledgerPath,policy:config.policy,readWorld,clearance:({spawn,reservations,members})=>world.clearance(spawn.position)&&![...members.map(m=>m.motion),...reservations.map(t=>t.reservation?.spawn)].filter(Boolean).some(m=>Math.hypot(m.position[0]-spawn.position[0],m.position[2]-spawn.position[2])<.65&&Math.abs(m.position[1]-spawn.position[1])<1.8),rpc:(node,...args)=>{authority.peer(node);return rpc.request(node,...args);}});
+ try{const project=(await loadWorldSource(world.source)).project;worldWelcome=new OwnerWorldWelcome({project,world,identity,authority});objectAccess=new OwnerObjectAccess({project,world,identity,authority,players:config.players??{},adminDelegations:config.objectAdminDelegations??[]});}catch(error){await authority.close();await rpc.close();throw error;}
  const wss=new WebSocketServer({noServer:true,maxPayload:192*1024,perMessageDeflate:false});
  const runtimeConfig={protocol:'elsemesh.owner-runtime/1',endpoint:'/__worlds',defaultWorldId:world.worldId,worldIds:[...contacts.keys()],worlds:[...contacts.values()].map(c=>({worldId:c.worldId,name:c.descriptor.name??c.worldId,contentDigest:c.descriptor.contentDigest})),serverNodeId:identity.nodeId,trustedOwners:config.trustedOwners,trustedAuthorities:[...contacts.values()].map(c=>c.authorityNodeId),contacts:[...contacts.values()].map(c=>({worldId:c.worldId,authorityNodeId:c.authorityNodeId,authorityWorldId:c.descriptor.published.descriptor.worldId}))};
  const server=createServer(async(req,res)=>{try{
@@ -94,7 +99,7 @@ export async function createOwnerWorldRuntime({root,config,identity,host='127.0.
  server.on('upgrade',(req,socket,head)=>{if(req.url!=='/__worlds'||!security.accept(req,server.address().port)){socket.destroy();return;}wss.handleUpgrade(req,socket,head,peer=>{
   let subject=null,authenticating=false,queuedRequests=0;const targetLanes=new Map();const challenge={protocol:'elsemesh.repository-auth/1',nonce:randomBytes(32).toString('hex'),expiresAt:Date.now()+10000,path:'/__worlds'};sendBounded(peer,JSON.stringify({type:'challenge',challenge}));const timer=setTimeout(()=>peer.close(1008,'Authentication timeout'),10000);timer.unref();
   peer.on('message',async bytes=>{let p,targetKey,workLane;try{p=JSON.parse(bytes.toString());if(!subject){check(!authenticating,'Authentication already pending');authenticating=true;check(p.type==='authenticate'&&Date.now()<challenge.expiresAt&&typeof p.publicKey==='string'&&p.publicKey.length<2000&&verify(null,Buffer.from(canonical(challenge)),p.publicKey,Buffer.from(p.signature,'base64')),'Browser identity rejected');const candidate=nodeId(p.publicKey);if(!config.players?.[candidate]){sendBounded(peer,JSON.stringify({type:'pending',nodeId:candidate}));peer.close(1008,'Pending owner enrolment');return;}subject=candidate;clearTimeout(timer);sendBounded(peer,JSON.stringify({type:'welcome',...welcome(session(subject))}));return;}
-   check(p.type==='owner-envelope'&&p.envelope?.signer===subject,'Signed owner request required');const e=p.envelope,s=session(subject),target=e.payload?.reservationId?(e.payload.sourceWorldId??routes.get(e.payload.reservationId)??s.worldId):(e.operation==='owner-challenge'||['subscribe','describe','read','unsubscribe','presence'].includes(e.operation)?e.payload.worldId:s.worldId);
+   check(p.type==='owner-envelope'&&p.envelope?.signer===subject,'Signed owner request required');const e=p.envelope,s=session(subject),target=e.payload?.reservationId?(e.payload.sourceWorldId??routes.get(e.payload.reservationId)??s.worldId):(e.operation==='owner-challenge'||['subscribe','describe','read','unsubscribe','presence','object-overlay-read'].includes(e.operation)?e.payload.worldId:s.worldId);
    check(contacts.has(target),'Unknown owner world');
    let lane=targetLanes.get(target);if(!lane){lane={tail:Promise.resolve(),queued:0};targetLanes.set(target,lane);}
    // A browser may time out before an older peer operation finishes. Queue its

@@ -41883,6 +41883,48 @@ var WebGLRenderer = class {
   }
 };
 
+// src/domain/object-access.ts
+var OBJECT_ACCESS_SCHEMA = "elsemesh.object-access/1";
+function supportedObjectAccessActions(project, objectId) {
+  const object3 = project.objects.find((o) => o && o.id === objectId);
+  if (!object3) return [];
+  const actions = object3.kind === "neon-sign" ? ["neon.power", "neon.configure"] : [];
+  if (object3.kind === "computer" || project.terminals?.some((t) => t && t.objectId === objectId)) actions.push("computer.use");
+  return actions;
+}
+function effectiveObjectAccess(project) {
+  if (Object.prototype.hasOwnProperty.call(project, "objectAccess")) {
+    const errors = validateObjectAccess(project);
+    if (errors.length) throw Error(errors[0]);
+    return structuredClone(project.objectAccess);
+  }
+  return { schema: OBJECT_ACCESS_SCHEMA, rules: project.objects.flatMap((o) => {
+    const actions = supportedObjectAccessActions(project, o.id);
+    return actions.length ? [{ objectId: o.id, actions }] : [];
+  }) };
+}
+function validateObjectAccess(project) {
+  if (!Object.prototype.hasOwnProperty.call(project, "objectAccess")) return [];
+  const value = project.objectAccess;
+  const record4 = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+  if (!record4(value) || Object.keys(value).some((k) => !["schema", "rules"].includes(k)) || value.schema !== OBJECT_ACCESS_SCHEMA || !Array.isArray(value.rules) || value.rules.length > 2e3) return ["Invalid object access policy."];
+  const seen = /* @__PURE__ */ new Set();
+  for (const rule of value.rules) {
+    if (!record4(rule) || Object.keys(rule).some((k) => !["objectId", "actions"].includes(k)) || typeof rule.objectId !== "string" || !rule.objectId.trim() || rule.objectId.length > 200 || seen.has(rule.objectId) || !Array.isArray(rule.actions) || rule.actions.length > 3 || new Set(rule.actions).size !== rule.actions.length) return ["Invalid or duplicate object access rule."];
+    seen.add(rule.objectId);
+    const objects = Array.isArray(project.objects) ? project.objects : [], supported = supportedObjectAccessActions({ objects, terminals: Array.isArray(project.terminals) ? project.terminals : [] }, rule.objectId);
+    if (!objects.some((o) => o && o.id === rule.objectId) || !supported.length || rule.actions.some((a) => !supported.includes(a))) return ["Object access rule references an unsupported object or action."];
+  }
+  return [];
+}
+function setObjectAccessActions(project, objectId, actions) {
+  const policy = effectiveObjectAccess(project);
+  const next = { ...project, objectAccess: { schema: OBJECT_ACCESS_SCHEMA, rules: [...policy.rules.filter((r) => r.objectId !== objectId), ...actions.length ? [{ objectId, actions }] : []] } };
+  const errors = validateObjectAccess(next);
+  if (errors.length) throw Error(errors[0]);
+  return next;
+}
+
 // src/domain/road-traffic.ts
 var record = (v) => !!v && typeof v === "object" && !Array.isArray(v);
 var keys = (v, allowed) => Object.keys(v).every((k) => allowed.includes(k));
@@ -43219,7 +43261,7 @@ function cloneSubtrees(project, ids) {
     clone.parentId = map.get(o.parentId);
     return clone;
   });
-  return { objects, rootIds: roots.map((id3) => map.get(id3)) };
+  return { objects, rootIds: roots.map((id3) => map.get(id3)), ...project.objectAccess ? { objectAccess: { ...project.objectAccess, rules: project.objectAccess.rules.filter((r) => map.has(r.objectId)).map((r) => ({ ...r, objectId: map.get(r.objectId), actions: [...r.actions] })) } } : {}, ...project.terminals ? { terminals: project.terminals.filter((t) => map.has(t.objectId)).map((t) => ({ ...t, id: crypto.randomUUID(), objectId: map.get(t.objectId), ...t.screenObjectId ? { screenObjectId: map.get(t.screenObjectId) ?? t.screenObjectId } : {}, ...t.screenObjectIds ? { screenObjectIds: t.screenObjectIds.map((id3) => map.get(id3) ?? id3) } : {} })) } : {} };
 }
 var treeBoundsCache = /* @__PURE__ */ new Map();
 function objectLocalBounds(project, o) {
@@ -44138,6 +44180,15 @@ function validateWorld(value) {
   if (p.geography !== void 0) errors.push(...validateGeography(p.geography, p.terrain));
   if (p.terrainImagery !== void 0) errors.push(...validateTerrainImagery(p.terrainImagery, p.geography));
   errors.push(...validateWorldConnections(p));
+  errors.push(...validateObjectAccess(p));
+  if (Object.prototype.hasOwnProperty.call(p, "welcome")) {
+    const greeting = p.welcome;
+    if (!greeting || typeof greeting !== "object" || Array.isArray(greeting) || Object.keys(greeting).some((k) => !["schema", "text", "audio"].includes(k))) errors.push("Invalid welcome greeting.");
+    else {
+      const g = greeting;
+      if (g.schema !== "elsemesh.world-welcome/1" || typeof g.text !== "string" || !g.text.trim() || g.text.length > 2e3 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(g.text) || typeof g.audio !== "boolean") errors.push("Welcome greeting must contain 1–2000 plain text characters and a read aloud choice.");
+    }
+  }
   errors.push(...validateRoadTraffic(p.traffic, Array.isArray(p.assets) ? p.assets : []));
   errors.push(...validateLandscape(p));
   if (!p.landscape && Array.isArray(p.objects) && p.objects.some((o) => o.landscapeOrigin)) errors.push("Landscape origins require landscape/1.");
@@ -44297,6 +44348,8 @@ function validateWorld(value) {
 }
 function playerWorldCapabilities(project) {
   return [
+    "object-access/1",
+    ...project.welcome ? ["welcome/1"] : [],
     ...project.landscape ? ["project/3", "landscape/1"] : [],
     ...project.traffic ? ["port-traffic/1"] : [],
     ...project.objects.some((o) => o.collisionOnly) ? ["collision-volumes/1"] : []
@@ -44311,7 +44364,7 @@ function validatePlayerWorldPackage(value) {
   const result = validateWorld(p.project);
   if (!result.valid || !result.project) return result;
   if (p.schema === LANDSCAPE_PLAYER_WORLD_SCHEMA !== !!result.project.landscape) return invalid("Landscape requires player-world/3 capabilities.");
-  const required = playerWorldCapabilities(result.project);
+  const required = playerWorldCapabilities(result.project).filter((c) => c !== "object-access/1" || result.project.objectAccess !== void 0 || Array.isArray(p.capabilities) && p.capabilities.includes(c));
   if (required.length) {
     if (!Array.isArray(p.capabilities) || p.capabilities.length !== required.length || new Set(p.capabilities).size !== required.length || !required.every((c) => p.capabilities.includes(c))) return invalid("Unsupported or missing player world capabilities.");
   } else if (p.capabilities !== void 0) return invalid("Unexpected player world capabilities.");
@@ -44399,7 +44452,7 @@ var PREVIOUS_WORLD_REPOSITORY_SCHEMA = "elsemesh.world-repository/2";
 var CONNECTION_WORLD_REPOSITORY_SCHEMA = "elsemesh.world-repository/3";
 var WORLD_REPOSITORY_SCHEMA = "elsemesh.world-repository/4";
 var WORLD_ENGINE_CONTRACT = "elsemesh.worlds.runtime/1";
-var WORLD_CAPABILITIES = ["project/2", "project/3", "landscape/1", "terrain", "objects", "hierarchy", "features", "neon-sign", "computer", "geography", "terrain-imagery", "weather", "portal/1", "water/1", "retro-terminal/1", "port-traffic/1", "collision-volumes/1"];
+var WORLD_CAPABILITIES = ["welcome/1", "object-access/1", "project/2", "project/3", "landscape/1", "terrain", "objects", "hierarchy", "features", "neon-sign", "computer", "geography", "terrain-imagery", "weather", "portal/1", "water/1", "retro-terminal/1", "port-traffic/1", "collision-volumes/1"];
 var WORLD_REPOSITORY_MANIFEST = "world.json";
 var WORLD_REPOSITORY_MANIFEST_LIMIT = 64 * 1024;
 var ENGINE_REFERENCE = "95719848d5ffa4428b57c75c272483e1c2113a72";
@@ -44472,9 +44525,9 @@ async function packWorldRepository(project, options = {}) {
     const { dataUrl, ...metadata } = image;
     return { ...metadata, file: await binary(dataUrl, "landscape-images", image.mediaType === "image/png" ? "png" : "jpg") };
   })) } : void 0;
-  const extended = project.portals !== void 0 || project.water !== void 0 || project.terminals !== void 0 || project.traffic !== void 0;
+  const extended = project.portals !== void 0 || project.water !== void 0 || project.terminals !== void 0 || project.traffic !== void 0 || project.objectAccess !== void 0 || project.welcome !== void 0;
   const activeRoles = landscape ? roles : extended ? connectionRoles : legacyRoles;
-  const values = { landscape, metadata: project.metadata, terrain: project.terrain, objects: project.objects, features: project.features ?? [], environment: project.environment, spawn: project.spawn, geography, assets, connections: { ...project.traffic !== void 0 ? { traffic: project.traffic } : {}, ...project.portals !== void 0 ? { portals: project.portals } : {}, ...project.water !== void 0 ? { water: project.water } : {}, ...project.terminals !== void 0 ? { terminals: project.terminals } : {} } };
+  const values = { landscape, metadata: project.metadata, terrain: project.terrain, objects: project.objects, features: project.features ?? [], environment: project.environment, spawn: project.spawn, geography, assets, connections: { ...project.welcome !== void 0 ? { welcome: project.welcome } : {}, ...project.objectAccess !== void 0 ? { objectAccess: project.objectAccess } : {}, ...project.traffic !== void 0 ? { traffic: project.traffic } : {}, ...project.portals !== void 0 ? { portals: project.portals } : {}, ...project.water !== void 0 ? { water: project.water } : {}, ...project.terminals !== void 0 ? { terminals: project.terminals } : {} } };
   const components = {};
   const contents = /* @__PURE__ */ new Map();
   for (const role of activeRoles) {
@@ -44546,7 +44599,7 @@ async function unpackWorldRepository(read) {
     imageryPlan = { metadata, ref, mediaType: ref.path.endsWith(".png") ? "image/png" : "image/jpeg" };
   }
   const connections = manifest.version >= 3 ? values.connections : {};
-  if (!object2(connections) || Object.keys(connections).some((key) => !["portals", "water", "terminals", "traffic"].includes(key))) throw new Error("Invalid repository connections component.");
+  if (!object2(connections) || Object.keys(connections).some((key) => !["portals", "water", "terminals", "traffic", "objectAccess", "welcome"].includes(key))) throw new Error("Invalid repository connections component.");
   const rawLandscape = manifest.version === 4 ? values.landscape : void 0;
   const imagePlans = [];
   if (rawLandscape !== void 0) {
@@ -44602,13 +44655,14 @@ async function unpackWorldRepository(read) {
   const project = validateProject(candidate);
   if (manifest.version >= 2) {
     if (Object.keys(project.metadata).some((key) => manifest.world?.[key] !== project.metadata[key]) || manifest.regions[0].regionId !== project.metadata.regionId) throw new Error("Manifest identity does not match scene metadata.");
-    if (requiredWorldCapabilities(project).some((capability) => !manifest.engine.requires.includes(capability))) throw new Error("Manifest omits a capability required by scene content.");
+    if (requiredWorldCapabilities(project).some((capability) => (capability !== "object-access/1" || project.objectAccess !== void 0) && !manifest.engine.requires.includes(capability))) throw new Error("Manifest omits a capability required by scene content.");
   }
   return project;
 }
 function requiredWorldCapabilities(project) {
-  const capabilities = /* @__PURE__ */ new Set([project.landscape ? "project/3" : "project/2", "terrain", "objects"]);
+  const capabilities = /* @__PURE__ */ new Set(["object-access/1", project.landscape ? "project/3" : "project/2", "terrain", "objects"]);
   if (project.landscape) capabilities.add("landscape/1");
+  if (project.welcome) capabilities.add("welcome/1");
   if (project.objects.some((o) => o.kind === "group" || o.parentId)) capabilities.add("hierarchy");
   for (const kind of ["neon-sign", "computer"]) if (project.objects.some((o) => o.kind === kind)) capabilities.add(kind);
   if (project.portals?.length) capabilities.add("portal/1");
@@ -48162,6 +48216,7 @@ export {
   NEON_PREFAB_SCHEMA,
   NEON_PRESETS,
   NEON_SIGN_SCHEMA,
+  OBJECT_ACCESS_SCHEMA,
   PLAYER_WORLD_SCHEMA,
   PORTAL_PLAYER_HEIGHT,
   PORTAL_PLAYER_RADIUS,
@@ -48216,6 +48271,7 @@ export {
   disposeAssetScene,
   disposeComputerGeometry,
   disposeNeonGeometry,
+  effectiveObjectAccess,
   effectiveObjectState,
   ensureLandscape,
   eraseGeneratedInstance,
@@ -48281,8 +48337,10 @@ export {
   sampleTerrain,
   sceneryParts,
   sculptTerrain,
+  setObjectAccessActions,
   stormState,
   subtreeIds,
+  supportedObjectAccessActions,
   sweepPortalCapsule,
   threeAtlas,
   treeWindOffset,
@@ -48298,6 +48356,7 @@ export {
   validateHierarchy,
   validateLandscape,
   validateNeonSign,
+  validateObjectAccess,
   validatePlayerWorldPackage,
   validateRoadTraffic,
   validateTerrainImagery,

@@ -79,7 +79,6 @@ import { WakeSim } from './ocean/WakeSim.js';
 import { Vegetation } from './world/Vegetation.js';
 import { loadScannedBark } from './world/vegetation/ScannedBark.js';
 import { SoundScape } from './audio/SoundScape.js';
-import { WarehouseGhost } from './world/WarehouseGhost.js';
 import { updateCameraVelocity, useStaticVelocity } from './post/CameraVelocity.js';
 import { Weather } from './fx/Weather.js';
 import { loadWeatherPreferences, saveWeatherPreferences } from './fx/weather-preferences.js';
@@ -400,7 +399,6 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.audio = qs.has( 'noAudio' ) ? null : new SoundScape();
 		this.player.audio = this.audio;
 		// Esmie is an internal voice for the complete world, independent of location.
-		this.esmie = new WarehouseGhost( this );
 		// the fishing game (rod, bites, catch, cooler, fish stand)
 		this.game = new Game( this );
 		this.needs = new SurvivalNeeds( this.game );
@@ -750,7 +748,6 @@ fn terrainWetness( xz: vec2f, h: f32 ) -> vec2f {
 		this.fourthIsland.update( dt );
 		this.fifthIsland.update( dt );
 		this.portIsland.update( dt );
-		this.esmie.update( dt );
 		this.monorail.marine.update(dt, this.camera.position);
 		this.avatar.update( dt, this.player, this.camera, this.freeCam );
 		if ( this.portIsland.driving ) this.avatar.group.visible = false;

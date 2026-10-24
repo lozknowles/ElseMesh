@@ -7,6 +7,7 @@ import {publishRegion,issueDelegation,verifyRegionVersion,verifyDelegation,creat
 import {repositoryFederationPortal} from '../../network/repository-federation.mjs';
 import {pinnedRepository,prepareRepositoryConfig} from './repository-world-server.mjs';
 import {createOwnerWorldRuntime} from './owner-world-runtime.mjs';
+import {issueObjectAdminDelegation} from '../../network/owner-object-access.mjs';
 import {loadWorldSource} from '../../src/world-runtime/vendor/world-engine-contract.js';
 const check=(ok,m)=>{if(!ok)throw Error(m);};
 const protocol='elsemesh.owner-contact/1';
@@ -82,21 +83,32 @@ export async function finalizeOwnerSetup({stateDir,peerAcceptance,enrollment,ava
  const authority=await existingIdentity(join(dir,'authority.json'));check(authority.nodeId===c.authorityNodeId,'Local authority key mismatch');
  await prepareRepositoryConfig(config,authority);await output(join(dir,'config.json'),config);return config;
 }
+export async function delegateObjectAdmin({stateDir,playerNodeId}={}){
+ const{dir,checkpoint:c}=await state(stateDir),config=await json(join(dir,'config.json')),owner=await existingIdentity(join(dir,'owner.json'));
+ check(owner.nodeId===c.ownerNodeId&&Object.hasOwn(config.players,playerNodeId),'Administrator must be an explicitly enrolled browser identity');
+ const delegation=issueObjectAdminDelegation(owner,{worldId:c.world.worldId,contentDigest:c.world.contentDigest,authorityNodeId:c.authorityNodeId,authorityEpoch:c.world.epoch,playerNodeId,expiresAt:c.world.binding.expiresAt});
+ const file=join(dir,'object-admin-delegations.json');let previous=[];try{previous=await json(file);}catch(e){if(e.code!=='ENOENT')throw e;}
+ check(Array.isArray(previous)&&previous.length<128,'Invalid administrator delegation store');
+ await writeFile(file,JSON.stringify([...previous.filter(d=>d.playerNodeId!==playerNodeId),delegation],null,2)+'\n',{mode:0o600});
+ return delegation;
+}
 export async function startOwnerSetup({stateDir,port=5201,relayUrl='ws://127.0.0.1:18891'}={}){
  const{dir,checkpoint:c}=await state(stateDir),config=await json(join(dir,'config.json')),identity=await existingIdentity(join(dir,'authority.json'));
  check(config.worlds.length===1&&config.contacts.length===2&&config.peers.length===2&&config.ledgerPath===join(dir,'ledger.sqlite')&&identity.nodeId===c.authorityNodeId,'Finalized owner config mismatch');
- return createOwnerWorldRuntime({root:c.staticRoot,config,identity,port,relayUrl});
+ let objectAdminDelegations=[];try{objectAdminDelegations=await json(join(dir,'object-admin-delegations.json'));}catch(e){if(e.code!=='ENOENT')throw e;}
+ return createOwnerWorldRuntime({root:c.staticRoot,config:{...config,objectAdminDelegations},identity,port,relayUrl});
 }
 async function cli(){
- if(process.argv[2]==='--help'){console.log('Owner world setup: init, invite/connect, accept, finalize, start. See docs/owner-world-setup.md. All options use --name value; keys are generated only by init on the owner machine.');return;}
+ if(process.argv[2]==='--help'){console.log('Owner world setup: init, invite/connect, accept, finalize, delegate-admin, start. See docs/owner-world-setup.md. All options use --name value; keys are generated only by init on the owner machine.');return;}
  const[command,...args]=process.argv.slice(2),options={};for(let i=0;i<args.length;i+=2){check(args[i]?.startsWith('--')&&args[i+1]&&!args[i+1].startsWith('--'),'Options require --name value');check(!Object.hasOwn(options,args[i]),'Duplicate option');options[args[i]]=args[i+1];}
- const allowed={init:['--state-dir','--world-root','--commit','--static-root'],invite:['--state-dir','--peer-contact','--peer-owner'],connect:['--state-dir','--peer-contact','--peer-owner'],accept:['--state-dir','--invitation'],finalize:['--state-dir','--peer-acceptance','--enrollment','--avatar-asset-id','--inventory-hash','--capacity'],start:['--state-dir','--port','--relay-url']};check(allowed[command]&&Object.keys(options).every(k=>allowed[command].includes(k)),'Unknown command or option');
+ const allowed={init:['--state-dir','--world-root','--commit','--static-root'],invite:['--state-dir','--peer-contact','--peer-owner'],connect:['--state-dir','--peer-contact','--peer-owner'],accept:['--state-dir','--invitation'],finalize:['--state-dir','--peer-acceptance','--enrollment','--avatar-asset-id','--inventory-hash','--capacity'],'delegate-admin':['--state-dir','--player-node'],start:['--state-dir','--port','--relay-url']};check(allowed[command]&&Object.keys(options).every(k=>allowed[command].includes(k)),'Unknown command or option');
  const stateDir=options['--state-dir'];check(stateDir,'--state-dir required');
  let result;
  if(command==='init')result=await initOwnerSetup({stateDir,worldRoot:options['--world-root'],commit:options['--commit'],staticRoot:options['--static-root']});
  else if(command==='invite'||command==='connect')result=await inviteOwnerSetup({stateDir,peerContact:await json(options['--peer-contact']),peerOwnerNodeId:options['--peer-owner']});
  else if(command==='accept')result=await acceptOwnerSetup({stateDir,invitation:await json(options['--invitation'])});
  else if(command==='finalize')result=await finalizeOwnerSetup({stateDir,peerAcceptance:await json(options['--peer-acceptance']),enrollment:await json(options['--enrollment']),avatarAssetId:options['--avatar-asset-id'],inventoryHash:options['--inventory-hash'],capacity:Number(options['--capacity']??16)});
+ else if(command==='delegate-admin')result=await delegateObjectAdmin({stateDir,playerNodeId:options['--player-node']});
  else if(command==='start'){const runtime=await startOwnerSetup({stateDir,port:Number(options['--port']??5201),relayUrl:options['--relay-url']??'ws://127.0.0.1:18891'});for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>runtime.close().then(()=>process.exit(0)));console.log(JSON.stringify({status:'LOCAL_OWNER_RUNTIME_STARTED',worldId:runtime.config.defaultWorldId,address:runtime.address}));return;}
  else throw Error('Command must be init, invite/connect, accept, finalize or start');
  console.log(JSON.stringify({status:command==='finalize'?'LOCAL_OWNER_CONFIG_READY_NOT_STARTED':'OWNER_SETUP_PHASE_READY',ownerNodeId:result.signer,worldId:result.descriptor?.worldId??result.worlds?.[0].worldId}));
