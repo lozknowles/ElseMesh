@@ -11,7 +11,7 @@ test('projected screen is a perspective quad and refuses rear, offscreen and cli
 test('whole-screen occlusion includes non-colliding meshes and avatars; wall behind TV does not hide',()=>{const f=fixture(),back=new T.Mesh(new T.BoxGeometry(30,12,.3),new T.MeshBasicMaterial());back.position.set(0,6,-91);f.root.add(back);let result=collectMediaScreenOccluders(f.active,{camera:f.camera,projection:f.projection,screenObjectId:'tv'});assert(result.complete);assert(mediaScreenUnobstructed(f.projection,f.camera,result.bounds,result));const prop=new T.Mesh(new T.BoxGeometry(.5,.5,.5),new T.MeshBasicMaterial());prop.position.set(6.5,5,-86);prop.userData.collision='none';f.root.add(prop);result=collectMediaScreenOccluders(f.active,{camera:f.camera,projection:f.projection,screenObjectId:'tv'});assert.equal(mediaScreenUnobstructed(f.projection,f.camera,result.bounds,result),false);f.root.remove(prop);result=collectMediaScreenOccluders(f.active,{camera:f.camera,projection:f.projection,screenObjectId:'tv',avatarRoots:[prop]});assert.equal(mediaScreenUnobstructed(f.projection,f.camera,result.bounds,result),false);assert.equal(mediaScreenUnobstructed(f.projection,f.camera,[],{complete:false}),false);});
 test('water proof requires installed enforcement and ALL five points strictly inside SAME bounded volume',()=>{const f=fixture(),water={surfaceExclusionsEnforced:true,surfaceExclusions:[volume]};assert(mediaScreenSurfaceExcluded({water},f.projection,f.camera));assert.equal(mediaScreenSurfaceExcluded({water:{...water,surfaceExclusionsEnforced:false}},f.projection,f.camera),false);assert.equal(mediaScreenSurfaceExcluded({water:{...water,surfaceExclusions:[{...volume,max:[Infinity,8.5,-63.5]}]}},f.projection,f.camera),false);const old=f.camera.position.y;f.camera.position.y=3.1+.025;assert.equal(mediaScreenSurfaceExcluded({water},f.projection,f.camera),false);f.camera.position.y=old;assert.equal(mediaScreenSurfaceExcluded({water:{...water,surfaceExclusions:[{...volume,max:[14.5,8.5,-85]},{...volume,id:'other',min:[-14.5,3.1,-85]}]}},f.projection,f.camera),false);});
 function fakeDOM(){const listeners=new Map(),messages=[];class Element{constructor(tag){this.tag=tag;this.style={};this.attributes={};this.children=[];this.contentWindow={postMessage:(...args)=>messages.push(args)};}append(...items){this.children.push(...items);}setAttribute(k,v){this.attributes[k]=v;}remove(){this.removed=true;}}const doc={body:new Element('body'),visibilityState:'visible',createElement:t=>new Element(t),exitPointerLock(){},addEventListener:(k,f)=>listeners.set(k,f),removeEventListener:k=>listeners.delete(k)},win={location:{origin:'http://localhost:18893'},addEventListener:(k,f)=>listeners.set(k,f),removeEventListener:k=>listeners.delete(k)};return {doc,win,listeners,messages};}
-test('iframe needs real Play after authorization, accepts only its own origin and tracks actual advancing time',()=>{const f=fixture(),dom=fakeDOM();let allowed=true,visible=true;const manager=new MediaScreen({getContext:()=>({ready:true,active:f.active,key:'session',camera:f.camera,viewport:f.viewport}),isAuthorized:(_id,action)=>allowed&&action==='media.play',isUnobstructed:()=>visible,document:dom.doc,window:dom.win});manager.enter({id:'tv',mediaScreen:config},f.active);assert.equal(manager.iframe,null);assert(manager.startPlayback());const iframe=manager.iframe;assert.equal(iframe.referrerPolicy,'strict-origin-when-cross-origin');const packet=info=>({source:iframe.contentWindow,origin:'https://www.youtube-nocookie.com',data:JSON.stringify({event:'infoDelivery',info})});manager.receive({...packet({playerState:1,currentTime:50}),origin:'https://attacker.test'});assert.equal(manager.status.currentTime,null);manager.receive(packet({playerState:1,currentTime:1}));manager.receive(packet({playerState:1,currentTime:2}));assert.equal(manager.diagnostics().advancedSeconds,1);visible=false;manager.update();assert.equal(manager.iframe,null);assert.equal(iframe.src,'about:blank');visible=true;manager.startPlayback();allowed=false;manager.update();assert.equal(manager.active,null);assert.equal(manager.iframe,null);manager.dispose();});
+test('iframe needs real Play after authorization, accepts only its own origin and tracks actual advancing time',()=>{const f=fixture(),dom=fakeDOM();let allowed=true,visible=true;const manager=new MediaScreen({getContext:()=>({ready:true,active:f.active,key:'session',camera:f.camera,viewport:f.viewport}),isAuthorized:(_id,action)=>allowed&&action==='media.play',isUnobstructed:()=>visible,document:dom.doc,window:dom.win});manager.enter({id:'tv',mediaScreen:config},f.active);assert.equal(manager.iframe,null);assert(manager.startPlayback());const iframe=manager.iframe;assert.equal(iframe.referrerPolicy,'strict-origin-when-cross-origin');const packet=info=>({source:iframe.contentWindow,origin:'https://www.youtube-nocookie.com',data:JSON.stringify({event:'infoDelivery',info})});manager.receive({...packet({playerState:1,currentTime:50}),origin:'https://attacker.test'});assert.equal(manager.status.currentTime,null);manager.receive(packet({playerState:1,currentTime:1}));manager.receive(packet({playerState:1,currentTime:2}));assert.equal(manager.diagnostics().advancedSeconds,1);visible=false;manager.update();assert.equal(manager.iframe,iframe);assert.equal(iframe.style.opacity,'0');manager.receive(packet({playerState:1,currentTime:3}));assert.equal(manager.diagnostics().advancedSeconds,2);manager.closeControls();assert.equal(manager.active?.object.id,'tv');assert.equal(manager.controlsOpen,false);assert.equal(iframe.style.pointerEvents,'none');visible=true;manager.update();assert.equal(manager.iframe,iframe);assert.equal(iframe.style.opacity,'1');assert.equal(iframe.style.pointerEvents,'none');manager.enter({id:'tv',mediaScreen:config},f.active);assert.equal(manager.controlsOpen,true);assert.equal(iframe.style.pointerEvents,'auto');assert.equal(manager.status.currentTime,3);allowed=false;manager.update();assert.equal(manager.active,null);assert.equal(manager.iframe,null);assert.equal(iframe.src,'about:blank');manager.dispose();});
 test('hidden tab destroys iframe/audio and embed errors stay explicit',()=>{const f=fixture(),dom=fakeDOM(),manager=new MediaScreen({getContext:()=>({ready:true,active:f.active,key:'session',camera:f.camera,viewport:f.viewport}),isAuthorized:()=>true,isUnobstructed:()=>true,document:dom.doc,window:dom.win});manager.enter({id:'tv',mediaScreen:config},f.active);manager.startPlayback();manager.receive({source:manager.iframe.contentWindow,origin:'https://www.youtube-nocookie.com',data:{event:'onError',info:150}});assert.match(manager.note.textContent,/does not allow embedding/);dom.doc.visibilityState='hidden';dom.listeners.get('visibilitychange')();assert.equal(manager.iframe,null);manager.dispose();});
 
 test('native fine-ground/zero-grass proof and flat indexed forest do not hide an empty warehouse cone',()=>{
@@ -47,4 +47,40 @@ test('unknown bounds and malformed sight volumes fail closed with a useful diagn
  }
  assert.equal(mediaScreenUnobstructed({...f.projection,world:[[NaN,0,0],...f.projection.world.slice(1)]},f.camera,[],{complete:true}),false);
  assert.equal(mediaScreenUnobstructed(f.projection,f.camera,[],{complete:false}),false);
+});
+
+test('TV can start while obstructed, continue offscreen and resume its picture without seeking',()=>{
+ const f=fixture(),dom=fakeDOM();let visible=false;
+ const manager=new MediaScreen({getContext:()=>({ready:true,active:f.active,key:'session',camera:f.camera,viewport:f.viewport}),isAuthorized:()=>true,isUnobstructed:()=>visible,document:dom.doc,window:dom.win});
+ manager.enter({id:'tv',mediaScreen:config},f.active);
+ assert(manager.startPlayback());
+ const iframe=manager.iframe;
+ assert.equal(manager.diagnostics().screenVisible,false);
+ assert.equal(iframe.style.opacity,'0');
+ manager.receive({source:iframe.contentWindow,origin:'https://www.youtube-nocookie.com',data:{event:'infoDelivery',info:{playerState:1,currentTime:5}}});
+ manager.closeControls();
+ assert.equal(manager.controlsOpen,false);
+ assert.equal(manager.active.object.id,'tv');
+ visible=true;manager.update();
+ assert.equal(manager.iframe,iframe);
+ assert.equal(manager.diagnostics().screenVisible,true);
+ assert.equal(iframe.style.opacity,'1');
+ manager.receive({source:iframe.contentWindow,origin:'https://www.youtube-nocookie.com',data:{event:'infoDelivery',info:{playerState:1,currentTime:8}}});
+ assert.equal(manager.diagnostics().advancedSeconds,3);
+ manager.dispose();
+ assert.equal(iframe.src,'about:blank');
+});
+
+test('offscreen TV and world change retain then close the exact player',()=>{
+ const f=fixture(),dom=fakeDOM();let key='session';
+ const manager=new MediaScreen({getContext:()=>({ready:true,active:f.active,key,camera:f.camera,viewport:f.viewport}),isAuthorized:()=>true,isUnobstructed:()=>true,document:dom.doc,window:dom.win});
+ manager.enter({id:'tv',mediaScreen:config},f.active);assert(manager.startPlayback());
+ const iframe=manager.iframe;manager.closeControls();
+ f.camera.lookAt(100,4.65,-82);manager.update();
+ assert.equal(manager.iframe,iframe);assert.equal(iframe.style.opacity,'0');
+ f.camera.lookAt(6.5,5.2,-89.8);manager.update();
+ assert.equal(manager.iframe,iframe);assert.equal(iframe.style.opacity,'1');
+ key='new-world';manager.update();
+ assert.equal(manager.iframe,null);assert.equal(manager.active,null);assert.equal(iframe.src,'about:blank');
+ manager.dispose();
 });

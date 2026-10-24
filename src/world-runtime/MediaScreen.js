@@ -167,42 +167,114 @@ const errors={2:'YouTube rejected this video ID.',5:'YouTube playback is unavail
 /** Local playback only. An active-world lease and conservative visibility proof are injected by the runtime. */
 export class MediaScreen {
  constructor({getContext,isAuthorized,isUnobstructed=()=>false,describeObstruction=()=>null,onEnter=()=>{},onExit=()=>{},document:doc=globalThis.document,window:win=globalThis.window}){
-  Object.assign(this,{getContext,isAuthorized,isUnobstructed,describeObstruction,onEnter,onExit,doc,win});this.active=null;this.iframe=null;this.status={state:'closed',playerState:null,currentTime:null,advancedSeconds:0,error:null};this.message=e=>this.receive(e);win.addEventListener('message',this.message);this.visibility=()=>{if(doc.visibilityState==='hidden'){this.destroyPlayer();this.status.state='hidden-stopped';}};doc.addEventListener('visibilitychange',this.visibility);
+  Object.assign(this,{getContext,isAuthorized,isUnobstructed,describeObstruction,onEnter,onExit,doc,win});
+  this.active=null;this.iframe=null;this.controlsOpen=false;this.screenVisible=false;
+  this.status={state:'closed',playerState:null,currentTime:null,advancedSeconds:0,error:null};
+  this.message=e=>this.receive(e);win.addEventListener('message',this.message);
+  this.visibility=()=>{if(doc.visibilityState==='hidden'){this.destroyPlayer();this.status.state='hidden-stopped';}};
+  doc.addEventListener('visibilitychange',this.visibility);
  }
  enter(object,active){
-  mediaLayout(object.mediaScreen);this.exit();const c=this.getContext();if(!c?.ready||c.active!==active||!this.isAuthorized(object.id,'media.play'))throw Error('Access restricted');
-  this.active={object,active,key:c.key};this.status={state:'awaiting-user-play',playerState:null,currentTime:null,advancedSeconds:0,error:null};
-  this.controls=this.doc.createElement('div');this.controls.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:10000;background:#14212bee;color:white;padding:12px;border-radius:10px;display:flex;gap:12px;align-items:center';
-  this.play=this.doc.createElement('button');this.play.textContent='Play on TV';this.play.onclick=()=>this.startPlayback();
-  this.note=this.doc.createElement('span');this.note.textContent='Playback uses YouTube. Click Play after access is granted.';
-  const back=this.doc.createElement('button');back.textContent='Return to game';back.onclick=()=>this.exit();this.controls.append(this.play,this.note,back);this.doc.body.append(this.controls);this.doc.exitPointerLock?.();this.onEnter();return true;
+  mediaLayout(object.mediaScreen);
+  if(this.active?.object.id===object.id&&this.active.active===active){this.openControls();return true;}
+  this.exit();
+  const c=this.getContext();
+  if(!c?.ready||c.active!==active||!this.isAuthorized(object.id,'media.play'))throw Error('Access restricted');
+  this.active={object,active,key:c.key};
+  this.status={state:'awaiting-user-play',playerState:null,currentTime:null,advancedSeconds:0,error:null};
+  this.openControls();
+  return true;
+ }
+ openControls(){
+  if(!this.active||this.controlsOpen)return;
+  this.controlsOpen=true;
+  this.controls=this.doc.createElement('div');
+  this.controls.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:10000;background:#14212bee;color:white;padding:12px;border-radius:10px;display:flex;gap:12px;align-items:center';
+  this.play=this.doc.createElement('button');
+  this.play.textContent=this.iframe?'Restart TV':'Play on TV';
+  this.play.onclick=()=>this.startPlayback();
+  this.note=this.doc.createElement('span');
+  this.note.textContent=this.iframe?(this.status.state==='playing'?'Playing on TV. Return to the game to keep watching while you walk.':'TV player is starting. Use the player controls if needed.'):'Playback uses YouTube. Click Play to turn on the TV.';
+  const back=this.doc.createElement('button');back.textContent='Return to game';back.onclick=()=>this.closeControls();
+  const stop=this.doc.createElement('button');stop.textContent='Stop TV';stop.onclick=()=>this.exit();
+  this.controls.append(this.play,this.note,back,stop);
+  this.doc.body.append(this.controls);
+  if(this.iframe)this.iframe.style.pointerEvents=this.screenVisible?'auto':'none';
+  this.doc.exitPointerLock?.();
+  this.onEnter();
+ }
+ closeControls(){
+  if(!this.controlsOpen)return;
+  this.controls?.remove();this.controls=null;this.controlsOpen=false;
+  if(this.iframe)this.iframe.style.pointerEvents='none';
+  this.onExit();
+  if(!this.iframe){this.active=null;this.status.state='closed';}
  }
  current(){
-  const c=this.getContext(),a=this.active;if(!a||!c?.ready||c.active!==a.active||c.key!==a.key||!this.isAuthorized(a.object.id,'media.play'))return null;
-  const matrix=c.objectMatrix?.(a.object.id)??a.active.matrices?.get(a.object.id);if(!matrix)return null;
-  const projection=projectMediaScreen(c.camera,matrix,a.object.mediaScreen,c.viewport);return {c,projection,visible:!!projection&&this.isUnobstructed(projection,c,a.object)===true};
+  const c=this.getContext(),a=this.active;
+  if(!a||!c?.ready||c.active!==a.active||c.key!==a.key||!this.isAuthorized(a.object.id,'media.play'))return null;
+  const matrix=c.objectMatrix?.(a.object.id)??a.active.matrices?.get(a.object.id);
+  if(!matrix)return null;
+  const projection=projectMediaScreen(c.camera,matrix,a.object.mediaScreen,c.viewport);
+  return {c,projection,visible:!!projection&&this.isUnobstructed(projection,c,a.object)===true};
  }
  startPlayback(){
-  const current=this.current();if(!current){this.exit();return false;}if(!current.visible){this.destroyPlayer();this.status.state='hidden-stopped';this.note.textContent='TV view is obstructed or offscreen. Playback stopped.'+(this.describeObstruction?.()?' '+this.describeObstruction():'');return false;}
-  this.destroyPlayer();const frame=this.doc.createElement('iframe');frame.title='YouTube video on physical TV';frame.width='1280';frame.height='720';frame.allow='autoplay; encrypted-media; picture-in-picture';frame.setAttribute('sandbox','allow-scripts allow-same-origin allow-presentation');frame.referrerPolicy='strict-origin-when-cross-origin';frame.style.cssText='position:fixed;top:0;left:0;width:1280px;height:720px;border:0;transform-origin:0 0;z-index:25;background:#000';frame.style.transform=screenQuadTransform(current.projection.quad);
-  frame.src=youtubeEmbedURL(this.active.object.mediaScreen,this.win.location.origin,this.status.currentTime??0);this.iframe=frame;this.doc.body.append(frame);this.status.state='player-requested';this.status.error=null;this.status.playerState=null;this.status.advancedSeconds=0;this.note.textContent='Use the TV player controls if autoplay is blocked.';this.poll=setInterval(()=>{this.update();this.send({event:'listening',id:'elsemesh-tv',channel:'elsemesh-tv'});this.send({event:'command',func:'addEventListener',args:['onStateChange']});this.send({event:'command',func:'addEventListener',args:['onError']});},500);this.update();return true;
+  const current=this.current();
+  if(!current){this.exit();return false;}
+  this.destroyPlayer();
+  const frame=this.doc.createElement('iframe');
+  frame.title='YouTube video on physical TV';frame.width='1280';frame.height='720';
+  frame.allow='autoplay; encrypted-media; picture-in-picture';
+  frame.setAttribute('sandbox','allow-scripts allow-same-origin allow-presentation');
+  frame.referrerPolicy='strict-origin-when-cross-origin';
+  frame.style.cssText='position:fixed;top:0;left:0;width:1280px;height:720px;border:0;transform-origin:0 0;z-index:25;background:#000';
+  frame.style.transform=current.projection?screenQuadTransform(current.projection.quad):'translate(-2000px,-2000px)';
+  frame.style.opacity=current.visible?'1':'0';
+  frame.style.pointerEvents=current.visible&&this.controlsOpen?'auto':'none';
+  frame.src=youtubeEmbedURL(this.active.object.mediaScreen,this.win.location.origin,this.status.currentTime??0);
+  this.iframe=frame;this.doc.body.append(frame);this.screenVisible=current.visible;
+  this.status.state='player-requested';this.status.error=null;this.status.playerState=null;this.status.advancedSeconds=0;
+  if(this.note)this.note.textContent=current.visible?'TV player is starting. Use the player controls if autoplay is blocked.':'TV player is starting behind an obstruction; the picture will reappear when visible.';
+  this.poll=setInterval(()=>{this.update();this.send({event:'listening',id:'elsemesh-tv',channel:'elsemesh-tv'});this.send({event:'command',func:'addEventListener',args:['onStateChange']});this.send({event:'command',func:'addEventListener',args:['onError']});},500);
+  this.update();
+  return true;
  }
  send(value){this.iframe?.contentWindow?.postMessage(JSON.stringify(value),'https://www.youtube-nocookie.com');}
  receive(event){
-  if(this.iframe){const current=this.current();if(!current){this.exit();return;}if(!current.visible){this.destroyPlayer();this.status.state='hidden-stopped';return;}}
-  if(!this.iframe||event.source!==this.iframe.contentWindow||event.origin!=='https://www.youtube-nocookie.com')return;let data;try{if(typeof event.data==='string'&&event.data.length>100000)return;data=typeof event.data==='string'?JSON.parse(event.data):event.data;}catch{return;}if(!data||typeof data!=='object')return;
-  if(data.event==='onError'){this.status.error=data.info;this.status.state='playback-error';this.note.textContent=errors[data.info]??'YouTube playback failed.';return;}
+  if(this.iframe&&!this.current()){this.exit();return;}
+  if(!this.iframe||event.source!==this.iframe.contentWindow||event.origin!=='https://www.youtube-nocookie.com')return;
+  let data;try{if(typeof event.data==='string'&&event.data.length>100000)return;data=typeof event.data==='string'?JSON.parse(event.data):event.data;}catch{return;}
+  if(!data||typeof data!=='object')return;
+  if(data.event==='onError'){this.status.error=data.info;this.status.state='playback-error';if(this.note)this.note.textContent=errors[data.info]??'YouTube playback failed.';return;}
   if(data.event==='onReady'){this.status.state='ready';this.send({event:'command',func:'playVideo',args:[]});}
-  const state=data.event==='onStateChange'?data.info:data.info?.playerState;if(Number.isInteger(state)){this.status.playerState=state;this.status.state=({'-1':'awaiting-player-gesture','0':'ended','1':'playing','2':'paused','3':'buffering','5':'cued'})[state]??'unknown-player-state';this.note.textContent=({'-1':'Use the TV play control to begin.','0':'Video ended.','1':'Playing on TV','2':'Paused on TV','3':'YouTube is buffering.','5':'Video is ready.'})[state]??'YouTube player state unavailable.';}
-  const time=data.info?.currentTime;if(Number.isFinite(time)&&time>=0){if(this.status.currentTime!==null&&this.status.playerState===1&&time>this.status.currentTime)this.status.advancedSeconds+=time-this.status.currentTime;this.status.currentTime=time;}
+  const state=data.event==='onStateChange'?data.info:data.info?.playerState;
+  if(Number.isInteger(state)){
+   this.status.playerState=state;
+   this.status.state=({'-1':'awaiting-player-gesture','0':'ended','1':'playing','2':'paused','3':'buffering','5':'cued'})[state]??'unknown-player-state';
+   if(this.note)this.note.textContent=({'-1':'Use the TV play control to begin.','0':'Video ended.','1':'Playing on TV','2':'Paused on TV','3':'YouTube is buffering.','5':'Video is ready.'})[state]??'YouTube player state unavailable.';
+  }
+  const time=data.info?.currentTime;
+  if(Number.isFinite(time)&&time>=0){if(this.status.currentTime!==null&&this.status.playerState===1&&time>this.status.currentTime)this.status.advancedSeconds+=time-this.status.currentTime;this.status.currentTime=time;}
  }
  update(){
-  if(!this.active)return;const current=this.current();if(!current){this.exit();return;}
-  if(!current.visible){if(this.iframe){this.destroyPlayer();this.status.state='hidden-stopped';this.note.textContent='TV view is obstructed or offscreen. Playback stopped.';}return;}
-  if(this.iframe)this.iframe.style.transform=screenQuadTransform(current.projection.quad);
+  if(!this.active)return;
+  const current=this.current();
+  if(!current){this.exit();return;}
+  if(!this.iframe)return;
+  this.screenVisible=current.visible;
+  this.iframe.style.opacity=current.visible?'1':'0';
+  this.iframe.style.pointerEvents=current.visible&&this.controlsOpen?'auto':'none';
+  if(current.projection)this.iframe.style.transform=screenQuadTransform(current.projection.quad);
  }
- destroyPlayer(){clearInterval(this.poll);this.poll=null;if(this.iframe){this.send({event:'command',func:'pauseVideo',args:[]});this.iframe.src='about:blank';this.iframe.remove();this.iframe=null;}}
- exit(){this.destroyPlayer();this.controls?.remove();this.controls=null;const had=!!this.active;this.active=null;this.status.state='closed';if(had)this.onExit();}
- diagnostics(){return {...this.status,activeObjectId:this.active?.object.id??null,iframePresent:!!this.iframe,playbackScope:'local active world only',occlusion:'whole-screen conservative hide; no partial depth compositing',audioHeard:false};}
+ destroyPlayer(){
+  clearInterval(this.poll);this.poll=null;this.screenVisible=false;
+  if(this.iframe){this.send({event:'command',func:'pauseVideo',args:[]});this.iframe.src='about:blank';this.iframe.remove();this.iframe=null;}
+ }
+ exit(){
+  this.destroyPlayer();
+  this.closeControls();
+  this.active=null;this.status.state='closed';
+ }
+ diagnostics(){return {...this.status,activeObjectId:this.active?.object.id??null,iframePresent:!!this.iframe,controlsOpen:this.controlsOpen,screenVisible:this.screenVisible,playbackScope:'local active world only',occlusion:'whole-screen conservative hide; playback continues through obstruction',audioHeard:false};}
  dispose(){this.exit();this.win.removeEventListener('message',this.message);this.doc.removeEventListener('visibilitychange',this.visibility);}
 }
