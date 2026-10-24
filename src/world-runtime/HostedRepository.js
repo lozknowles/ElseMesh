@@ -15,7 +15,7 @@ export function hostedRepositorySource(input,options={}){
   if(!Number.isSafeInteger(maxBytes)||maxBytes<1)throw Error('Repository byte limit is invalid.');
   const url=new URL(path,root).href,controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);let reader;
   try{
-   const response=await fetcher(url,{signal:controller.signal,redirect:'error',credentials:'omit',referrerPolicy:'no-referrer'});
+   const response=await fetcher(url,{signal:controller.signal,redirect:'error',credentials:'omit',referrerPolicy:'no-referrer',cache:path==='world.json'?'no-store':'default'});
    if(!response.ok||response.redirected||(response.url&&response.url!==url))throw Error('Hosted repository request failed or redirected ('+response.status+').');
    const length=response.headers.get('content-length');// Transfer length may be compressed; enforce the decoded byte budget below.
    if(length!==null&&!/^\d+$/.test(length))throw Error('Hosted repository response length is invalid.');
