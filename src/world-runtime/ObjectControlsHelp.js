@@ -1,18 +1,19 @@
+import {supportedObjectAccessActions} from './vendor/world-engine-contract.js';
 export function accessObjectLabel(project,objectId){
  const object=project?.objects?.find(o=>o.id===objectId),terminal=project?.terminals?.find(t=>t.objectId===objectId);
  const name=object?.name?.trim()||({c64:'Commodore 64',bbc:'BBC Micro',sun:'Sun workstation'}[terminal?.kind])||(object?.kind==='neon-sign'?'Neon sign':'Computer');
  const shortId=objectId.length>20?objectId.slice(0,8)+'…'+objectId.slice(-6):objectId;
  return name+' · '+shortId;
 }
+export function accessActionLabel(action){return {'computer.use':'Use computer','neon.power':'Switch sign power','neon.configure':'Configure sign'}[action]??'Unsupported action';}
 export function supportedObjectActions(project){
- const terminalIds=new Set((project?.terminals??[]).map(t=>t.objectId));
- return (project?.objects??[]).flatMap(o=>o.kind==='computer'||terminalIds.has(o.id)?[{objectId:o.id,actions:['computer.use']}]:o.kind==='neon-sign'?[{objectId:o.id,actions:['neon.power','neon.configure']}]:[]);
+ return (project?.objects??[]).flatMap(o=>{const actions=supportedObjectAccessActions(project,o.id);return actions.length?[{objectId:o.id,actions}]:[];});
 }
 export function objectActionRows(project,snapshot,{fresh=false}={}){
  const present=new Map((project?.objects??[]).map(o=>[o.id,o])),rules=supportedObjectActions(project);
  return rules.filter(r=>present.has(r.objectId)).flatMap(rule=>rule.actions.map(action=>{
   const object=present.get(rule.objectId),effective=snapshot?.effectiveActions?.find(r=>r.objectId===rule.objectId)?.actions??[];
-  return {objectId:rule.objectId,action,label:accessObjectLabel(project,object.id)+' · '+({'computer.use':'Use computer','neon.power':'Switch sign power','neon.configure':'Configure sign'}[action]??action),allowed:fresh&&effective.includes(action),known:fresh};
+  return {objectId:rule.objectId,action,label:accessObjectLabel(project,object.id)+' · '+accessActionLabel(action),allowed:fresh&&effective.includes(action),known:fresh};
  }));
 }
 export class ObjectControlsHelp {

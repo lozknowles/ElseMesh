@@ -1,4 +1,4 @@
-import {supportedObjectActions,accessObjectLabel} from './ObjectControlsHelp.js';
+import {supportedObjectActions,accessObjectLabel,accessActionLabel} from './ObjectControlsHelp.js';
 const element=(tag,text)=>{const e=document.createElement(tag);if(text)e.textContent=text;return e;};
 /** Private grant data is rendered only from the authority's administrator response. */
 export class ObjectAccessPanel {
@@ -12,7 +12,7 @@ export class ObjectAccessPanel {
   if(!snapshot)return;
   this.body.append(element('p','Computer access needs a player grant and permission in this world. Sign controls also need permission for the linked sign.'));
   const grants=snapshot.grants??[],rules=snapshot.rules??[];
-  if(!snapshot.isAdmin){this.body.append(element('p',grants.length?'Your grants: '+grants.map(g=>accessObjectLabel(this.host.active?.project,g.objectId)+' · '+g.action).join(', '):'Access restricted'));return;}
+  if(!snapshot.isAdmin){this.body.append(element('p',grants.length?'Your grants: '+grants.map(g=>accessObjectLabel(this.host.active?.project,g.objectId)+' · '+accessActionLabel(g.action)).join(', '):'Access restricted'));return;}
   this.body.append(element('p','Administrator · changes take effect for active sessions.'));
   const player=element('select');player.setAttribute('aria-label','Player for access');
   for(const item of snapshot.players??[]){const option=element('option',item.label+' · '+item.nodeId);option.value=item.nodeId;player.append(option);}
@@ -24,7 +24,7 @@ export class ObjectAccessPanel {
   if(supported.some(r=>r.objectId===this.selectedObject))target.value=this.selectedObject;
   this.selectedPlayer=player.value;this.selectedObject=target.value;
   this.body.append(player,target);const actions=element('div');this.body.append(actions);
-  const draw=()=>{actions.replaceChildren();const rule=supported.find(r=>r.objectId===target.value);for(const action of rule?.actions??[]){const label=element('label',action+' '),checkbox=element('input');checkbox.type='checkbox';const inWorld=rules.some(r=>r.objectId===target.value&&r.actions.includes(action));checkbox.disabled=!inWorld;if(!inWorld)label.append(document.createTextNode('Access restricted by world policy '));checkbox.checked=grants.some(g=>g.playerNodeId===player.value&&g.objectId===target.value&&g.action===action);checkbox.onchange=async()=>{checkbox.disabled=true;try{await this.client.update({expectedRevision:snapshot.policyRevision,playerNodeId:player.value,objectId:target.value,action,allowed:checkbox.checked});this.onStatus('Access updated');}catch(error){checkbox.checked=!checkbox.checked;this.onStatus(error.message);}finally{checkbox.disabled=false;}};label.append(checkbox);actions.append(label);}if(!rule?.actions?.length)actions.append(element('p','Access restricted'));};
+  const draw=()=>{actions.replaceChildren();const rule=supported.find(r=>r.objectId===target.value);for(const action of rule?.actions??[]){const label=element('label',accessActionLabel(action)+' '),checkbox=element('input');checkbox.type='checkbox';const inWorld=rules.some(r=>r.objectId===target.value&&r.actions.includes(action));checkbox.disabled=!inWorld;if(!inWorld)label.append(document.createTextNode('Access restricted by world policy '));checkbox.checked=grants.some(g=>g.playerNodeId===player.value&&g.objectId===target.value&&g.action===action);checkbox.onchange=async()=>{checkbox.disabled=true;try{await this.client.update({expectedRevision:snapshot.policyRevision,playerNodeId:player.value,objectId:target.value,action,allowed:checkbox.checked});this.onStatus('Access updated');}catch(error){checkbox.checked=!checkbox.checked;this.onStatus(error.message);}finally{checkbox.disabled=false;}};label.append(checkbox);actions.append(label);}if(!rule?.actions?.length)actions.append(element('p','Access restricted'));};
   player.onchange=()=>{this.selectedPlayer=player.value;draw();};target.onchange=()=>{this.selectedObject=target.value;draw();};draw();
  }
 }

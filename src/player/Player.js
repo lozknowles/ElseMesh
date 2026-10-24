@@ -233,7 +233,9 @@ export class Player {
 		const old = p.clone();
 		p.addScaledVector( this.velocity, dt );
 		if ( this.cave ) this.cave.constrainPlayer( old, p );
-		this.colliders.resolveCapsule( p, RADIUS, HEIGHT, 0.4 );
+		// Measure a grounded step from the accepted feet height, before this frame's gravity.
+		const stepHeight = this.grounded ? 0.4 + Math.max( 0, old.y - p.y ) : 0.4;
+		this.colliders.resolveCapsule( p, RADIUS, HEIGHT, stepHeight );
 		if ( this.landOnBoat( old, p ) ) return;
 		const g = this.groundAt( p.x, p.z, p.y + 0.45 );
 		if ( p.y <= g ) {

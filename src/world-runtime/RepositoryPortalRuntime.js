@@ -51,7 +51,8 @@ export class RepositoryPortalRuntime{
    for(const [id,record]of this.previewRecords)if(record.worldId===worldId){this.views.setState(id,'unavailable');this.previewLayers.get(id)?.accept({worldId,players:[]});}
    if(worldId===this.transport.worldId){this.authorityOffline=true;this.input.suspend();this.onStatus('World owner unavailable; movement paused.');}
   }else if(status==='live'){
-   this.offlineWorlds.delete(worldId);
+   const recovered=this.offlineWorlds.delete(worldId);
+   if(recovered&&worldId!==this.transport.worldId&&!this.authorityOffline&&!this.pending&&!this.transport.frozen)this.onStatus('World connection restored.');
    for(const [id,record]of this.previewRecords)if(record.worldId===worldId){const entry=this.views.entries.get(id);if(record.loaded&&entry?.candidate&&!entry.preparing&&!entry.readinessError)this.views.setState(id,'live');else if(record.error)record.retryAt=Math.max(1,performance.now()-1);}
    if(worldId===this.transport.worldId&&this.authorityOffline){if(this.pending||this.transport.frozen){this.onStatus('World owner available. Reconnect to resume, or Recover transfer if one is unresolved.');return;}this.authorityOffline=false;this.input.resume();this.onStatus('World owner reconnected.');}
   }
