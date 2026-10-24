@@ -1,3 +1,4 @@
+import {avatarMotionFacing} from './AvatarFacing.js';
 import { BoxGeometry, CylinderGeometry, Group, Mesh, SphereGeometry, Vector3 } from '../engine/index.js';
 import { standard } from '../materials/Materials.js';
 import { HOUSE } from '../world/boat/Wheelhouse.js';
@@ -158,6 +159,8 @@ export class PlayerAvatar {
 
 	update(dt, player, camera, freeCam) {
 		const c = this.cinematic;
+		// Cinematics and boat/deck coordinates keep their authored orientation.
+		if (c || player.mode !== 'walk') this.facingState = {};
 		const aboard = c ? (c.mode === 'boat' || c.mode === 'helm') : (player.mode === 'boat' || player.mode === 'deck');
 		const atHelm = c ? (c.mode === 'boat' || c.mode === 'helm' || !!c.seated) : player.mode === 'boat';
 		this.seated.visible = atHelm;
@@ -186,7 +189,7 @@ export class PlayerAvatar {
 			moving = player.mode === 'deck' && player.deckVel.lengthSq() > 0.04;
 		} else {
 			this.group.position.copy(player.position);
-			this.group.rotation.y = player.yaw + Math.PI;
+			this.group.rotation.y = avatarMotionFacing(this.facingState ??= {}, {velocity:player.velocity,position:player.position,dt,fallbackYaw:player.yaw+Math.PI,context:player,mode:player.mode});
 			moving = player.mode === 'walk' && player.velocity.lengthSq() > 0.12;
 		}
 		this.clock += dt * (moving ? 8 : 2);

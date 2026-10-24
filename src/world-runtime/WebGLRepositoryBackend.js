@@ -1,3 +1,5 @@
+import {updateWebGLWeatherShelter} from './WebGLWeatherShelter.js';
+import {repositoryPeerFacing} from '../player/AvatarFacing.js';
 import {repositoryProjectWaterHeight} from './RepositoryWater.js';
 import {T} from './vendor/world-engine-contract.js';
 import {WebGLRepositoryAvatar} from './WebGLRepositoryAvatar.js';
@@ -29,7 +31,7 @@ export function createWebGLRepositoryPeerLayer(scene,ownNodeId,prepareResources)
  const ensure=pose=>{if(disposed||pose.nodeId===ownNodeId)return null;let a=avatars.get(pose.nodeId);if(!a){if(avatars.size>=32){const old=[...avatars].filter(([id])=>!packet.players.some(p=>p.nodeId===id)).sort((a,b)=>(a[1].lastPresenceAt??0)-(b[1].lastPresenceAt??0))[0];if(!old)return null;old[1].dispose();avatars.delete(old[0]);warms.delete(old[0]);}a=new WebGLRepositoryAvatar(group,{prepareResources});a.group.userData.remotePlayerId=pose.playerId;a.group.visible=false;avatars.set(pose.nodeId,a);}return a;};
  return {group,avatars,get packet(){return packet;},get pendingPrewarms(){return [...warms.values()].filter(w=>!w.done).length;},accept(next){if(disposed)return;at=performance.now();packet=next;},
  prewarmKnownProfiles(poses){return Promise.all(poses.filter(p=>p.nodeId!==ownNodeId).map(p=>{const key=JSON.stringify(p.appearance??{}),old=warms.get(p.nodeId);if(old?.key===key)return old.promise;const a=ensure(p);if(!a)return false;const w={key,done:false};w.promise=Promise.resolve().then(()=>p.appearance?a.setAppearance(p.appearance):a.ready).then(()=>a.ready).then(()=>{if(!packet.players.some(q=>q.nodeId===p.nodeId))a.group.visible=false;return true;}).finally(()=>w.done=true);warms.set(p.nodeId,w);return w.promise;}));},
- update(dt,player,camera){if(disposed)return;const keep=new Set();for(const pose of packet.players){if(pose.nodeId===ownNodeId)continue;keep.add(pose.nodeId);const a=ensure(pose);if(!a)continue;a.lastPresenceAt=performance.now();if(pose.appearance)a.setAppearance(pose.appearance)?.catch(error=>console.warn('Remote avatar appearance:',error));a.cinematic={x:pose.position[0],y:pose.position[1],z:pose.position[2],yaw:pose.yaw+Math.PI,speed:Math.hypot(...(pose.velocity??[0,0,0])),mode:'walk'};a.update(dt,player,camera,true);a.group.visible=a.group.visible&&performance.now()-at<3000;}for(const [node,a]of avatars)if(!keep.has(node))a.group.visible=false;},
+ update(dt,player,camera){if(disposed)return;const keep=new Set();for(const pose of packet.players){if(pose.nodeId===ownNodeId)continue;keep.add(pose.nodeId);const a=ensure(pose);if(!a)continue;a.lastPresenceAt=performance.now();if(pose.appearance)a.setAppearance(pose.appearance)?.catch(error=>console.warn('Remote avatar appearance:',error));a.cinematic={x:pose.position[0],y:pose.position[1],z:pose.position[2],yaw:repositoryPeerFacing(a,pose,packet.worldId),speed:Math.hypot(...(pose.velocity??[0,0,0])),mode:'walk'};a.update(dt,player,camera,true);a.group.visible=a.group.visible&&performance.now()-at<3000;}for(const [node,a]of avatars)if(!keep.has(node))a.group.visible=false;},
  dispose(){if(disposed)return;disposed=true;for(const a of avatars.values())a.dispose();avatars.clear();warms.clear();group.removeFromParent();}};
 }
 
@@ -45,5 +47,5 @@ export function updateWebGLRepositoryEnvironment(engine,active,time){
  const color=new T.Color().setRGB(.04+day*.46,.06+day*.60,.11+day*.64);engine.scene.background.copy(color);
  const underwater=engine.camera.position.y<repositoryProjectWaterHeight(active?.project,engine.camera.position.x,engine.camera.position.z,time);
  engine.scene.fog.color.copy(underwater?new T.Color('#1b6a77'):color);engine.scene.fog.density=underwater?.045:Math.min(.008,(env.mistDensity??.004)*.08)*(1+.12*Math.sin(time*(env.mistSpeed??2)*.07));
- active?.root.userData.updateWebGL?.(time);return {flash,backend:'webgl2',underwater:!!underwater};
+ const shelter=updateWebGLWeatherShelter(engine,active,time,underwater);active?.root.userData.updateWebGL?.(time);return {flash,backend:'webgl2',underwater:!!underwater,...shelter};
 }

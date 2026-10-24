@@ -174,17 +174,25 @@ fn skyRadiance( dir: vec3f, withSun: bool ) -> vec3f {
 // Sky with clouds composited (low resolution cloud panorama). withSun = false (environment
 // map): no sun or moon disk, the key light is lit directly.
 fn skyRadianceWithClouds( dir: vec3f, withSun: bool ) -> vec3f {
+#if PORTAL_VIEW
+	return skyRadiance(dir,withSun);
+#else
 	var base: vec3f;
 	if ( withSun ) { base = skyBackground( dir, 1.0 ) + skyMoon( dir ) + skySunDisk( dir ); }
 	else { base = skyBackground( dir, ${ f( STAR_REFLECTION ) } ); }
 	${ composite( 'cloudsSample' ) }
+#endif
 }
 
 // Water reflections: no moon disk (the water's specular lobe reflects the key light) and only a
 // trace of the stars, which rough water would spread into flickering sparkles.
 fn skyReflectionRadiance( dir: vec3f ) -> vec3f {
+#if PORTAL_VIEW
+	return skyBackground(dir,0.0);
+#else
 	let base = skyBackground( dir, ${ f( STAR_REFLECTION ) } );
 	${ composite( 'cloudsSample' ) }
+#endif
 }
 
 // Main view background: full resolution clouds for the camera's view (the sun's disc behind them

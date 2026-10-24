@@ -53,7 +53,7 @@ function dataTexture( data, width, height, format, label, mips = false ) {
 
 export class TerrainGPU {
 
-	constructor( terrain, shoreField ) {
+	constructor( terrain, shoreField, { maps: suppliedMaps = null } = {} ) {
 
 		this.terrain = terrain;
 		const res = terrain.res;
@@ -62,7 +62,7 @@ export class TerrainGPU {
 		// heights: R32F, loaded with manual bilinear filtering (no sampler / float filtering needed)
 		this.heightTexture = dataTexture( terrain.heights, res, res, 'r32float', 'terrainHeights' );
 
-		const maps = bakeTerrainMaps( terrain );
+		const maps = suppliedMaps || bakeTerrainMaps( terrain );
 		// trilinear, clamp to edge (smpLinearClamp), linear data (no colour space)
 		this.normalTexture = dataTexture( maps.normal, res, res, 'rgba8unorm', 'terrainNormalRockAO', true );
 		this.splatTexture = dataTexture( maps.splat, res, res, 'rgba8unorm', 'terrainSplat', true );
@@ -124,6 +124,19 @@ export class TerrainGPU {
 		this.timings = { ...maps.ms, detail: this.detailTexture.userData.ms, total: performance.now() - t0 };
 
 	}
+
+ // The detail texture is process-owned and intentionally survives world disposal.
+ dispose() {
+  for ( const key of [ 'heightTexture', 'normalTexture', 'splatTexture', 'shadowHeightTexture', 'sunShadowTexture', 'shoreTexture' ] ) this[ key ]?.destroy();
+  this.uniforms.buffer?.destroy();
+ }
+ uploadRegion( { x, z, width, height, heights, normal, splat } ) {
+  if ( heights ) this.heightTexture.upload( heights, { x, y:z, width, height } );
+  if ( normal ) { this.normalTexture.upload( normal, { x, y:z, width, height } ); generateMipmaps( this.normalTexture ); }
+  if ( splat ) { this.splatTexture.upload( splat, { x, y:z, width, height } ); generateMipmaps( this.splatTexture ); }
+  this._sunBaked = false;
+  this._heightDirty = true;
+ }
 
 	// ------------------------------------------------------------ heightfield sun shadow
 
@@ -187,6 +200,11 @@ fn main( @builtin( global_invocation_id ) gid: vec3u ) {
 	// `renderer` is unused (kept for the call sites); the dispatch records into the frame encoder.
 	updateSunShadow( renderer, force = false ) {
 
+		if ( this._heightDirty ) {
+			const sh = buildShadowHeights( this.terrain, 4 );
+			sh.levels.forEach( ( l, mip ) => this.shadowHeightTexture.upload( l.data, { mip, width: l.width, height: l.height } ) );
+			this._heightDirty = false;
+		}
 		const L = G.sunDir.value;
 		if ( ! force && this._sunBaked && L.angleTo( this.uSunBake.value ) < 0.0015 ) return false;
 		this.uSunBake.value.copy( L );

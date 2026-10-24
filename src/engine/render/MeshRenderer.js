@@ -81,7 +81,7 @@ export class MeshRenderer {
 
 	_beginFrame() {
 
-		if ( this.frame === GPU.frame ) return;
+		if ( this.frame === GPU.frame ) { this._armSubmissionUpload(); return; }
 		this.frame = GPU.frame;
 		this._ensureDrawBuffer();
 		// grow for next frame if this one came close
@@ -93,14 +93,20 @@ export class MeshRenderer {
 		}
 
 		this.drawCount = 0;
-		GPU.onSubmit( () => {
-
-			if ( this.drawCount ) GPU.queue.writeBuffer( this.drawBuffer, 0, this.drawData.buffer, 0, this.drawCount * DRAW_STRIDE );
-
-		} );
+		this._armSubmissionUpload();
 		this.stats.draws = 0;
 		this.stats.triangles = 0;
 
+	}
+
+	// Hooks drain per submission; frame slots and previous transforms do not.
+	_armSubmissionUpload() {
+		if ( this._submissionUploadArmed ) return;
+		this._submissionUploadArmed = true;
+		GPU.onSubmit( () => {
+			if ( this.drawCount ) GPU.queue.writeBuffer( this.drawBuffer, 0, this.drawData.buffer, 0, this.drawCount * DRAW_STRIDE );
+			this._submissionUploadArmed = false;
+		} );
 	}
 
 	// per-object slot in this frame's draw buffer (shared by every pass that draws it this frame)

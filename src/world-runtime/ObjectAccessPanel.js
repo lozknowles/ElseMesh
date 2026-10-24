@@ -10,7 +10,7 @@ export class ObjectAccessPanel {
   else{this.selectedPlayer=this.body.querySelector('[aria-label="Player for access"]')?.value||this.selectedPlayer;this.selectedObject=this.body.querySelector('[aria-label="Object for access"]')?.value||this.selectedObject;}
   this.body.replaceChildren();this.body.append(element('p',snapshot?snapshot.policyMode:'Connect to the world owner to view object access.'));
   if(!snapshot)return;
-  this.body.append(element('p','Computer access needs a player grant and permission in this world. Sign controls also need permission for the linked sign.'));
+  this.body.append(element('p','Object use needs a player grant and permission in this world. Sign controls also need permission for the linked sign.'));
   const grants=snapshot.grants??[],rules=snapshot.rules??[];
   if(!snapshot.isAdmin){this.body.append(element('p',grants.length?'Your grants: '+grants.map(g=>accessObjectLabel(this.host.active?.project,g.objectId)+' · '+accessActionLabel(g.action)).join(', '):'Access restricted'));return;}
   this.body.append(element('p','Administrator · changes take effect for active sessions.'));

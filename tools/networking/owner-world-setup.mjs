@@ -7,6 +7,7 @@ import {publishRegion,issueDelegation,verifyRegionVersion,verifyDelegation,creat
 import {repositoryFederationPortal} from '../../network/repository-federation.mjs';
 import {pinnedRepository,prepareRepositoryConfig} from './repository-world-server.mjs';
 import {createOwnerWorldRuntime} from './owner-world-runtime.mjs';
+import {selectOwnerRevision} from '../../network/owner-world-revision.mjs';
 import {issueObjectAdminDelegation} from '../../network/owner-object-access.mjs';
 import {loadWorldSource} from '../../src/world-runtime/vendor/world-engine-contract.js';
 const check=(ok,m)=>{if(!ok)throw Error(m);};
@@ -86,6 +87,7 @@ export async function finalizeOwnerSetup({stateDir,peerAcceptance,enrollment,ava
 export async function delegateObjectAdmin({stateDir,playerNodeId}={}){
  const{dir,checkpoint:c}=await state(stateDir),config=await json(join(dir,'config.json')),owner=await existingIdentity(join(dir,'owner.json'));
  check(owner.nodeId===c.ownerNodeId&&Object.hasOwn(config.players,playerNodeId),'Administrator must be an explicitly enrolled browser identity');
+ let revisionState;try{revisionState=await (await import('../../network/owner-world-ledger.mjs')).OwnerWorldLedger.inspect(config.ledgerPath);}catch(e){if(e.code!=='ENOENT')throw e;}check(!revisionState?.revision,'Administrator reissuance after migration requires an explicit signed revision manifest');
  const delegation=issueObjectAdminDelegation(owner,{worldId:c.world.worldId,contentDigest:c.world.contentDigest,authorityNodeId:c.authorityNodeId,authorityEpoch:c.world.epoch,playerNodeId,expiresAt:c.world.binding.expiresAt});
  const file=join(dir,'object-admin-delegations.json');let previous=[];try{previous=await json(file);}catch(e){if(e.code!=='ENOENT')throw e;}
  check(Array.isArray(previous)&&previous.length<128,'Invalid administrator delegation store');
@@ -95,6 +97,7 @@ export async function delegateObjectAdmin({stateDir,playerNodeId}={}){
 export async function startOwnerSetup({stateDir,port=5201,relayUrl='ws://127.0.0.1:18891'}={}){
  const{dir,checkpoint:c}=await state(stateDir),config=await json(join(dir,'config.json')),identity=await existingIdentity(join(dir,'authority.json'));
  check(config.worlds.length===1&&config.contacts.length===2&&config.peers.length===2&&config.ledgerPath===join(dir,'ledger.sqlite')&&identity.nodeId===c.authorityNodeId,'Finalized owner config mismatch');
+ const selected=await selectOwnerRevision(config,identity);if(selected!==config)return createOwnerWorldRuntime({root:c.staticRoot,config:selected,identity,port,relayUrl});
  let objectAdminDelegations=[];try{objectAdminDelegations=await json(join(dir,'object-admin-delegations.json'));}catch(e){if(e.code!=='ENOENT')throw e;}
  return createOwnerWorldRuntime({root:c.staticRoot,config:{...config,objectAdminDelegations},identity,port,relayUrl});
 }

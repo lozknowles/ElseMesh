@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as N from '../src/engine/index.js';
-import { PortalViews,portalTargetSize,portalMappingMatrix,portalDestinationPlane } from '../src/world-runtime/PortalViews.js';
+import { PortalViews,portalViewWaterState,portalTargetSize,portalMappingMatrix,portalDestinationPlane } from '../src/world-runtime/PortalViews.js';
 import { FrameUniforms,createViewUniforms,setFrameCamera } from '../src/engine/render/Frame.js';
 import { Material } from '../src/engine/render/Material.js';
 import { buildMeshShader } from '../src/engine/render/MeshShader.js';
@@ -113,4 +113,17 @@ test('restored native graphics never restore previous VIEW permission or cached 
  assert.equal(e.authorizedView,false);assert.equal(e.hasImage,false);assert.equal(e.candidate,null);assert.equal(root.parent,null);assert.equal(e.target,target);assert.equal(e.aperture,aperture);
  views.render({width:640,height:480});assert.equal(draws,0);assert.equal(e.aperture.userData.portalViewState,'loading');
  views.setState('return','restricted');views.render({width:640,height:480});assert.equal(draws,0);assert.equal(e.aperture.userData.portalViewState,'restricted');views.dispose();
+});
+
+test('destination water levels and mapped-camera medium never inherit the main view',()=>{
+ const views=setup(),candidate={root:new N.Group(),descriptor:{project:{water:{level:12,extent:1000,waveAmplitude:0,waveSpeed:0},environment:{windSpeed:3}}}};
+ views.setDestination('wet',{candidate,ownsCandidate:false,source:pose(),destination:pose(),authorizedView:true,state:'live'});
+ const e=views.entries.get('wet');e.camera.position.set(0,10,0);
+ const saved={seaLevel:FrameUniforms.fields.seaLevel.value,cameraWaterHeight:FrameUniforms.fields.cameraWaterHeight.value,cameraUnderwater:FrameUniforms.fields.cameraUnderwater.value};
+ FrameUniforms.fields.seaLevel.value=-8;FrameUniforms.fields.cameraWaterHeight.value=-9;FrameUniforms.fields.cameraUnderwater.value=0;
+ e.block.onBeforePack();assert.equal(e.block.fields.seaLevel.value,12);assert.equal(e.block.fields.cameraWaterHeight.value,12);assert.equal(e.block.fields.cameraUnderwater.value,1);assert.equal(e.block.fields.windSpeed.value,3);
+ const native={descriptor:{project:{water:{level:40}}},nativeIsland:{water:{seaLevel:7}}};
+ assert.equal(portalViewWaterState(native,e.camera).seaLevel,7);
+ for(const [key,value]of Object.entries(saved))FrameUniforms.fields[key].value=value;
+ views.dispose();
 });

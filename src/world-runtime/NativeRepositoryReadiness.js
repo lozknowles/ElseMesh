@@ -6,7 +6,7 @@ import {PlayerAvatar} from '../player/PlayerAvatar.js';
 /** Reuses App.precompile: collect every mesh, request async pipelines, no draws.
  * Flags are restored synchronously before yielding to the running source frame.
  */
-export async function prepareNativeRepositoryResources({meshRenderer,camera,root,gpu=GPU,targetFactory=(formats)=>new RenderTarget(1,1,{colors:formats,depth:DEPTH_FORMAT,label:'repository-prepare'})}={}){
+export async function prepareNativeRepositoryResources({meshRenderer,camera,root,refractionDefines,gpu=GPU,targetFactory=(formats)=>new RenderTarget(1,1,{colors:formats,depth:DEPTH_FORMAT,label:'repository-prepare'})}={}){
  if(!root||!meshRenderer)throw Error('Native resource preparation dependencies required');
  const targets=[],materialIds=new Set(),previous=meshRenderer.precompiling;
  root.traverse?.(node=>{for(const material of Array.isArray(node.material)?node.material:[node.material])if(material)materialIds.add(String(material.id));});
@@ -20,6 +20,7 @@ export async function prepareNativeRepositoryResources({meshRenderer,camera,root
    meshRenderer.render(root,{...shared,...colors(main),kind:'main',late:true,label:'repository prepare late'});
    meshRenderer.render(root,{...shared,kind:'depth',label:'repository prepare shadows',depthView:main.depthTexture.view(),clearDepth:1,depthCompare:'less-equal',depthBias:2,depthBiasSlopeScale:1.5});
    meshRenderer.render(root,{...shared,...colors(portal),kind:'color',label:'repository prepare portal',defines:{PORTAL_CLIP:1},filter:o=>!o.userData.portalAperture&&!o.material?.userData.portalAperture});
+   if(refractionDefines)meshRenderer.render(root,{...shared,...colors(portal),kind:'color',label:'repository prepare refraction',defines:refractionDefines,filter:o=>!o.userData.portalAperture&&!o.material?.isWaterMaterial});
   }finally{meshRenderer.precompiling=previous;}
   const handles=[...(meshRenderer.pipelines??new Map())].filter(([key])=>materialIds.has(String(key).split('.')[0])).map(([,p])=>p.handle);
   gpu.submit();
@@ -48,6 +49,9 @@ export class ReadiedRepositoryAvatar extends PlayerAvatar{
   if(this.disposed||version!==this.loadVersion)return;
   const model=this.scanned;if(!model)return;
   model.group.visible=false;
+  // Native shader skinning needs current posed bounds for visibility/TV occlusion.
+  // This is the existing per-model conservative bounds path, updated with every pose.
+  model.enableAnimatedBounds?.();
   try{await this.prepareResources?.(this.group);if(this.scanned===model&&!this.disposed)model.group.visible=true;}
   catch(error){model.group.visible=false;throw error;}
  }

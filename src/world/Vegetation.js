@@ -3,7 +3,7 @@ import { G } from '../core/Globals.js';
 import { VegSite, scatterVegetation, buildGrassMask, RULES } from './vegetation/Scatter.js';
 import { VegType, LodLevel } from './vegetation/InstanceLOD.js';
 import { GrassField } from './vegetation/GrassField.js';
-import { uCamPos, uGustOffset, UNDER_FERN_FADE } from './vegetation/VegNodes.js';
+import { vegParams, uCamPos, uGustOffset, UNDER_FERN_FADE } from './vegetation/VegNodes.js';
 
 // WGSL variant index of an instance (VegNodes.vegVariantOf)
 const variantOf = ( seed, isShrub ) => `vegVariantOf( ${ seed }, ${ isShrub } )`;
@@ -15,6 +15,7 @@ import { createPlantLeafMaterial, createCanopyMaterial, createCanopyBakeMaterial
 import { ImpostorAtlas, buildImpostorQuad } from './vegetation/Impostors.js';
 import { LeafAtlas } from './vegetation/LeafTextures.js';
 import { createIslandFiveCanopyRecords } from './IslandFiveSystem.js';
+import { ShaderModule, UniformBlock } from '../engine/gpu/Shader.js';
 
 // Island vegetation: coconut palms along the back of the beach (leaning to the sea), a closed
 // rainforest canopy on the hillsides and gullies thinning into scattered trees and shrub
@@ -94,7 +95,7 @@ const CANOPY_FAR = [ 2600, 2800 ];
 
 export class Vegetation {
 
-	constructor( { scene, terrain, village = null } ) {
+	constructor( { scene, terrain, village = null, records = null, grassMask: authoredGrassMask = null, barkMaps = null } ) {
 
 		this.scene = scene;
 		this.terrain = terrain;
@@ -103,26 +104,30 @@ export class Vegetation {
 		this.group.matrixAutoUpdate = false;
 
 		const t0 = performance.now();
-		const site = new VegSite( terrain, villageObstacles( village ) );
+		// Repository callers supply captured records and masks. Generation remains solely
+		// the legacy application's opt-in path; repository content never invokes scatter.
+		if ( records && ! authoredGrassMask ) throw Error( 'Authored vegetation requires a grass mask.' );
+		const site = records ? null : new VegSite( terrain, villageObstacles( village ) );
 		this.site = site;
-		const recs = scatterVegetation( site );
-		// Agent Control: accessible fruiting Musa beside the third-island path, clear of its walking lane.
-		for (const [i, [x,z]] of [[102,588],[108,590],[127,603],[126,608]].entries()) {
-			recs.bananas.push({x,z,y:terrain.heightAt(x,z),H:2.4,l:0,la:0,s:1,seed:.12+i*.21,yaw:i*1.7});
+		const recs = records || scatterVegetation( site );
+		if ( ! records ) {
+			for (const [i, [x,z]] of [[102,588],[108,590],[127,603],[126,608]].entries()) recs.bananas.push({x,z,y:terrain.heightAt(x,z),H:2.4,l:0,la:0,s:1,seed:.12+i*.21,yaw:i*1.7});
+			recs.trees.push(...createIslandFiveCanopyRecords());
 		}
-		// Agent Control: Island Five reuses the authoritative canopy records rather than
-		// placeholder spheres. This shares the same atlas, geometry, wind and LOD path.
-		recs.trees.push(...createIslandFiveCanopyRecords());
 		this.records = recs;
 		const t1 = performance.now();
-		const grassMask = buildGrassMask( site );
+		const grassMask = authoredGrassMask || buildGrassMask( site );
 		this.timings = { scatter: t1 - t0, mask: performance.now() - t1 };
 
 		// materials (shared across meshes)
 		const leafMat = createPlantLeafMaterial();
 		this.leafAtlas = new LeafAtlas();
 		const canopyMat = createCanopyMaterial( this.leafAtlas );
-		uCanopyNear.value.set( TREE_NEAR, SHRUB_NEAR );
+		if ( barkMaps ) for ( const [ mat, maps ] of [ [ leafMat, barkMaps.palm ], [ canopyMat, barkMaps.tree ] ] ) for ( const key of [ 'barkDiffuse', 'barknor_gl', 'barkarm' ] ) {
+			if ( ! maps?.[ key ] ) throw Error( 'Missing authored vegetation bark map ' + key );
+			mat.bindings[ key ] = { texture: maps[ key ] };
+		}
+
 
 		// geometry
 		const palmNear = buildPalmNear();
@@ -232,6 +237,25 @@ export class Vegetation {
 		this.group.updateMatrixWorld( true );
 		scene.add( this.group );
 
+		// Clone the vegetation uniform and only the module graph, leaving immutable
+		// geometry/detail textures shared. Distinct worlds cannot overwrite wind/LOD.
+		const fields = Object.fromEntries( vegParams.order.map( key => {
+			const value = vegParams.fields[ key ].value;
+			return [ key, [ vegParams.layout[ key ].typeStr, value?.clone ? value.clone() : structuredClone( value ) ] ];
+		} ) );
+		this.viewParams = new UniformBlock( 'VegParams', fields, { label: 'vegetationInstance' } );
+		this.viewParams.fields.gustOffset.value.set( 0, 0 );
+		this.viewParams.fields.canopyNear.value.set( TREE_NEAR, SHRUB_NEAR );
+		const clones = new Map();
+		const cloneModule = module => {
+			if ( clones.has( module ) ) return clones.get( module );
+			const bindings = Object.fromEntries( Object.entries( module.bindings ).map( ( [ k, v ] ) => [ k, v.uniform === vegParams ? { ...v, uniform: this.viewParams } : v ] ) );
+			const deps = module.deps.map( cloneModule );
+			const changed = Object.values( module.bindings ).some( b => b.uniform === vegParams ) || deps.some( ( dep, i ) => dep !== module.deps[ i ] );
+			const clone = changed ? new ShaderModule( { name: module.name, code: module.code, bindings, deps } ) : module;
+			clones.set( module, clone ); return clone;
+		};
+		for ( const mat of [ ...this.materials, this.grass.material ] ) mat.modules = mat.modules.map( cloneModule );
 		this._camPos = new THREE.Vector3();
 		this.timings.total = performance.now() - t0;
 
@@ -250,13 +274,13 @@ export class Vegetation {
 
 		camera.updateMatrixWorld();
 		const p = camera.getWorldPosition( this._camPos );
-		uCamPos.value.copy( p );
+		this.viewParams.fields.camPos.value.copy( p );
 
 		// travelling gust field offset (integrated so speed/direction changes never jump)
 		const wd = G.windDir.value;
 		const speed = 0.7 * G.windSpeed.value + 1.5;
-		uGustOffset.value.x += wd.x * speed * dt;
-		uGustOffset.value.y += wd.y * speed * dt;
+		this.viewParams.fields.gustOffset.value.x += wd.x * speed * dt;
+		this.viewParams.fields.gustOffset.value.y += wd.y * speed * dt;
 
 		// near-level refills happen only after the camera moved a few metres; at most two
 		// types per frame (most overdue first) so fast flights never stack up refills.
@@ -329,7 +353,8 @@ export class Vegetation {
 		this.atlas.rtA.dispose();
 		this.leafAtlas.rt.dispose();
 		this.atlas.rtB.dispose();
-		this.atlas.depth.destroy();
+		this.atlas.depth?.destroy();
+		this.viewParams.buffer?.destroy();
 		this.grass.dispose();
 
 	}

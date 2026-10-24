@@ -1,0 +1,14 @@
+import {readFile} from 'node:fs/promises';
+import {resolve,join} from 'node:path';
+import {createHash} from 'node:crypto';
+import assert from 'node:assert/strict';
+import {readNativeIslandSource} from '../src/world-runtime/NativeIslandSource.js';
+const directory=resolve(process.argv[2]??'.local-evidence/native-island-20261024/loz');
+const nativeIsland=JSON.parse(await readFile(join(directory,'native-island.json'),'utf8'));
+const refs=new Map(nativeIsland.resources.map(r=>[r.id,r]));
+const started=performance.now();let readBytes=0;
+const source=await readNativeIslandSource({nativeIsland},async id=>{const ref=refs.get(id),bytes=await readFile(join(directory,ref.path));assert.equal(bytes.byteLength,ref.bytes);assert.equal(createHash('sha256').update(bytes).digest('hex'),ref.sha256);readBytes+=bytes.byteLength;return{ref,data:ref.format==='vegetation-json'?JSON.parse(bytes.toString('utf8')):ref.format==='f32le'?new Float32Array(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength)):new Uint8Array(bytes)};});
+const startupBytes=readBytes;assert.equal(source.domain.res,2048);assert.equal(source.coarse.res,128);assert.equal(source.tiles.length,256);assert.equal(source.grassMask.data.length,1024*1024*4);assert.equal(source.shore.data.length,512*512*4);assert.equal(Object.values(source.records).filter(Array.isArray).reduce((n,a)=>n+a.length,0),65398);
+const tile=source.tiles.find(t=>t.bounds[0]<=61&&t.bounds[2]>61&&t.bounds[1]<=-62&&t.bounds[3]>-62);const decoded=await source.readTile(tile);assert.equal(decoded.fields.heights.length,128*128);assert.equal(decoded.fields.normal.length,128*128*4);assert.equal(decoded.fields.splat.length,128*128*4);
+assert.ok(startupBytes<30*1024*1024,'fine height/material tiles remain lazy');
+console.log(JSON.stringify({capture:directory,verifiedResources:source.sourceStats().reads,startupBytes,arrivalTileBytes:readBytes-startupBytes,totalClosureBytes:nativeIsland.resources.reduce((n,r)=>n+r.bytes,0),elapsedMs:performance.now()-started,vegetationRecords:65398,gpuSparse:false}));source.dispose();

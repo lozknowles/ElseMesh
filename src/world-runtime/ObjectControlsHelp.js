@@ -5,7 +5,7 @@ export function accessObjectLabel(project,objectId){
  const shortId=objectId.length>20?objectId.slice(0,8)+'…'+objectId.slice(-6):objectId;
  return name+' · '+shortId;
 }
-export function accessActionLabel(action){return {'computer.use':'Use computer','neon.power':'Switch sign power','neon.configure':'Configure sign'}[action]??'Unsupported action';}
+export function accessActionLabel(action){return {'computer.use':'Use computer','neon.power':'Switch sign power','neon.configure':'Configure sign','media.play':'Watch TV'}[action]??'Unsupported action';}
 export function supportedObjectActions(project){
  return (project?.objects??[]).flatMap(o=>{const actions=supportedObjectAccessActions(project,o.id);return actions.length?[{objectId:o.id,actions}]:[];});
 }
@@ -27,10 +27,10 @@ export class ObjectControlsHelp {
  render(){
   this.body.replaceChildren();const add=(tag,text)=>{const e=document.createElement(tag);e.textContent=text;this.body.append(e);return e;};
   add('h2','Controls and interactions');add('p','W A S D / arrow keys: move and look · Mouse: look · Space: jump · Shift: run · V: change view · K: appearance · H: world panel · F1: help');
-  add('p','E: interact with a nearby computer. Sign controls are inside its linked computer.');
+  add('p','E: interact with a nearby computer or TV. Sign controls are inside its linked computer.');
   if(this.hasWelcome()){const replay=document.createElement('button');replay.textContent='Replay world welcome';replay.onclick=()=>{this.close();this.replayWelcome();};this.body.append(replay);}
   const rows=objectActionRows(this.getProject(),this.getSnapshot(),{playerNodeId:this.getPlayerNodeId(),fresh:this.isFresh()});
-  if(!rows.length)add('p','No supported computer or sign interactions in this world.');
+  if(!rows.length)add('p','No supported object interactions in this world.');
   for(const row of rows){const p=document.createElement('p'),label=document.createElement(row.allowed?'span':'s');label.textContent=row.label;p.append(label,document.createTextNode(row.allowed?' · Available':row.known?' · Access restricted':' · Access unavailable'));this.body.append(p);}
  }
  close(){if(!this.open)return;this.dialog.close();this.onClose();}

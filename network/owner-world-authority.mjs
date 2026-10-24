@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { canonical, signObject, verifyObject, assetId } from './identity.mjs';
 import { verifyRegionVersion, verifyDelegation, verifyPortalInvitation, createPortalHandoffV2, acceptPortalHandoffV2, mapPortalTransformV2, FEDERATION_CAPABILITIES } from './federation.mjs';
-import { OwnerWorldLedger } from './owner-world-ledger.mjs';
+import { OwnerWorldLedger,currentOwnerTransfer } from './owner-world-ledger.mjs';
 const check = (ok, message) => { if (!ok) throw new Error(message); };
 const digest = value => assetId(Buffer.from(canonical(value)));
 export const playerIdForNode = nodeId => `player:${nodeId.split(':')[1]}`;
@@ -66,7 +66,7 @@ export class OwnerWorldAuthority {
   }
   async acceptedState({ grantId, playerId, sessionId, motion, sequence, generation }, { allowCollisionCorrection = false } = {}) {
     this.assertCurrent(); const grant = this.grant(grantId); check(grant.playerId === playerId && grant.sessionId === sessionId && safeMotion(motion), 'Invalid accepted state');
-    return this.ledger.transact(async state => { const member = state.members[playerId]; check(member?.status === 'ACTIVE' && member.sessionId === sessionId, 'Player frozen or absent'); check(Number.isSafeInteger(sequence) && sequence > member.sequence && generation === member.generation, 'Stale accepted state sequence/generation'); const clear = await this.clearance({spawn:motion,playerId,reservations:Object.values(state.transfers).filter(t=>t.role==='DESTINATION'&&t.status==='RESERVED'),members:Object.values(state.members).filter(m=>m.playerId!==playerId)}); if (clear === false && allowCollisionCorrection === true) return { corrected: true, member: structuredClone(member), rejectedSequence: sequence }; check(clear === true,'Movement clearance denied'); member.motion = structuredClone(motion); member.sequence = sequence; return member; });
+    return this.ledger.transact(async state => { const member = state.members[playerId]; check(member?.status === 'ACTIVE' && member.sessionId === sessionId, 'Player frozen or absent'); check(Number.isSafeInteger(sequence) && sequence > member.sequence && generation === member.generation, 'Stale accepted state sequence/generation'); const clear = await this.clearance({spawn:motion,playerId,...(allowCollisionCorrection===true?{purpose:'movement',previousMotion:structuredClone(member.motion)}:{}),reservations:Object.values(state.transfers).filter(t=>t.role==='DESTINATION'&&t.status==='RESERVED'),members:Object.values(state.members).filter(m=>m.playerId!==playerId)}); if (clear === false && allowCollisionCorrection === true) return { corrected: true, member: structuredClone(member), rejectedSequence: sequence }; check(clear === true,'Movement clearance denied'); member.motion = structuredClone(motion); member.sequence = sequence; return member; });
   }
   async checkCapacity(state, playerId, spawn) {
     const reservations = Object.values(state.transfers).filter(t => t.role === 'DESTINATION' && t.status === 'RESERVED');
@@ -148,7 +148,7 @@ export class OwnerWorldAuthority {
     });
   }
   async status({ transferId }, { callerNodeId } = {}) {
-    const t = this.ledger.snapshot().transfers[transferId]; check(t, 'Unknown transfer');
+    const state=this.ledger.snapshot(),t = state.transfers[transferId]; check(currentOwnerTransfer(t,state.binding), 'Unknown or archived transfer');
     if (callerNodeId) { check(t.role === 'DESTINATION' && t.binding.sourceAuthority === callerNodeId, 'Wrong status caller'); return t.receipt ?? t.tombstone ?? t.reservation; }
     if (t.role === 'SOURCE' && ['FENCED','ISSUED'].includes(t.status)) { const result = await this.rpc(t.binding.destinationAuthority,'status',{transferId}); if (result.kind === 'owner-world-commit-receipt') return this.finalise(t,result); }
     if(t.status==='DEPARTED')return t.receipt;if(t.status==='CANCELLED')return t.tombstone;
@@ -162,6 +162,7 @@ export class OwnerWorldAuthority {
     return this.ledger.transact(state=>{const current=state.transfers[transferId]; check(current.status!=='DEPARTED','Already departed'); current.status='CANCELLED';current.tombstone=result;const member=state.members[t.binding.playerId];if(member?.transferId===transferId){member.status='ACTIVE';delete member.transferId;}return result;});
   }
   dispatch(operation,payload,context={}) {
+    if(payload?.transferId){const state=this.ledger.snapshot(),t=state.transfers[payload.transferId];check(!t||currentOwnerTransfer(t,state.binding),'Archived transfer cannot be replayed');}
     const allowed = ['challenge','subscribe','read','state','accepted-state','enter-local','prepare','ready','handoff','commit','status','cancel']; check(allowed.includes(operation),'Unknown authority operation');
     if (context.callerNodeId) { this.peer(context.callerNodeId); check(['challenge','subscribe','read','ready','commit','status','cancel'].includes(operation),'Peer operation forbidden'); }
     return this[operation==='accepted-state'?'acceptedState':operation==='enter-local'?'enterLocal':operation](payload,context);

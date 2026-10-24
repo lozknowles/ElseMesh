@@ -76,3 +76,26 @@ test('private delegation, explicit grants, revisions, replay, distance, links an
  });
  }finally{await ledger.close();await rm(dir,{recursive:true,force:true});}
 });
+
+test('media screen requires its own grant and accepted viewing proximity',async()=>{
+ const dir=await mkdtemp(join(tmpdir(),'owner-tv-')),owner=newIdentity(),identity=newIdentity(),viewer=newIdentity();
+ const world={worldId:'world',contentDigest:'content',ownerNodeId:owner.nodeId,epoch:1,binding:{expiresAt:Date.now()+600000}};
+ const tv=object('tv','media-screen',[0,2.2,0],{mediaScreen:{schema:'elsemesh.media-screen/1',provider:'youtube',videoId:'N-V7VpmoPkU',width:6.4}}),p={...project(),objects:[...project().objects,tv]};
+ const ledger=await OwnerWorldLedger.open(join(dir,'ledger.sqlite'),{world:'world'}),session={nodeId:viewer.nodeId,playerId:'viewer',sessionId:'session',generation:1};
+ const authority={ledger,assertCurrent(){},policy:{viewPlayers:['viewer'],enterPlayers:['viewer']}};
+ await ledger.transact(s=>{s.members.viewer={...session,playerNodeId:viewer.nodeId,status:'ACTIVE',motion:{position:[0,0,5]}};s.grants.view={playerNodeId:viewer.nodeId,sessionId:'session',expiresAt:Date.now()+60000};return true;});
+ const access=new OwnerObjectAccess({project:p,world,identity,authority,players:{[viewer.nodeId]:{label:'Viewer'}}});let seq=0;
+ const call=(op,data={})=>access.handle({requestId:'media-'+seq++,operation:op,payload:{worldId:'world',contentDigest:'content',sessionId:'session',generation:1,policyDigest:access.policy.policyDigest,policyRevision:ledger.snapshot().objectAccess?.revision??1,...data}},session,{grantId:'view'});
+ try{
+  assert.equal((await call('object-use',{objectId:'tv'})).allowed,false);
+  await ledger.transact(s=>{s.objectAccess.grants[JSON.stringify([viewer.nodeId,'tv','computer.use'])]=true;return true;});
+  assert.equal((await call('object-use',{objectId:'tv'})).allowed,false,'computer permission never grants media playback');
+  await ledger.transact(s=>{s.objectAccess.grants[JSON.stringify([viewer.nodeId,'tv','media.play'])]=true;return true;});
+  const allowed=await call('object-use',{objectId:'tv'});assert.equal(allowed.allowed,true);assert.equal(allowed.result.action,'media.play');
+  assert.equal((await call('object-neon-power',{objectId:'tv',targetObjectId:'sign',value:true})).allowed,false);
+  await ledger.transact(s=>{s.members.viewer.motion.position=[0,0,7];return true;});
+  assert.equal((await call('object-use',{objectId:'tv',position:[0,0,2]})).allowed,false,'browser cannot forge viewing proximity');
+  await ledger.transact(s=>{s.members.viewer.motion.position=[0,0,5];delete s.objectAccess.grants[JSON.stringify([viewer.nodeId,'tv','media.play'])];return true;});
+  assert.equal((await call('object-use',{objectId:'tv'})).allowed,false,'revoked playback stops renewing');
+ }finally{await ledger.close();await rm(dir,{recursive:true,force:true});}
+});

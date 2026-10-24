@@ -13,6 +13,8 @@ import { RepositoryFederation, challengePayload } from '../../network/repository
 import { FEDERATION_CAPABILITIES } from '../../network/federation.mjs';
 import { isRepositoryContentPath } from '../../src/world-runtime/LocalRepositoryFiles.js';
 import { loadWorldSource, admitFederatedRuntimeWorld, collisionWorldBounds, sampleTerrain } from '../../src/world-runtime/vendor/world-engine-contract.js';
+import {createRepositoryMotionClearance} from '../../network/repository-motion-clearance.mjs';
+import {prepareNativeIslandPhysics} from '../../network/repository-native-physics.mjs';
 const exec=promisify(execFile),check=(v,m)=>{if(!v)throw Error(m);},MAX_FILE=128*1024*1024;
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.png':'image/png','.jpg':'image/jpeg','.glb':'model/gltf-binary','.svg':'image/svg+xml','.woff2':'font/woff2'};
 /** Reads immutable Git objects only. Never exposes a worktree, .git or filesystem path. */
@@ -34,10 +36,8 @@ export async function prepareRepositoryConfig(config,identity){
   check(configured.binding&&Number.isSafeInteger(configured.binding.expiresAt)&&configured.binding.expiresAt>Date.now(),'Expired content admission');
   check(configured.binding&&verifyObject(configured.binding,new Set([configured.ownerNodeId])),'Untrusted content admission');
   admitFederatedRuntimeWorld(project,loaded.identity.contentDigest,configured.binding,configured.published,{verifyBinding:b=>b===configured.binding,verifyRegion:p=>p.descriptor});
-  const colliders=collisionWorldBounds(project);const clearance=position=>{
-   const [x,y,z]=position,r=.3;if(Math.abs(x)>project.terrain.width/2-r||Math.abs(z)>project.terrain.depth/2-r||y<sampleTerrain(project.terrain,x,z)-.08)return false;
-   return !colliders.some(({bounds:b})=>x+r>b.min.x&&x-r<b.max.x&&z+r>b.min.z&&z-r<b.max.z&&y+1.8>b.min.y+.02&&y+.05<b.max.y);
-  };
+  const physics=await prepareNativeIslandPhysics(project,source.read),heightAt=physics?.heightAt??((x,z)=>sampleTerrain(project.terrain,x,z));
+  const clearance=createRepositoryMotionClearance({colliders:collisionWorldBounds(project),heightAt,width:physics?project.nativeIsland.grid.size:project.terrain.width,depth:physics?project.nativeIsland.grid.size:project.terrain.depth});
   check(!configured.portals||canonical(configured.portals.map(({invitation,acceptance,...p})=>p))===canonical(project.portals??[]),'Operator portal data disagrees with pinned content');
   const approvals=new Map((configured.portals??[]).map(p=>[p.id,{invitation:p.invitation,acceptance:p.acceptance}]));
   worlds.push({...configured,contentDigest:loaded.identity.contentDigest,spawn:project.spawn.position,portals:(project.portals??[]).map(p=>({...p,...approvals.get(p.id)})),clearance,source});

@@ -38,9 +38,10 @@ export class RepositoryWorldHost {
    const camera=this.engine.camera.clone();
    resourceLease=await this.acquireResources(loaded);
    descriptor=resourceLease?.candidate.descriptor??describeRuntimeWorld(loaded.project);
-   candidate=resourceLease?.candidate??await this.buildCandidate(descriptor,camera);
+   candidate=resourceLease?.candidate??await this.buildCandidate(descriptor,camera,{loaded});
    if(generation!==this.generation||this.disposed){if(resourceLease)resourceLease.release();else this.disposeCandidate(candidate);return false;}
    if(!candidate?.root?.isObject3D||candidate.root.parent&&!resourceLease)throw Error('Prepared world root must be detached.');
+   if(candidate.nativeIsland)await candidate.nativeIsland.ensureArrival(pose?.position??descriptor.spawn.position);
    const player=new Player({camera,input:this.input,terrain:candidate.terrain,colliders:candidate.colliders,query:candidate.query??dryQuery(),boat:null});
    if(pose){
     if(!Array.isArray(pose.position)||pose.position.length!==3||!pose.position.every(Number.isFinite)||
@@ -133,11 +134,14 @@ export class RepositoryWorldHost {
    const distance=point.distanceTo(this.engine.camera.position);if(distance<best){best=distance;found=object;}
   }return found;
  }
- update(dt,time){
-  if(!this.active)return;const {player,root,forest}=this.active;this.active.query?.setTime(time);player.update(dt);this.active.traffic?.update(dt,{x:player.position.x,z:player.position.z,yaw:player.yaw,kind:'pedestrian'});forest?.userData.updateTreeLOD(time,this.engine.camera.position);
+ update(dt,time,{move=true}={}){
+  if(!this.active)return;const {player,root,forest}=this.active;this.active.query?.setTime(time);
+  const nativeIsland=this.active.nativeIsland;
+  if(move&&(!nativeIsland||nativeIsland.canOccupy(player.position.x,player.position.z,Math.max(3,player.velocity.length()*dt+2))))player.update(dt);
+  nativeIsland?.update(dt,this.engine.camera);this.active.traffic?.update(dt,{x:player.position.x,z:player.position.z,yaw:player.yaw,kind:'pedestrian'});forest?.userData.updateTreeLOD(time,this.engine.camera.position);
   const configs=new Map((this.overlay?.signs??[]).map(s=>[s.id,s]));
   root.traverse(node=>{if(!node.userData.updateNeon)return;const state=configs.get(node.userData.neonObjectId);const elapsed=Number.isFinite(state?.effectStartMs)?Math.max(0,(Date.now()+(this.overlay?.offsetMs??0)-state.effectStartMs)/1000):time;node.userData.updateNeon(elapsed,this.environment().timeOfDay??14,state?.powered??state?.config?.powered);});
-  if(this.input.pressed.has('KeyE')){const computer=this.nearestComputer();if(computer)this.onInteract(computer,this.active);}
+  if(move&&this.input.pressed.has('KeyE')){const computer=this.nearestComputer();if(computer)this.onInteract(computer,this.active);}
  }
  disconnect(){this.pendingUpdate=null;++this.generation;this.setRuntimeOverlay(null);this.input._clearTransientInput();}
  dispose(){this.disconnect();this.disposed=true;for(const prepared of [...this.prepared])this.discardPrepared(prepared);if(!this.retainResources(this.active))this.disposeCandidate(this.active);this.active=null;}

@@ -23,8 +23,8 @@ export class OwnerObjectAccessClient {
  }
  async read(){const {receipt:r,context}=await this.request('object-access-read',{},true);this.snapshot={...r.result,policyDigest:r.policyDigest,policyRevision:r.policyRevision,expiresAt:r.expiresAt,context};this.onSnapshot(this.snapshot);return this.snapshot;}
  async update(data){await this.request('object-access-update',data);return this.read();}
- async use(objectId){const {receipt:r,context}=await this.request('object-use',{objectId});if(r.result?.objectId!==objectId||r.result?.action!=='computer.use'){this.invalidate();throw Error('Object access unavailable');}this.lease={objectId,expiresAt:r.expiresAt,renewAt:this.now()+1000,context};return true;}
- valid(objectId=this.lease?.objectId){return !!this.lease&&this.lease.objectId===objectId&&this.lease.expiresAt>this.now()&&this.same(this.lease.context);}
+ async use(objectId,action='computer.use'){if(!['computer.use','media.play'].includes(action))throw new AccessRestricted();const {receipt:r,context}=await this.request('object-use',{objectId});if(r.result?.objectId!==objectId||r.result?.action!==action){this.invalidate();throw Error('Object access unavailable');}this.lease={objectId,action,expiresAt:r.expiresAt,renewAt:this.now()+1000,context};return true;}
+ valid(objectId=this.lease?.objectId,action=this.lease?.action){return !!this.lease&&this.lease.objectId===objectId&&this.lease.action===action&&this.lease.expiresAt>this.now()&&this.same(this.lease.context);}
  async effect(objectId,targetObjectId,action,value){if(!this.valid(objectId))throw new AccessRestricted();await this.request(action==='neon.power'?'object-neon-power':'object-neon-configure',{objectId,targetObjectId,...(action==='neon.power'?{value}:{config:value})});await this.read();}
  tick(){
   if(this.lease&&!this.valid()){this.invalidate();return;}
@@ -34,7 +34,7 @@ export class OwnerObjectAccessClient {
   if(!renew&&!poll)return;
   try{this.context();}catch{return;}
   this.pending=true;this.nextPoll=now+1000;
-  const objectId=this.lease?.objectId,epoch=this.epoch,context=this.context();
-  void (async()=>{if(poll)await this.read();if(renew&&objectId&&this.lease?.objectId===objectId)await this.use(objectId);})().catch(error=>{if(epoch===this.epoch&&this.same(context)){this.invalidate();this.lastError=error.message;}}).finally(()=>this.pending=false);
+  const objectId=this.lease?.objectId,action=this.lease?.action,epoch=this.epoch,context=this.context();
+  void (async()=>{if(poll)await this.read();if(renew&&objectId&&this.lease?.objectId===objectId)await this.use(objectId,action);})().catch(error=>{if(epoch===this.epoch&&this.same(context)){this.invalidate();this.lastError=error.message;}}).finally(()=>this.pending=false);
  }
 }

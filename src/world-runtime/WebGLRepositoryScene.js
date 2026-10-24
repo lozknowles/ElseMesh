@@ -1,3 +1,5 @@
+import {buildMediaScreenHousing} from './MediaScreen.js';
+import {buildWebGLNativeIsland} from './WebGLNativeIsland.js';
 import {buildRepositoryTraffic} from './RepositoryTraffic.js';
 import {buildRepositoryLandscape,addLandscapeCollisions,landscapeAssets,installRepositoryLandscapeMaterial} from './RepositoryLandscape.js';
 import { T, resolveWorldMatrices,effectiveObjectState,buildComputerGeometry,disposeComputerGeometry,inspectAndLoadAsset,disposeAssetScene,acquireNeonGeometry,sampleNeonEffect,createTreeGeometry,buildFeatureGeometry } from './vendor/world-engine-contract.js';
@@ -41,6 +43,7 @@ export function buildWebGLNeon(config){
 }
 export function disposeWebGLRepositoryScene(candidate){
  if(!candidate||candidate.disposed)return;candidate.disposed=true;
+ candidate.nativeIsland?.dispose();
  candidate.root?.removeFromParent();const geometries=new Set(),materials=new Set(),textures=new Set();
  candidate.root?.traverse(n=>{if(n.geometry)geometries.add(n.geometry);for(const m of Array.isArray(n.material)?n.material:[n.material])if(m){materials.add(m);for(const value of Object.values(m))if(value?.isTexture)textures.add(value);}});
  for(const g of geometries)g.dispose();for(const m of materials)m.dispose();for(const t of textures)t.dispose();
@@ -99,18 +102,20 @@ function sea(project,time){
  * Source glTF materials/textures remain owned until candidate disposal; static primitives are
  * batched by asset+override+terminal kind, preserving saved world matrices and object IDs.
  */
-export async function buildWebGLRepositoryScene(descriptor,camera){
+export async function buildWebGLRepositoryScene(descriptor,camera,options={}){
  const project=descriptor.project,root=new T.Group(),candidate={root,descriptor,terrain:descriptor.terrain,colliders:new Colliders(),query:repositoryWaterQuery(project.water,project),assets:[],loadedAssets:new Set()};
  candidate.project=project;root.name='repository-world:'+descriptor.worldId;const time={value:0};root.userData.updateWebGL=t=>{time.value=t;};
  try{
   for(const b of descriptor.boxes)candidate.colliders.addBox(new Vector3(...b.center),new Vector3(...b.half),0,{walkable:b.walkable,solid:b.solid,tag:b.id});
-  const ground=terrainGeometry(project);root.add(new T.Mesh(ground,await terrainMaterial(project,ground)));
+  if(project.nativeIsland){candidate.nativeIsland=await buildWebGLNativeIsland({project,root,camera,options:options.nativeIsland??{}});candidate.terrain=candidate.nativeIsland.data;candidate.query=candidate.nativeIsland.query;candidate.backendQualification=candidate.nativeIsland.stats();const update=root.userData.updateWebGL;root.userData.updateWebGL=t=>{update(t);candidate.nativeIsland.query.setTime(t);};}
+  else {const ground=terrainGeometry(project);root.add(new T.Mesh(ground,await terrainMaterial(project,ground)));}
   const generatedAssets=landscapeAssets(project),allObjects=[...project.objects,...generatedAssets],matrices=resolveWorldMatrices(allObjects);candidate.matrices=matrices;
   const add=(parent,geometry,color)=>parent.add(new T.Mesh(geometry,standard(color)));
   for(const object of project.objects){
    if(object.collisionOnly||['group','tree','glb'].includes(object.kind)||!effectiveObjectState(project.objects,object.id).visible)continue;
    const item=new T.Group();item.userData.editorObjectId=object.id;item.matrixAutoUpdate=false;item.matrix.copy(matrices.get(object.id));root.add(item);
-   if(object.kind==='computer'){const computer=buildComputerGeometry();try{for(const p of computer.parts){const color=p.emissive?object.computer.screenColor:p.color;item.add(new T.Mesh(p.geometry.clone(),p.emissive?new T.MeshBasicMaterial({color,side:T.DoubleSide}):standard(color)));}}finally{disposeComputerGeometry(computer);}}
+   if(object.kind==='media-screen'){item.add(buildMediaScreenHousing(object.mediaScreen,{api:T,material:props=>new T.MeshStandardMaterial(props)}));}
+   else if(object.kind==='computer'){const computer=buildComputerGeometry();try{for(const p of computer.parts){const color=p.emissive?object.computer.screenColor:p.color;item.add(new T.Mesh(p.geometry.clone(),p.emissive?new T.MeshBasicMaterial({color,side:T.DoubleSide}):standard(color)));}}finally{disposeComputerGeometry(computer);}}
    else if(object.kind==='neon-sign'){const neon=buildWebGLNeon(object.neon);neon.userData.neonObjectId=object.id;item.add(neon);}
    else if(object.kind==='building'){add(item,new T.BoxGeometry(3.6,2.2,3).translate(0,1.1,0),object.color);add(item,new T.ConeGeometry(2.7,1.1,4).rotateY(Math.PI/4).translate(0,2.55,0),'#574e42');}
    else if(['box','sphere','cylinder','cone'].includes(object.kind))add(item,object.kind==='sphere'?new T.SphereGeometry(.8,24,16):object.kind==='cylinder'?new T.CylinderGeometry(.65,.65,1.6,24):object.kind==='cone'?new T.ConeGeometry(.8,1.6,24):new T.BoxGeometry(1.6,1.6,1.6),object.color);
@@ -133,8 +138,8 @@ export async function buildWebGLRepositoryScene(descriptor,camera){
     }
    });for(const object of objects)candidate.assets.push({objectId:object.id,primitives,kind,backend:'webgl2'});
   }
-  candidate.assetBatchCount=groups.size;candidate.forest=forest(project,matrices,time);root.add(candidate.forest);
-  const water=sea(project,time);if(water)root.add(water);
+  candidate.assetBatchCount=groups.size;if(!project.nativeIsland){candidate.forest=forest(project,matrices,time);root.add(candidate.forest);}
+  const water=project.nativeIsland?null:sea(project,time);if(water)root.add(water);
   for(const feature of project.features??[]){if(feature.visible===false)continue;for(const part of buildFeatureGeometry(feature,project)){const wet=['water','foam'].includes(part.semantic);root.add(new T.Mesh(part.geometry,standard(part.color,wet?{roughness:.22,transparent:true,opacity:.9,metalness:.1}:{})));}}
   const landscape=buildRepositoryLandscape(project);root.add(landscape);candidate.landscape=landscape;candidate.landscapeCollisions=addLandscapeCollisions(project,candidate.colliders);const update=root.userData.updateWebGL;root.userData.updateWebGL=t=>{update(t);landscape.userData.updateLandscape(t);};
   candidate.traffic=await buildRepositoryTraffic(project,candidate);

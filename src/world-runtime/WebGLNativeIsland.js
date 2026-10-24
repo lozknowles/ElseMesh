@@ -1,0 +1,153 @@
+import {canonicalWaterSurfaceExclusions,waterSurfaceExclusionTest} from '../ocean/WaterSurfaceExclusions.js';
+import {T} from './vendor/world-engine-contract.js';
+import {NativeIslandTerrain} from './NativeIslandTerrain.js';
+import {NativeIslandTiles} from './NativeIslandTiles.js';
+import {getDetailTexture} from '../world/terrain/DetailTextures.js';
+import * as Plants from '../world/vegetation/PlantGeometry.js';
+
+export const WEBGL_NATIVE_ISLAND_QUALIFICATION=Object.freeze({backend:'webgl2',backendQualification:'unqualified-optical-equivalence',waterModel:'source-parameter analytic swell and shore approximation',limitations:['Original FFT, refraction, swash simulation and underwater optics are not reproduced.','Near plants use original source geometry and exact records; distant crowns use reduced source card geometry, not the original octahedral atlases.','Leaf alpha, wind and terrain microshading are GLSL approximations; grass density is applied to the ground without individual grass blades.']});
+const fract=x=>x-Math.floor(x),UP=new T.Vector3(0,1,0);
+export function nativePlantPoseMatrix(record,out=new T.Matrix4(),canopy=false){return out.compose(new T.Vector3(record.x,record.y,record.z),new T.Quaternion().setFromAxisAngle(UP,record.yaw),new T.Vector3(record.s,record.s*(canopy?Math.abs(record.sy??1):1),record.s));}
+/** Copies the ORIGINAL installed geometry including source part/deformation attributes. */
+export function convertNativePlantGeometry(source,{leafStride=1}={}){
+ const geometry=new T.BufferGeometry();
+ for(const name of ['position','normal','uv','aVeg','aMat']){const attr=source.getAttribute(name);if(!attr)continue;const array=new Float32Array(attr.count*attr.itemSize);for(let i=0;i<attr.count;i++)for(let c=0;c<attr.itemSize;c++)array[i*attr.itemSize+c]=attr.getComponent(i,c);geometry.setAttribute(name,new T.BufferAttribute(array,attr.itemSize));}
+ const indices=[],part=geometry.getAttribute('aMat');let card=0;
+ for(let i=0;i<source.index.count;i+=3){const a=source.index.getX(i),leaf=part.getX(a)===1||part.getX(a)===4;if(leaf&&leafStride>1&&Math.floor(card++/2)%leafStride!==0)continue;indices.push(a,source.index.getX(i+1),source.index.getX(i+2));}
+ geometry.setIndex(indices);geometry.computeBoundingSphere();return geometry;
+}
+export function webGLNativeTerrainTile(data,tile,step=1){
+ const nx=Math.ceil(tile.width/step)+1,nz=Math.ceil(tile.height/step)+1,positions=new Float32Array(nx*nz*3),uv=new Float32Array(nx*nz*2),indices=[];
+ for(let z=0;z<nz;z++)for(let x=0;x<nx;x++){const gx=Math.min(data.res-1,tile.x+Math.min(tile.width,x*step)),gz=Math.min(data.res-1,tile.z+Math.min(tile.height,z*step)),i=z*nx+x;positions.set([data.origin+(gx+.5)*data.texel,data.heights[gz*data.res+gx],data.origin+(gz+.5)*data.texel],i*3);uv.set([x/(nx-1),z/(nz-1)],i*2);if(x<nx-1&&z<nz-1)indices.push(i,i+nx,i+1,i+1,i+nx,i+nx+1);}
+ const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.BufferAttribute(positions,3));geometry.setAttribute('uv',new T.BufferAttribute(uv,2));geometry.setIndex(indices);geometry.computeVertexNormals();return geometry;
+}
+function texture(data,res,channels=4,type=T.UnsignedByteType){const value=new T.DataTexture(data,res,res,channels===4?T.RGBAFormat:T.RedFormat,type);value.magFilter=value.minFilter=type===T.FloatType?T.NearestFilter:T.LinearFilter;value.generateMipmaps=false;value.flipY=false;value.needsUpdate=true;return value;}
+async function barkTextures(source){
+ const owned=[],result={palm:{},tree:{}};
+ try{const settled=await Promise.allSettled(['palm','tree'].flatMap(kind=>[['albedo','map'],['normal','normalMap'],['orm','orm']].map(async([slot,name])=>{const id=source.vegetationTextures?.[kind]?.[slot],ref=source.barkAssets?.find(r=>r.id===id);if(!ref||ref.mediaType!=='image/jpeg')throw Error('Missing portable WebGL bark resource.');const bytes=await source.readAsset(id),bitmap=await createImageBitmap(new Blob([bytes],{type:'image/jpeg'}));if(bitmap.width!==ref.width||bitmap.height!==ref.height){bitmap.close();throw Error('WebGL bark dimensions differ.');}const value=new T.Texture(bitmap);value.wrapS=value.wrapT=T.RepeatWrapping;value.colorSpace=slot==='albedo'?T.SRGBColorSpace:T.NoColorSpace;value.needsUpdate=true;value.addEventListener('dispose',()=>bitmap.close());owned.push(value);result[kind][name]=value;})));const failure=settled.find(r=>r.status==='rejected');if(failure)throw failure.reason;return{...result,dispose(){for(const value of owned)value.dispose();}};}catch(error){for(const value of owned)value.dispose();throw error;}
+}
+const PLANT_VERTEX=`
+attribute vec4 aVeg;attribute vec4 aMat;attribute vec4 iPlant;attribute vec4 iRecord;
+uniform float nativeTime;uniform vec2 nativeWind;uniform vec2 nativeGust;uniform float nativeWindStrength;uniform sampler2D nativeDetail;
+varying vec4 vNativePart;varying vec2 vNativeUv;
+vec3 nativeRotate(vec3 v,vec3 axis){vec3 k=vec3(axis.z,0.0,-axis.x);vec3 c=cross(k,v);return v+c+cross(k,c)/(axis.y+1.0);}
+vec3 nativePlantPosition(vec3 P){
+ float u=aVeg.x,H=iPlant.z,seed=iPlant.w;vec3 leanDir=vec3(cos(iPlant.x),0.0,sin(iPlant.x));
+ vec2 base=instanceMatrix[3].xz;vec2 gp=base-nativeGust;float g=smoothstep(.46,.6,texture2D(nativeDetail,gp/140.0).a*.62+texture2D(nativeDetail,gp/61.0+.37).a*.38);
+ float w=nativeWindStrength,phase=seed*6.2832;vec2 wd=vec2(cos(iRecord.x)*nativeWind.x-sin(iRecord.x)*nativeWind.y,sin(iRecord.x)*nativeWind.x+cos(iRecord.x)*nativeWind.y);
+ float sway=w*w*.014*(g*.9+.3)+sin(nativeTime*.83+phase)*w*.0065*(g+.45);float side=sin(nativeTime*.61+phase*1.7)*w*.0028;vec3 wind=vec3(wd.x,0.0,wd.y)*sway+vec3(-wd.y,0.0,wd.x)*side;
+ if(iRecord.z>.5){P.xz+=vec2(wind.x,wind.z)*pow(max(P.y/12.5,0.0),2.0)*12.5;return P;}
+ float c=fract(seed*7.31),fc=mix(u,u*(2.0-u),c),df=mix(1.0,2.0*(1.0-u),c);vec3 tangent=normalize(vec3(0,1,0)+leanDir*(iPlant.y*df)+wind*(u*2.0));
+ vec3 stem=vec3(0,u*H,0)+(leanDir*(iPlant.y*fc)+wind*u*u)*H+nativeRotate(vec3(P.x,0,P.z),tangent);
+ vec3 tip=normalize(vec3(0,1,0)+leanDir*(iPlant.y*(1.0-c))+wind*2.0),tilt=normalize(vec3(0,1,0)+tip);vec3 centre=vec3(0,H,0)+(leanDir*iPlant.y+wind)*H;vec3 crown=nativeRotate(P,tilt);
+ float s=aVeg.y,ph=aVeg.w;float bend=s*s*4.5*(w*w*.16*(g*.8+.35)+sin(nativeTime*(ph*.5+1.3)+ph*23.0+phase)*w*.075*(g+.3));
+ vec3 disp=vec3(wd.x,0,wd.y)*bend+vec3(0,sin(nativeTime*(ph+2.1)+ph*41.0)*s*s*w*.1-bend*.3,0);vec3 moved=normalize(crown+disp+vec3(0,.00001,0))*length(crown);return aMat.x<.5?stem:centre+moved;
+}`;
+function plantMaterial(kind,time,wind,gust,detail,bark){
+ const material=new T.MeshStandardMaterial({color:'#ffffff',side:T.DoubleSide,roughness:.86});material.alphaTest=.35;
+ material.onBeforeCompile=shader=>{Object.assign(shader.uniforms,{nativeTime:time,nativeWind:wind,nativeGust:gust,nativeWindStrength:{value:1},nativeDetail:{value:detail},nativeBark:{value:bark.map},nativeBarkNormal:{value:bark.normalMap},nativeOrm:{value:bark.orm}});
+ shader.vertexShader=PLANT_VERTEX+'\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
+ vNativePart=aMat;vNativeUv=uv;transformed=nativePlantPosition(transformed);`);
+ shader.fragmentShader=`varying vec4 vNativePart;varying vec2 vNativeUv;uniform sampler2D nativeBark;uniform sampler2D nativeBarkNormal;uniform sampler2D nativeOrm;
+`+shader.fragmentShader;
+ shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+ bool bark=vNativePart.x<.5${kind==='tree'?' || vNativePart.x>4.5':''};
+ if(bark){diffuseColor.rgb*=texture2D(nativeBark,vNativeUv).rgb*texture2D(nativeOrm,vNativeUv).r;}else{
+ ${kind==='tree'?`vec2 p=fract(vNativeUv)*2.0-1.0;float leaf=1.0-dot(p*vec2(1.0,1.2),p*vec2(1.0,1.2));if(leaf<.08)discard;`:'float edge=abs(vNativeUv.x*2.0-1.0);if(vNativeUv.x>=0.0 && edge>pow(max(sin(clamp(vNativeUv.y,0.0,1.0)*3.14159),.04),.35))discard;'}
+ diffuseColor.rgb*=mix(vec3(.07,.15,.035),vec3(.24,.34,.095),vNativePart.z);if(vNativePart.x>8.5&&vNativePart.x<9.5)diffuseColor.rgb=vec3(.65,.09,.035);
+ }`);
+ shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>\n if(vNativePart.x<.5${kind==='tree'?' || vNativePart.x>4.5':''})roughnessFactor=clamp(texture2D(nativeOrm,vNativeUv).g,.6,1.0);`);
+ shader.fragmentShader=shader.fragmentShader.replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>\n if(vNativePart.x<.5${kind==='tree'?' || vNativePart.x>4.5':''}){vec3 barkN=texture2D(nativeBarkNormal,vNativeUv).xyz*2.0-1.0;vec3 p1=dFdx(-vViewPosition),p2=dFdy(-vViewPosition);vec2 t1=dFdx(vNativeUv),t2=dFdy(vNativeUv);vec3 tangent=normalize(p1*t2.y-p2*t1.y),bitangent=normalize(-p1*t2.x+p2*t1.x);normal=normalize(tangent*barkN.x*.65+bitangent*barkN.y*.65+normal*barkN.z);}`);
+ };material.customProgramCacheKey=()=> 'native-source-plants-webgl/1:'+kind;return material;
+}
+function buildPlants(source,time,detail,materials){
+ const root=new T.Group(),batches=[],matrix=new T.Matrix4();let displayed=0,lastPos=new T.Vector3(Infinity,Infinity,Infinity),lastDirection=new T.Vector3(),lastCamera=null;
+ const specs={palms:[Plants.buildPalmNear,120,2800,false],youngPalms:[Plants.buildYoungPalm,0,140,false],ferns:[Plants.buildFern,0,58,false],bananas:[Plants.buildBanana,0,120,false],monsteras:[Plants.buildMonstera,0,105,false],elephantEars:[Plants.buildElephantEar,0,105,false],heliconias:[Plants.buildHeliconia,0,105,false],strelitzias:[Plants.buildStrelitzia,0,105,false],trees:[Plants.buildTreeNear,65,2800,true],shrubs:[Plants.buildShrubNear,45,2800,true]};
+ for(const [species,[factory,near,far,canopy]] of Object.entries(specs)){
+  const variants=canopy?(species==='trees'?3:2):species==='bananas'?2:1;
+  for(let variant=0;variant<variants;variant++){
+   const records=source.records[species].filter(r=>canopy?Math.floor(fract(r.seed*7.77)*variants)===variant:species==='bananas'?(r.seed<.5?0:1)===variant:true);if(!records.length)continue;
+   const original=species==='bananas'?factory(variant?23:9):factory();const native=canopy?Plants.lobeVariantGeometry(original.geometry,Plants.LOBE_TABLE,(variant+(species==='shrubs'?Plants.TREE_VARIANTS:0))*8):original.geometry;
+   for(const distant of near?[false,true]:[false]){
+    const farPalm=species==='palms'&&distant?Plants.buildPalmFar().geometry:null;const geometry=convertNativePlantGeometry(farPalm??native,{leafStride:distant?(canopy?12:1):1}),count=records.length;if(farPalm)farPalm.dispose();geometry.setAttribute('iPlant',new T.InstancedBufferAttribute(new Float32Array(count*4),4));geometry.setAttribute('iRecord',new T.InstancedBufferAttribute(new Float32Array(count*4),4));
+    const mesh=new T.InstancedMesh(geometry,materials[canopy?'tree':'palm'],count);mesh.count=0;mesh.frustumCulled=false;root.add(mesh);batches.push({mesh,records,species,canopy,distant,near,far});
+   }
+   if(native!==original.geometry)native.dispose();original.geometry.dispose();
+  }
+ }
+ const direction=new T.Vector3(),frustum=new T.Frustum(),vp=new T.Matrix4(),sphere=new T.Sphere();
+ return{root,updateView(camera){camera.getWorldDirection(direction);if(camera===lastCamera&&lastPos.distanceToSquared(camera.position)<16&&lastDirection.dot(direction)>.998)return;lastCamera=camera;lastPos.copy(camera.position);lastDirection.copy(direction);camera.updateMatrixWorld();vp.multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);frustum.setFromProjectionMatrix(vp);displayed=0;
+  for(const batch of batches){const {mesh}=batch,plant=mesh.geometry.getAttribute('iPlant'),recordAttr=mesh.geometry.getAttribute('iRecord');let count=0;
+   for(const r of batch.records){const distance=Math.hypot(r.x-camera.position.x,r.z-camera.position.z);if(distance>batch.far||batch.near&&(batch.distant?distance<batch.near:distance>=batch.near))continue;sphere.center.set(r.x,r.y+(r.H??5)*.5,r.z);sphere.radius=Math.max(4,r.H??0)*r.s+4;if(!frustum.intersectsSphere(sphere))continue;
+    nativePlantPoseMatrix(r,matrix,batch.canopy);mesh.setMatrixAt(count,matrix);plant.setXYZW(count,(r.la??0)-r.yaw,r.l??0,(batch.species==='bananas'?.02:r.H??1)/Math.max(.001,r.s),r.seed);recordAttr.setXYZW(count,r.yaw,r.s,batch.canopy?1:0,0);count++;
+   }
+   mesh.count=count;mesh.instanceMatrix.needsUpdate=true;plant.needsUpdate=recordAttr.needsUpdate=true;displayed+=count;
+  }
+ },stats:()=>({records:Object.values(source.records).filter(Array.isArray).reduce((n,a)=>n+a.length,0),displayed,batches:batches.length,farPolicy:'reduced original card topology; unqualified atlas equivalence'}),dispose(){for(const batch of batches)batch.mesh.geometry.dispose();root.removeFromParent();}};
+}
+function terrainMaterial({normal,splat,rect,domain,detail,shore,grass,ready,coarse,time}){
+ const material=new T.MeshStandardMaterial({color:'#ffffff',roughness:.9,side:T.DoubleSide});
+ material.onBeforeCompile=shader=>{Object.assign(shader.uniforms,{nativeNormal:{value:normal},nativeSplat:{value:splat},nativeRect:{value:new T.Vector4(...rect)},nativeDomain:{value:new T.Vector2(domain.origin,domain.size)},nativeDetail:{value:detail},nativeShore:{value:shore},nativeGrass:{value:grass},nativeReady:{value:ready},nativeTime:time});
+ shader.vertexShader=`varying vec3 vNativeWorld;
+`+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
+ vNativeWorld=(modelMatrix*vec4(transformed,1.0)).xyz;`);
+ shader.fragmentShader=`varying vec3 vNativeWorld;uniform sampler2D nativeNormal,nativeSplat,nativeDetail,nativeShore,nativeGrass,nativeReady;uniform vec4 nativeRect;uniform vec2 nativeDomain;uniform float nativeTime;
+`+shader.fragmentShader;
+ shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+ vec2 domainUv=(vNativeWorld.xz-nativeDomain.x)/nativeDomain.y;
+ ${coarse?'if(texture2D(nativeReady,domainUv).r>.5)discard;':''}
+ vec2 mapUv=(vNativeWorld.xz-nativeRect.xy)/nativeRect.zw;vec4 masks=texture2D(nativeSplat,mapUv),nr=texture2D(nativeNormal,mapUv);float h=vNativeWorld.y;
+ vec4 a=texture2D(nativeDetail,vNativeWorld.xz/1.9),b=texture2D(nativeDetail,vNativeWorld.xz/6.7+.21);float rock=smoothstep(.2,.65,nr.b+(a.r-.5)*.3);float sand=smoothstep(.25,.75,masks.r+(b.b-.5)*.3);float path=smoothstep(.2,.7,masks.g);
+ vec3 soil=mix(vec3(.10,.15,.035),vec3(.21,.26,.07),b.g);soil=mix(soil,vec3(.19,.12,.065),path);vec3 ground=mix(soil,vec3(.65,.58,.4)*(a.b*.18+.84),sand);ground=mix(ground,vec3(.19,.20,.16)*(a.r*.35+.7),rock);ground=mix(ground,vec3(.29,.34,.21),smoothstep(-.2,-8.0,h));
+ vec4 grassCover=texture2D(nativeGrass,domainUv);ground=mix(ground,ground*vec3(.72,.96,.57),clamp(grassCover.r,0.0,1.0)*.3);float wet=sand*smoothstep(.8,-.15,h);diffuseColor.rgb*=ground*mix(1.0,.58,wet)*mix(.5,1.0,nr.a);
+ `);
+ shader.fragmentShader=shader.fragmentShader.replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>\n vec2 nativeNXZ=texture2D(nativeNormal,(vNativeWorld.xz-nativeRect.xy)/nativeRect.zw).rg*2.0-1.0;normal=normalize(mat3(viewMatrix)*vec3(nativeNXZ.x,sqrt(max(1.0-dot(nativeNXZ,nativeNXZ),.0025)),nativeNXZ.y));`);
+ };material.customProgramCacheKey=()=> 'native-field-terrain-webgl/1:'+coarse;return material;
+}
+export function buildWebGLNativeSea(source,data,time,shoreTexture){
+ const surfaceExclusions=canonicalWaterSurfaceExclusions(source.ocean.surfaceExclusions??[]),excluded=waterSurfaceExclusionTest(surfaceExclusions,'vSeaWorld','glsl');
+ const sea=source.ocean,period=sea.shore.period,wavelength=9.81*period*period/(2*Math.PI),direction=new T.Vector2(source.appearance.swellDir.x,source.appearance.swellDir.y).normalize();
+ const seaPositions=[],seaIndices=[],rings=96,sectors=192;for(let r=0;r<=rings;r++)for(let i=0;i<=sectors;i++){const radius=7000*Math.pow(r/rings,2),angle=i/sectors*Math.PI*2;seaPositions.push(Math.cos(angle)*radius,0,Math.sin(angle)*radius);if(r<rings&&i<sectors){const k=r*(sectors+1)+i;seaIndices.push(k,k+sectors+1,k+1,k+1,k+sectors+1,k+sectors+2);}}const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(seaPositions,3));geometry.setIndex(seaIndices);geometry.computeVertexNormals();
+ // Source-parameter waves; explicitly no claim of original FFT or optical equivalence.
+ const surface=new T.MeshStandardMaterial({color:'#1b697a',roughness:.17,metalness:.15,transparent:true,opacity:.92,side:T.DoubleSide});
+ surface.onBeforeCompile=shader=>{Object.assign(shader.uniforms,{nativeTime:time,nativeShore:{value:shoreTexture},nativeSwell:{value:direction},nativeWave:{value:new T.Vector4(sea.level,sea.shore.amplitude,2*Math.PI/wavelength,2*Math.PI/period)}});
+  shader.vertexShader=`uniform float nativeTime;uniform vec2 nativeSwell;uniform vec4 nativeWave;varying vec3 vSeaWorld;
+`+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
+ float phase=dot(position.xz,nativeSwell)*nativeWave.z-nativeTime*nativeWave.w;transformed.y=nativeWave.x+nativeWave.y*sin(phase);vSeaWorld=(modelMatrix*vec4(transformed,1.0)).xyz;`);
+  shader.fragmentShader=`uniform float nativeTime;uniform sampler2D nativeShore;uniform vec2 nativeSwell;uniform vec4 nativeWave;varying vec3 vSeaWorld;
+`+shader.fragmentShader;shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+ vec4 shore=texture2D(nativeShore,(vSeaWorld.xz-(${data.origin.toFixed(1)}))/${data.size.toFixed(1)});float front=abs(fract(shore.x/max(${period.toFixed(6)},.01)-nativeTime/${period.toFixed(6)})-.5);float foam=(1.0-smoothstep(.02,.10,front))*clamp(shore.w,0.0,1.0)*.6;diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.8,.88,.84),foam);`);
+  shader.fragmentShader=shader.fragmentShader.replace(/}\s*$/, 'if('+excluded+'){discard;}\n}');
+ };surface.customProgramCacheKey=()=> 'native-analytic-sea-webgl/2:'+JSON.stringify(surfaceExclusions);const mesh=new T.Mesh(geometry,surface);mesh.frustumCulled=false;mesh.userData.repositoryWater=true;
+ const depth=new T.MeshDepthMaterial({side:T.DoubleSide});
+ depth.onBeforeCompile=shader=>{
+  const colorShader={uniforms:{},vertexShader:T.ShaderLib.standard.vertexShader,fragmentShader:T.ShaderLib.standard.fragmentShader};surface.onBeforeCompile(colorShader);
+  Object.assign(shader.uniforms,colorShader.uniforms);
+  shader.vertexShader=colorShader.vertexShader.slice(0,colorShader.vertexShader.indexOf('#define STANDARD'))+shader.vertexShader;
+  const displacement=colorShader.vertexShader.match(/#include <begin_vertex>([\s\S]*?)#include <morphtarget_vertex>/)?.[1];
+  if(!displacement)throw Error('Native sea depth displacement unavailable');
+  shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>'+displacement);
+  shader.fragmentShader='varying vec3 vSeaWorld;\n'+shader.fragmentShader;
+  shader.fragmentShader=shader.fragmentShader.replace(/}\s*$/, 'if('+excluded+'){discard;}\n}');
+ };
+ depth.customProgramCacheKey=()=> 'native-analytic-sea-depth-webgl/1:'+JSON.stringify(surfaceExclusions);mesh.customDepthMaterial=depth;
+ const cpu=new Float32Array(4);let x=0,z=0;const height=()=>sea.level+sea.shore.amplitude*Math.sin((x*direction.x+z*direction.y)*2*Math.PI/wavelength-time.value*2*Math.PI/period);const query={cpu,cpuValid:true,allocate:()=>0,setPoint(_slot,nx,nz){x=nx;z=nz;cpu[0]=height();},setTime(t){time.value=t;cpu[0]=height();}};return{mesh,query,seaLevel:sea.level,surfaceExclusionsEnforced:true,surfaceExclusions,getSurfaceExclusions:()=>surfaceExclusions,dispose(){geometry.dispose();surface.dispose();depth.dispose();mesh.removeFromParent();}};
+}
+export async function buildWebGLNativeIsland({project,root,camera,options={}}){
+ if(typeof options.readNativeIsland!=='function')throw Error('WebGL native island needs its verified source reader.');
+ const source=await options.readNativeIsland(project),data=new NativeIslandTerrain({...source.domain,coarse:source.coarse}),group=new T.Group(),time={value:0};root.add(group);
+ let disposed=false,bark,plants,water,cache;const ownedTextures=[],tileMeshes=new Map(),arrivalLeases=new Set();
+ const dispose=()=>{if(disposed)return;disposed=true;for(const release of arrivalLeases)release();cache?.dispose();source.dispose?.();plants?.dispose();water?.dispose();bark?.dispose();for(const mesh of tileMeshes.values()){mesh.geometry.dispose();mesh.material.dispose();mesh.userData.nativeTextures.forEach(t=>t.dispose());}tileMeshes.clear();group.traverse(node=>{if(node.userData.nativeBase){node.geometry.dispose();node.material.dispose();}});group.removeFromParent();for(const value of ownedTextures)value.dispose();};
+ try{
+  bark=await(options.prepareVegetationAssets??barkTextures)(source);const nativeDetail=getDetailTexture({upload:false}),detail=texture(nativeDetail.image.data,nativeDetail.width);detail.wrapS=detail.wrapT=T.RepeatWrapping;detail.generateMipmaps=true;detail.minFilter=T.LinearMipmapLinearFilter;ownedTextures.push(detail);
+  const grass=texture(source.grassMask.data,source.grassMask.res),shore=texture(source.shore.data,source.shore.res,4,T.FloatType),coarseNormal=texture(source.coarse.normal,source.coarse.res),coarseSplat=texture(source.coarse.splat,source.coarse.res),side=Math.ceil(source.domain.res/128),readyData=new Uint8Array(side*side),ready=texture(readyData,side,1);ready.magFilter=ready.minFilter=T.NearestFilter;ownedTextures.push(grass,shore,coarseNormal,coarseSplat,ready);
+  const materialFor=(normal,splat,rect,coarse)=>terrainMaterial({normal,splat,rect,domain:source.domain,detail,shore,grass,ready,coarse,time});
+  const base=new T.Mesh(webGLNativeTerrainTile(data,{x:0,z:0,width:data.res-1,height:data.res-1},Math.round(data.res/source.coarse.res)),materialFor(coarseNormal,coarseSplat,[data.origin,data.origin,data.size,data.size],true));base.userData.nativeBase=true;group.add(base);
+  const updateTileGeometry=tile=>{const mesh=tileMeshes.get(tile.id);if(!mesh)return;mesh.geometry.dispose();mesh.geometry=webGLNativeTerrainTile(data,tile);};
+  cache=new NativeIslandTiles({tiles:source.tiles,readTile:source.readTile,maxBytes:options.maxBytes,maxConcurrency:options.maxConcurrency,onLoad(tile,decoded){const fields=decoded.fields??decoded;data.apply(tile,decoded);const normal=texture(fields.normal,tile.width),splat=texture(fields.splat,tile.width),mesh=new T.Mesh(webGLNativeTerrainTile(data,tile),materialFor(normal,splat,[data.origin+tile.x,data.origin+tile.z,tile.width,tile.height],false));mesh.userData.nativeTextures=[normal,splat];tileMeshes.set(tile.id,mesh);group.add(mesh);readyData[Math.floor(tile.z/128)*side+Math.floor(tile.x/128)]=255;ready.needsUpdate=true;for(const other of source.tiles)if(Math.abs(other.x-tile.x)<=128&&Math.abs(other.z-tile.z)<=128)updateTileGeometry(other);},onEvict(tile){const mesh=tileMeshes.get(tile.id);if(mesh){mesh.removeFromParent();mesh.geometry.dispose();mesh.material.dispose();mesh.userData.nativeTextures.forEach(t=>t.dispose());tileMeshes.delete(tile.id);}readyData[Math.floor(tile.z/128)*side+Math.floor(tile.x/128)]=0;ready.needsUpdate=true;}});data.cache=cache;
+  const angle=source.ocean.fft.local.windDirection*Math.PI/180,wind={value:new T.Vector2(Math.sin(angle),Math.cos(angle))},gust={value:new T.Vector2()};
+  const materials={palm:plantMaterial('palm',time,wind,gust,detail,bark.palm),tree:plantMaterial('tree',time,wind,gust,detail,bark.tree)};plants=buildPlants(source,time,detail,materials);group.add(plants.root);water=buildWebGLNativeSea(source,data,time,shore);group.add(water.mesh);
+  const frustum=new T.Frustum(),vp=new T.Matrix4(),box=new T.Box3(),bindView=viewCamera=>{viewCamera.updateMatrixWorld();vp.multiplyMatrices(viewCamera.projectionMatrix,viewCamera.matrixWorldInverse);frustum.setFromProjectionMatrix(vp);const {x,z}=viewCamera.position;cache.requestView(x,z,2400,tile=>{box.min.set(tile.bounds[0],tile.minHeight??-90,tile.bounds[1]);box.max.set(tile.bounds[2],tile.maxHeight??200,tile.bounds[3]);return frustum.intersectsBox(box)||Math.hypot((tile.bounds[0]+tile.bounds[2])/2-x,(tile.bounds[1]+tile.bounds[3])/2-z)<180;});plants.updateView(viewCamera);};
+  return{data,water,query:water.query,async ensureArrival(position){const release=await cache.ensureAt(position[0],position[2],3);arrivalLeases.add(release);return()=>{arrivalLeases.delete(release);release();};},canOccupy(x,z,radius=1){return [[x-radius,z-radius],[x+radius,z-radius],[x-radius,z+radius],[x+radius,z+radius]].every(([px,pz])=>cache.readyAt(px,pz));},bindView,update(dt,viewCamera){gust.value.addScaledVector(wind.value,(.7*(project.environment.windSpeed??7)+1.5)*dt);bindView(viewCamera);},stats:()=>({...WEBGL_NATIVE_ISLAND_QUALIFICATION,...cache.stats(),plants:plants.stats(),source:source.sourceStats?.(),terrainPolicy:'exact fine cell heights and captured normal/splat; approximate GLSL surface shading',grassPolicy:'captured density field; blades not implemented'}),dispose(){materials.palm.dispose();materials.tree.dispose();dispose();}};
+ }catch(error){dispose();throw error;}
+}

@@ -31,8 +31,9 @@ export class Terrain {
 	// sunShadow: apply the heightfield sun shadow here (pass false if it is applied to every scene
 	// material through SceneLighting.directModulation). renderer: optional (unused: the sun shadow
 	// map is baked from update() into the frame encoder).
-	constructor( { scene, terrainData, terrainGPU, gridSize = 40, rangeFactor = 2.0, sunShadow = true, renderer = null } ) {
+	constructor( { scene, terrainData, terrainGPU, gridSize = 40, rangeFactor = 2.0, sunShadow = true, renderer = null, appearance = WORLD, caveMouth = true } ) {
 
+		this.surfaceCode = terrainSurfaceCode( appearance, caveMouth );
 		this.data = terrainData;
 		this.gpu = terrainGPU;
 		const half = terrainData.size / 2;
@@ -109,7 +110,7 @@ export class Terrain {
 		this._simpleShading = enabled;
 		const mat = this.material;
 		mat.defines.TERRAIN_SIMPLE_SHADING = enabled ? 1 : 0;
-		mat.surface = enabled ? SIMPLE_TERRAIN_SURFACE : TERRAIN_SURFACE;
+		mat.surface = enabled ? SIMPLE_TERRAIN_SURFACE : this.surfaceCode;
 		mat.__pkFrame = - 1;
 
 	}
@@ -131,24 +132,26 @@ export class Terrain {
 		mat.defines.HAS_WETNESS = this.wetness ? 1 : 0;
 		mat.defines.MATERIAL_SUN_MODULATION = this.sunShadow ? 1 : 0;
 		mat.defines.TERRAIN_SIMPLE_SHADING = this._simpleShading ? 1 : 0;
-		mat.surface = this._simpleShading ? SIMPLE_TERRAIN_SURFACE : TERRAIN_SURFACE;
+		mat.surface = this._simpleShading ? SIMPLE_TERRAIN_SURFACE : this.surfaceCode;
 		mat.needsUpdate = true;
 		mat.__pkFrame = - 1;
 
 	}
 
-	update( camera ) {
+	update( camera, dt = G.dt.value ) {
 
 		camera.getWorldPosition( this.uViewPos.value );
 		this.lod.update( camera );
-		// travelling gust field offset (integrated so speed/direction changes never jump)
-		const wd = G.windDir.value;
-		const speed = 0.7 * G.windSpeed.value + 1.5;
-		const dt = G.dt.value;
-		this.gustOffset.x += wd.x * speed * dt;
-		this.gustOffset.y += wd.y * speed * dt;
+		this.advanceWind( dt );
 		this.gpu.updateSunShadow( this.renderer );
 
+	}
+
+	advanceWind( dt ) {
+		const wd = G.windDir.value;
+		const speed = 0.7 * G.windSpeed.value + 1.5;
+		this.gustOffset.x += wd.x * speed * dt;
+		this.gustOffset.y += wd.y * speed * dt;
 	}
 
 }
@@ -191,6 +194,7 @@ fn terDetail( uv: vec2f ) -> vec4f {
 }
 `;
 
+function terrainSurfaceCode( WORLD, caveMouth ) {
 const TERRAIN_SURFACE = /* wgsl */`
 	let p = in.P;
 	// The only exterior terrain cutout: an elliptical sea-level opening on the
@@ -653,3 +657,5 @@ const TERRAIN_SURFACE = /* wgsl */`
 	s.normal = outN;
 	s.ao = sat( outAO );
 `;
+return caveMouth ? TERRAIN_SURFACE : TERRAIN_SURFACE.replace( 'if ( dot( caveMouth, caveMouth ) < 1.0 && p.y < 5.5 ) { discard; }', '' );
+}

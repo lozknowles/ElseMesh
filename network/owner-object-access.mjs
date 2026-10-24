@@ -24,6 +24,7 @@ export class OwnerObjectAccess{
  const now=Date.now();this.authority.assertCurrent();check(Number.isSafeInteger(this.world.binding?.expiresAt)&&this.world.binding.expiresAt>now,'Expired content admission');
  const context={contentDigest:this.world.contentDigest,policyDigest:this.policy.policyDigest,policyVersion:this.policy.policyVersion};
  let access=state.objectAccess;
+ if(access&&(access.contentDigest!==context.contentDigest||access.policyDigest!==context.policyDigest)&&state.revision)throw Error('Migrated access context differs from committed revision');
  if(!access||access.contentDigest!==context.contentDigest||access.policyDigest!==context.policyDigest){access={...context,revision:(access?.revision??0)+1,grants:{},audit:[],overlay:{signs:[]},replay:{}};state.objectAccess=access;}
  const result=(allowed,value=null)=>signObject({protocol:'elsemesh.object-access-result/1',requestId:envelope.requestId,accessRequestId:p.accessRequestId??null,operation:op,allowed,message:allowed?'Allowed':'Access restricted',worldId:this.world.worldId,...context,policyRevision:access.revision,playerNodeId:s.nodeId,sessionId:s.sessionId,generation:s.generation,authorityEpoch:this.world.epoch,issuedAt:now,expiresAt:now+3000,result:value},this.identity);
  const member=state.members[s.playerId],g=state.grants[viewGrant?.grantId],overlayRead=op==='object-overlay-read';
@@ -44,10 +45,13 @@ export class OwnerObjectAccess{
  return result(true,{revision:access.revision});
  }
  const o=this.objects.get(p.objectId),t=this.project.terminals?.find(t=>t.objectId===p.objectId),m=this.matrices.get(p.objectId);
- if(!o||!(o.kind==='computer'||t)||!m||!effectiveObjectState(this.project.objects,o.id).visible||!permitted(o.id,'computer.use')||!this.authority.policy.enterPlayers.includes(s.playerId))return result(false);
- const position=[m.elements[12],m.elements[13]+.5,m.elements[14]],distance=Math.hypot(...position.map((v,i)=>v-member.motion.position[i]));
- if(distance>Math.min(3,t?.interactionRadius??3))return result(false);
- if(op==='object-use')return result(true,{objectId:o.id,action:'computer.use'});
+ const media=o?.kind==='media-screen'&&o.mediaScreen?.provider==='youtube',useAction=media?'media.play':'computer.use';
+ if(!o||!(o.kind==='computer'||t||media)||!m||!effectiveObjectState(this.project.objects,o.id).visible||!permitted(o.id,useAction)||!this.authority.policy.enterPlayers.includes(s.playerId))return result(false);
+ const position=[m.elements[12],m.elements[13]+(media?0:.5),m.elements[14]],eye=member.motion.position.map((v,i)=>v+(media&&i===1?1.65:0)),distance=Math.hypot(...position.map((v,i)=>v-eye[i]));
+ const interactionRadius=media?Math.min(8,Math.max(3,o.mediaScreen.width)):Math.min(3,t?.interactionRadius??3);
+ if(distance>interactionRadius)return result(false);
+ if(op==='object-use')return result(true,{objectId:o.id,action:useAction});
+ if(media)return result(false);
  const action=op==='object-neon-power'?'neon.power':op==='object-neon-configure'?'neon.configure':null,target=this.objects.get(p.targetObjectId);
  if(!action||!target||target.kind!=='neon-sign'||o.computer?.targetSignId!==target.id||!effectiveObjectState(this.project.objects,target.id).visible||!permitted(target.id,action))return result(false);
  let config=structuredClone(access.overlay.signs.find(x=>x.id===target.id)?.config??target.neon);

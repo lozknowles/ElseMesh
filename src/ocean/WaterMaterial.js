@@ -1,3 +1,4 @@
+import {canonicalWaterSurfaceExclusions,waterSurfaceExclusionTest} from './WaterSurfaceExclusions.js';
 import { Material, ShaderModule, G } from '../engine/webgpu.js';
 import { Vector4 } from '../engine/index.js';
 import { commonModule } from '../engine/render/wgsl/common.js';
@@ -55,7 +56,7 @@ export const viewPositionFromViewZ = ( uv, viewZ ) => `viewPositionFromViewZ( ${
 // shader: previous world position = current, staticVelocity), r.mask = ( seenFromBelow, 1, 0, 1 ).
 export class WaterMaterial extends Material {
 
-	constructor( { surface, sky, sceneCopy, sceneDepthHalf = null, refraction = null, reflection = null, hullMask = null, hullMaskActive = null } ) {
+	constructor( { surface, sky, sceneCopy, sceneDepthHalf = null, refraction = null, reflection = null, hullMask = null, hullMaskActive = null, surfaceExclusions = [] } ) {
 
 		super( {
 			name: 'water',
@@ -86,6 +87,7 @@ export class WaterMaterial extends Material {
 			},
 		} );
 		this.isWaterMaterial = true;
+		this.surfaceExclusions=canonicalWaterSurfaceExclusions(surfaceExclusions);
 		// shaded here: only the sun shadow of the scene lighting is used (see MeshShader)
 		this.lightingHooks = false;
 		// (`surface` is the Material's surface snippet here: the WaterSurface is `waterSurface`)
@@ -204,6 +206,10 @@ export class WaterMaterial extends Material {
 	o.vSurfMask = r.surfMask;
 `;
 		this.output = this.cheap ? 'r.color = vec4f( 0.02, 0.05, 0.1, 1.0 ); r.mask = vec4f( 0.0, 1.0, 0.0, 1.0 );' : this._shadeWGSL( { T, TN: !! S.terrain?.normalTexture, SH, SIM, SF, CL, HULL, REFL } );
+		// Run exclusion discard after shade derivatives, including cheap/debug variants.
+		const excluded=waterSurfaceExclusionTest(this.surfaceExclusions,'in.P');
+		this.output+='\nif('+excluded+'){discard;}';
+		this.shadow='return !('+excluded+');';
 		this.needsUpdate = true;
 
 	}

@@ -51,3 +51,12 @@ test('access selections survive grant revision refresh and temporary unavailable
  panel.render(snapshot);const player=panel.body.querySelector('[aria-label="Player for access"]'),target=panel.body.querySelector('[aria-label="Object for access"]');player.value='second';player.onchange();target.value='two';target.onchange();panel.render({...snapshot,policyRevision:2});assert.equal(panel.body.querySelector('[aria-label="Player for access"]').value,'second');assert.equal(panel.body.querySelector('[aria-label="Object for access"]').value,'two');panel.render(null);panel.render({...snapshot,policyRevision:3});assert.equal(panel.body.querySelector('[aria-label="Player for access"]').value,'second');assert.equal(panel.body.querySelector('[aria-label="Object for access"]').value,'two');
  }finally{globalThis.document=priorDocument;}
 });
+
+test('media lease validates and renews its exact action instead of computer permission',async()=>{
+ const f=fixture(),request=f.t.request,calls=[];
+ f.t.request=async(op,payload)=>{calls.push([op,payload.objectId]);const r=await request(op,payload);if(op==='object-use')r.result.action='media.play';return r;};
+ await f.c.read();await f.c.use('tv','media.play');assert(f.c.valid('tv','media.play'));assert(!f.c.valid('tv','computer.use'));
+ f.setTime(11000);f.c.tick();await new Promise(resolve=>setTimeout(resolve,10));
+ assert(f.c.valid('tv','media.play'));assert.equal(f.c.lease.action,'media.play');assert(calls.filter(c=>c[0]==='object-use').length>=2);
+ const wrong=fixture();await assert.rejects(wrong.c.use('tv','media.play'),/unavailable/);assert(!wrong.c.valid());
+});

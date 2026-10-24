@@ -1,3 +1,4 @@
+import { excludeShelteredRain } from './WeatherShelter.js';
 import { Group, Mesh, BufferGeometry, BufferAttribute } from '../engine/index.js';
 import { Material } from '../engine/render/Material.js';
 import { RAIN_PARTICLES, quadIndices, stormState, writeLightningQuad, writeRainQuads } from './vendor/world-engine-contract.js';
@@ -18,9 +19,9 @@ export class NativeWeather {
     this.lastWeather='clear';
     this.weatherStarted=0;
   }
-  update(time,camera,yaw,settings,onThunder) {
+  update(time,camera,yaw,settings,onThunder,shelters=[]) {
     const attribute=this.rain.geometry.getAttribute('position');
-    const count=writeRainQuads(attribute.array,time,camera.position.toArray(),settings);
+    const count=excludeShelteredRain(attribute.array,writeRainQuads(attribute.array,time,camera.position.toArray(),settings),shelters);
     attribute.needsUpdate=true;this.rain.geometry.setDrawRange(0,count*6);this.rain.visible=count>0;
     if(settings.weather!==this.lastWeather) {this.lastThunder=-1;this.lastWeather=settings.weather;this.weatherStarted=time;}
     const state=stormState(time-this.weatherStarted,settings);
@@ -30,6 +31,6 @@ export class NativeWeather {
     writeLightningQuad(boltAttribute.array,camera.position.toArray(),yaw,settings.weatherSeed??7341,state.event);
     boltAttribute.needsUpdate=true;
     if(state.event>=0 && state.event!==this.lastThunder) {this.lastThunder=state.event;onThunder(state.event);}
-    return { ...state, particles:count };
+    return { ...state, particles:count, shelters:shelters.length, logicalCollisionRoof:shelters.some(v=>v.logicalCollisionRoof) };
   }
 }

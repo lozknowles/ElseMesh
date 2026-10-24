@@ -1,3 +1,4 @@
+import { shelterUniformFields, mistShelterWGSL } from './WeatherShelter.js';
 // Builder-owned effect. Upstream AirHaze has stationary exponential layers;
 // this dry-world post adapter adds moving world-space density before native ACES.
 // The layer starts at the authored terrain's lowest valid elevation; height is
@@ -13,13 +14,14 @@ export function terrainMistBase(terrain) {
 
 export function createDryWorldMedium(depth) {
   const uniforms = new UniformBlock('BuilderMist', {
-    density: ['f32', 0.004], speed: ['f32', 2], height: ['f32', 9], base: ['f32', 0],
+    ...shelterUniformFields(), density: ['f32', 0.004], speed: ['f32', 2], height: ['f32', 9], base: ['f32', 0],
     storm: ['f32', 0], lightning: ['f32', 0],
     waterEnabled: ['f32', 0], waterLevel: ['f32', 0], waveAmplitude: ['f32', 0], waveSpeed: ['f32', 0], waterExtent: ['f32', 0],
   }, { label: 'builderMist' });
   const mediumModule = new ShaderModule({
     name: 'builder-repository-medium', deps: [commonModule], uniforms, uniformName: 'builderMist',
     code: /* wgsl */`
+${mistShelterWGSL}
 fn bmWaterHeight(p: vec2f) -> f32 {
   return builderMist.waterLevel + builderMist.waveAmplitude * sin(p.x*0.04 + p.y*0.03 + frame.time*builderMist.waveSpeed);
 }
@@ -64,6 +66,7 @@ fn underwaterComposite(uv: vec2f, pixel: vec2f) -> vec4f {
   var optical = 0.0;
   for (var i=0; i<24; i++) {
     let p = frame.cameraPos + ray * (f32(i)+0.5)*step;
+    if (bmSheltered(p)) { continue; }
     let moving = p * vec3f(0.045,0.09,0.045) - vec3f(frame.time*builderMist.speed*0.045,0,frame.time*builderMist.speed*0.018);
     let noise = bmNoise(moving)*0.72 + bmNoise(moving*2.13)*0.28;
     let bank = smoothstep(0.28,0.7,noise);

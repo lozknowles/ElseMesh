@@ -1,6 +1,6 @@
 // File metadata is indexed without reading bytes. Only paths requested by the
 // shared repository manifest loader can be opened; unrelated files stay unread.
-export const isRepositoryContentPath=path=>path==='world.json'||/^(snapshots\/[a-f0-9]{64}\/(metadata|terrain|objects|features|environment|spawn|geography|assets|connections|landscape)\.json|assets\/[a-f0-9]{64}\.glb|landscape-images\/[a-f0-9]{64}\.(png|jpg)|imagery\/[a-f0-9]{64}\.(png|jpg))$/.test(path);
+export const isRepositoryContentPath=path=>path==='world.json'||/^(snapshots\/[a-f0-9]{64}\/(metadata|terrain|objects|features|environment|spawn|geography|assets|connections|landscape)\.json|assets\/[a-f0-9]{64}\.glb|landscape-images\/[a-f0-9]{64}\.(png|jpg)|imagery\/[a-f0-9]{64}\.(png|jpg)|native-island\/[a-f0-9]{64}\.bin)$/.test(path);
 export function localRepositorySource(files){
  const list=Array.from(files??[]);if(!list.length)throw Error('Choose a world repository folder.');
  const index=new Map();let root;

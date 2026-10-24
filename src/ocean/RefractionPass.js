@@ -1,3 +1,4 @@
+import {GPU} from '../engine/gpu/GPU.js';
 import { RenderTarget } from '../engine/gpu/Texture.js';
 import { LAYERS, DEPTH_FORMAT } from '../engine/render/SceneRenderer.js';
 import { FrameUniforms, createViewUniforms, setFrameCamera } from '../engine/render/Frame.js';
@@ -25,6 +26,7 @@ import { Box3, Matrix4, Vector3 } from '../engine/math/index.js';
 // the pixel density stays the same. REFRACTION_GUARD: clip-space scale (sx, sy) and centre (cx, cy):
 // ndc_refraction = ( ndc_screen - c ) / s (WaterMaterial maps its lookups the same way).
 const CLIP_MARGIN = 0.4; // m above sea level (wave troughs and crests move the real surface around it)
+export const REFRACTION_PREPARE_DEFINES=Object.freeze({REFRACTION_CLIP:1,REFRACTION_CLIP_MARGIN:CLIP_MARGIN});
 const GUARD = { left: 0.15, right: 0.15, bottom: 0.6, top: 0.0 };
 export const REFRACTION_GUARD = {
 	cx: ( GUARD.right - GUARD.left ) / 2, cy: ( GUARD.top - GUARD.bottom ) / 2,
@@ -57,6 +59,13 @@ export class RefractionPass {
 		this._camera = Object.create( camera );
 		this._camera.projectionMatrix = new Matrix4();
 		this.block = createViewUniforms( 'refraction' );
+		this.sourceFrameBlock=FrameUniforms;
+		const pack=this.block.onBeforePack;
+		this.block.onBeforePack=()=>{
+			pack();const source=this.sourceFrameBlock;source.onBeforePack?.();
+			for(const key of ['seaLevel','cameraWaterHeight','cameraUnderwater','windSpeed'])this.block.fields[key].value=source.fields[key].value;
+			this.block.fields.seaLevel.value=this._seaLevel??source.fields.seaLevel.value;
+		};
 		this.target = new RenderTarget( 1, 1, { colors: [ 'rgba16float' ], depth: DEPTH_FORMAT, label: 'refraction' } );
 		this.texture = this.target.texture;
 		this.depthTexture = this.target.depthTexture;
@@ -68,6 +77,8 @@ export class RefractionPass {
 
 			const m = o.material;
 			if ( m.underwaterLighting === 'none' || m.isWaterMaterial ) return false;
+			// CDLOD positions are displaced by terrain fields; its local grid y is not a world bound.
+			if(o.geometry.attributes.nodeData)return true;
 			if ( o.isInstancedMesh ) return this._instancedMinY( o ) < this._clipY;
 			if ( ! o.geometry.attributes.position ) return true;
 			return _box.copy( this._localBox( o ) ).applyMatrix4( o.matrixWorld ).min.y < this._clipY;
@@ -80,7 +91,7 @@ export class RefractionPass {
 		this._instBoxes = new WeakMap();
 
 		this._clipY = 0;
-		this._defines = { REFRACTION_CLIP: 1, REFRACTION_CLIP_MARGIN: CLIP_MARGIN };
+		this._defines = REFRACTION_PREPARE_DEFINES;
 
 	}
 
@@ -133,8 +144,9 @@ export class RefractionPass {
 
 	}
 
-	render( seaLevel ) {
+	render( seaLevel, view = {} ) {
 
+		this._seaLevel=seaLevel;
 		const sr = this.sceneRenderer;
 		const g = this.guard;
 		const w = Math.max( 1, Math.round( sr.width * this.scale * g.sx ) ), h = Math.max( 1, Math.round( sr.height * this.scale * g.sy ) );
@@ -143,7 +155,9 @@ export class RefractionPass {
 		const rt = this.target;
 		// this frame's camera (with its jitter, so the temporal resolve sees the seabed as in the scene)
 		// through the guard band
-		const F = FrameUniforms.fields;
+		this.sourceFrameBlock=view.frameBlock??FrameUniforms;
+		this.sourceFrameBlock.onBeforePack?.();
+		const F = this.sourceFrameBlock.fields;
 		const cam = this._camera;
 		cam.projectionMatrix.multiplyMatrices( _guard, this.camera.projectionMatrix );
 		_prevVP.multiplyMatrices( _guard, F.prevViewProjNoJitter.value );
@@ -151,6 +165,7 @@ export class RefractionPass {
 			jitterX: F.jitter.value.x / g.sx * w / 2, jitterY: F.jitter.value.y / g.sy * h / 2,
 			prevViewProj: _prevVP, prevCameraPos: F.prevCameraPos.value, block: this.block,
 		} );
+		this.block.fields.portalClipPlane.value=F.portalClipPlane.value.clone();
 		this.meshRenderer.render( this.scene, {
 			label: 'refraction',
 			kind: 'color',
@@ -163,10 +178,16 @@ export class RefractionPass {
 			depthFormat: DEPTH_FORMAT,
 			clearDepth: 0,
 			layerMask: this.enabled ? 1 << LAYERS.OPAQUE : 0,
-			filter: this._filter,
-			defines: this._defines,
+			filter: o=>this._filter(o)&&(!view.filter||view.filter(o)),
+			defines: {...view.defines,...this._defines},
 		} );
 
+	}
+
+	dispose() {
+		if(this._disposed)return;this._disposed=true;
+		const release=()=>{this.texture.destroy();this.depthTexture.destroy();this.block.buffer?.destroy();};
+		if(GPU.encoder)GPU.onSubmit(null,release);else release();
 	}
 
 }

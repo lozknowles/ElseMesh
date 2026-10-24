@@ -1,3 +1,4 @@
+import {avatarMotionFacing} from '../player/AvatarFacing.js';
 import {createAvatarTransportPresentation,createAvatarTransportMaterialAdapter,prepareWebGLAvatarTransportMaterial} from './AvatarTransportPresentation.js';
 import {T,BuiltinCharacterGLTFLoader} from './vendor/world-engine-contract.js';
 import {AVATAR_STYLES,DEFAULT_APPEARANCE,validateAppearance,appearanceKey} from '../player/AvatarAppearance.js';
@@ -76,8 +77,8 @@ export class WebGLRepositoryAvatar{
  update(dt,player,camera,freeCam=false){
   if(this.disposed)return;
   const c=this.cinematic;
-  if(c){this.group.position.set(c.x,c.y,c.z);this.group.rotation.y=c.yaw??0;}
-  else if(player){this.group.position.copy(player.position);this.group.rotation.y=(player.yaw??0)+Math.PI;}
+  if(c){this.facingState={};this.group.position.set(c.x,c.y,c.z);this.group.rotation.y=c.yaw??0;}
+  else if(player){this.group.position.copy(player.position);this.group.rotation.y=avatarMotionFacing(this.facingState??={}, {velocity:player.velocity,position:player.position,dt,fallbackYaw:(player.yaw??0)+Math.PI,context:player,mode:player.mode});}
   this.transportPresentation.update();
   const velocity=player?.velocity,speed=c?(c.speed??(c.walk?3.4:0)):Math.hypot(velocity?.x??0,velocity?.z??0);
   const mode=c?.mode??player?.mode,helm=mode==='helm'||mode==='boat'||c?.seated;

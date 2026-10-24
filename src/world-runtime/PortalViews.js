@@ -2,8 +2,11 @@ import * as N from '../engine/index.js';
 import { Material } from '../engine/render/Material.js';
 import { RenderTarget } from '../engine/gpu/Texture.js';
 import { createViewUniforms, setFrameCamera, FrameUniforms } from '../engine/render/Frame.js';
+import { GPU } from '../engine/gpu/GPU.js';
+import { SceneRenderer } from '../engine/render/SceneRenderer.js';
 import { DEPTH_FORMAT } from '../engine/render/SceneRenderer.js';
 import { portalMappingElements } from './vendor/world-engine-contract.js';
+import { repositoryProjectWaterHeight } from './RepositoryWater.js';
 import { disposeRepositoryScene } from './RepositoryScene.js';
 
 export const PORTAL_VIEW_LIMIT = 2;
@@ -21,6 +24,18 @@ export function portalDestinationPlane(destination,margin=.015) {
  const yaw=destination.yaw||0,n=new N.Vector3(Math.sin(yaw),0,Math.cos(yaw));
  return new N.Vector4(n.x,n.y,n.z,-n.dot(new N.Vector3(...destination.position))-margin);
 }
+// Per-destination medium state is independent of the main membership's water.
+export function portalViewWaterState(candidate,camera,time=0){
+ const project=candidate?.descriptor?.project??candidate?.project;
+ const native=candidate?.nativeIsland?.water;
+ const seaLevel=native?.seaLevel??project?.nativeIsland?.sea?.level??project?.water?.level??0;
+ let height=native?seaLevel:repositoryProjectWaterHeight(project,camera.position.x,camera.position.z,time);
+ const query=native?.query;
+ if(query?.cpuValid&&Math.hypot(query.resultInputs?.[0]-camera.position.x,query.resultInputs?.[1]-camera.position.z)<.01)height=query.cpu[0];
+ const wet=Number.isFinite(height)&&height>-99999;
+ return{seaLevel,cameraWaterHeight:wet?height:seaLevel,cameraUnderwater:wet&&camera.position.y<height?1:0,windSpeed:project?.environment?.windSpeed??7};
+}
+
 const output=/* wgsl */`
  let uv = in.pixel * frame.invResolution;
  let stripe = step(0.5, fract((in.uv.x + in.uv.y) * 12.0 + frame.time * 0.25));
@@ -68,6 +83,7 @@ export class PortalViews {
    const aperture=new N.Mesh(new N.PlaneGeometry(1,1),material);
    aperture.castShadow=false;aperture.userData.portalAperture=true;aperture.userData.portalId=portalId;
    e={id:portalId,target,material,aperture,scene:new N.Scene(),camera:new N.PerspectiveCamera(),block:createViewUniforms('portal:'+portalId),state:'unavailable',authorizedView:false,hasImage:false};
+   const pack=e.block.onBeforePack;e.block.onBeforePack=()=>{pack();if(e.candidate){for(const [key,value]of Object.entries(portalViewWaterState(e.candidate,e.camera,e.viewTime??0)))e.block.fields[key].value=value;}};
    this.entries.set(portalId,e);
   }
   if(options.candidate && options.candidate!==e.candidate) {
@@ -75,6 +91,15 @@ export class PortalViews {
    if(options.candidate.root.parent)throw Error('Portal preview root must be independently built and detached');
    this._releaseCandidate(e);e.candidate=options.candidate;e.ownsCandidate=options.ownsCandidate!==false;
    e.scene.add(e.candidate.root);e.hasImage=false;
+   if(e.candidate.nativeIsland){
+    e.viewRenderer=new SceneRenderer(this.meshRenderer,e.scene,e.camera);
+    e.viewWater=e.candidate.nativeIsland.water.createView(e.viewRenderer);
+    e.viewBackground=this.background?.createMRT?.();
+    e.viewRenderer.background=e.viewBackground??null;
+    e.material.bindings.portalView={texture:e.viewRenderer.sceneRT.texture};
+    e.material.needsUpdate=true;
+   }else{e.material.bindings.portalView={texture:e.target.texture};}
+
   }
   if(options.source)e.source=options.source;
   if(options.destination)e.destination=options.destination;
@@ -85,9 +110,9 @@ export class PortalViews {
    e.aperture.position.fromArray(e.source.position);e.aperture.rotation.set(0,e.source.yaw||0,0);
    e.aperture.scale.set(e.source.width||2,e.source.height||3,1);
   }
-  if((this.prepareResources||this.background)&&(!e.resourcesReady||options.candidate&&!options.candidate.residentReady)){
+  if((this.prepareResources||this.background)&&(!e.resourcesReady||options.candidate&&(!options.candidate.residentReady||e.viewRenderer))){
    const token=(e.prepareToken??0)+1;e.prepareToken=token;e.preparing=true;e.aperture.visible=false;const candidate=e.candidate;
-   e.readyPromise=Promise.all([...(this.prepareResources?[this.prepareResources(e.aperture),...(candidate?[this.prepareResources(candidate.root)]:[])]:[]),...(this.background?[this.background.readyPromise]:[])]).then(()=>{
+   e.readyPromise=Promise.all([...(this.prepareResources?[this.prepareResources(e.aperture),...(candidate?[this.prepareResources(candidate.root)]:[])]:[]),...(this.background?[this.background.readyPromise]:[]),...(e.viewRenderer?[this._prepareView(e)]:[])]).then(()=>{
     if(this.entries.get(portalId)!==e||e.prepareToken!==token)return false;
     e.preparing=false;e.resourcesReady=true;e.aperture.visible=true;this._status(e);return true;
    },error=>{if(this.entries.get(portalId)===e&&e.prepareToken===token){e.preparing=false;e.state='unavailable';e.readinessError=error.message;this._status(e);}throw error;});
@@ -117,7 +142,7 @@ export class PortalViews {
    if(normal.dot(cameraPosition.clone().sub(new N.Vector3(...e.source.position)))<=0)continue;
    const sphere=new N.Sphere(new N.Vector3(...e.source.position),Math.hypot(e.source.width||2,e.source.height||3)/2);
    if(!frustum.intersectsSphere(sphere))continue;
-   const size=portalTargetSize(width,height,this.maxLongEdge);e.target.setSize(size.width,size.height);
+   e.viewTime=time;const size=portalTargetSize(width,height,this.maxLongEdge);e.target.setSize(size.width,size.height);
    const cam=e.camera;
    cam.matrixAutoUpdate=false;
    cam.matrix.multiplyMatrices(portalMappingMatrix(e.source,e.destination),this.mainCamera.matrixWorld);
@@ -130,9 +155,16 @@ export class PortalViews {
     jitterX:FrameUniforms.fields.jitter.value.x*size.width/2,
     jitterY:FrameUniforms.fields.jitter.value.y*size.height/2});
    e.block.fields.portalClipPlane.value=portalDestinationPlane(e.destination);
+   e.candidate.nativeIsland?.bindView(cam,e.viewWater);
    e.candidate.root.traverse(n=>{n.userData.updateNeon?.(time,14);n.userData.updateTreeLOD?.(time,cam.position);});
    const horizon=FrameUniforms.fields.horizonColor.value;
-   this.meshRenderer.render(e.scene,{label:'portal:'+e.id,kind:'color',camera:cam,frameBlock:e.block,
+   if(e.viewRenderer){
+    e.viewRenderer.setSize(size.width,size.height);
+    e.viewRenderer.clearColor=[horizon.r??horizon.x,horizon.g??horizon.y,horizon.b??horizon.z,1];
+    e.viewRenderer.render({frameBlock:e.block,filter:o=>!o.userData.portalAperture&&!o.material?.userData.portalAperture,defines:{PORTAL_CLIP:1,PORTAL_VIEW:1}});
+    // LOD storage and material buffers are mutable across views. Submit before rebinding.
+    GPU.submit();
+   }else this.meshRenderer.render(e.scene,{label:'portal:'+e.id,kind:'color',camera:cam,frameBlock:e.block,
     colorViews:[e.target.texture.view()],colorFormats:e.target.formats,clearColors:[[horizon.r??horizon.x,horizon.g??horizon.y,horizon.b??horizon.z,1]],
     depthView:e.target.depthTexture.view(),depthFormat:DEPTH_FORMAT,clearDepth:cam.reversedDepth===false?1:0,
     betweenLists:this.background?(rp=>this.background.draw(rp,e.block,cam)):undefined,
@@ -141,8 +173,21 @@ export class PortalViews {
    e.hasImage=true;this._status(e,true);
   }
  }
- _releaseCandidate(e){if(e.candidate){if(e.candidate.root.parent===e.scene)e.candidate.root.removeFromParent();if(e.ownsCandidate)disposeRepositoryScene(e.candidate);e.candidate=null;}}
- remove(id){const e=this.entries.get(id);if(!e)return;e.aperture.removeFromParent();this._releaseCandidate(e);e.aperture.geometry.dispose();e.material.dispose();e.material.uniformBlock.buffer?.destroy();e.target.texture.destroy();e.target.depthTexture.destroy();e.block.buffer?.destroy();this.entries.delete(id);}
+ async _prepareView(e){
+  setFrameCamera(e.camera,1,1,{block:e.block});
+  const mr=this.meshRenderer,previous=mr.precompiling;
+  mr.precompiling=true;
+  try{e.candidate.nativeIsland.bindView(e.camera,e.viewWater);e.viewRenderer.render({prepare:true,frameBlock:e.block,cull:false,defines:{PORTAL_CLIP:1,PORTAL_VIEW:1},filter:o=>!o.userData.portalAperture&&!o.material?.userData.portalAperture});}
+  finally{mr.precompiling=previous;}
+  GPU.submit();await GPU.pipelinesReady();await e.viewBackground?.readyPromise;
+  const failed=[...mr.pipelines.values()].some(p=>p.handle.failed);
+  if(failed)throw Error('Portal native pipeline failed');
+ }
+ _releaseCandidate(e){if(e.candidate){
+  const renderer=e.viewRenderer,water=e.viewWater,background=e.viewBackground;
+  if(renderer){const release=()=>{water?.dispose();background?.dispose();renderer.dispose();};if(GPU.encoder)GPU.onSubmit(null,release);else release();e.viewRenderer=e.viewWater=e.viewBackground=null;}
+if(e.candidate.root.parent===e.scene)e.candidate.root.removeFromParent();if(e.ownsCandidate)disposeRepositoryScene(e.candidate);e.candidate=null;}}
+ remove(id){const e=this.entries.get(id);if(!e)return;e.aperture.removeFromParent();this._releaseCandidate(e);const release=()=>{e.aperture.geometry.dispose();e.material.dispose();e.material.uniformBlock.buffer?.destroy();e.target.texture.destroy();e.target.depthTexture.destroy();e.block.buffer?.destroy();};if(GPU.encoder)GPU.onSubmit(null,release);else release();this.entries.delete(id);}
  clear(){for(const id of [...this.entries.keys()])this.remove(id);}
  dispose(){this.clear();this.active=null;}
 }

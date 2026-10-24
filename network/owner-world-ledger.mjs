@@ -1,11 +1,18 @@
 import { mkdir, open, lstat, chmod, unlink } from 'node:fs/promises';
+import {canonical,assetId} from './identity.mjs';
 import { dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 const schema='CREATE TABLE owner_ledger (id INTEGER PRIMARY KEY CHECK(id=1), payload TEXT NOT NULL)';
 const check=(value,message)=>{if(!value)throw Error(message);};
+export const ownerStateDigest=state=>assetId(Buffer.from(canonical(state)));
+export function currentOwnerTransfer(t,binding){return !!t&&!t.archivedByMigration&&!!t.binding&&(t.role==='SOURCE'?t.binding.sourceWorld===binding.world&&t.binding.sourceEpoch===binding.epoch&&t.binding.sourceContent===binding.content:t.role==='DESTINATION'&&t.binding.destinationWorld===binding.world&&t.binding.destinationEpoch===binding.epoch&&t.binding.destinationContent===binding.content);}
+export function revisionHomeMember(state,playerId){const worldId=state.revision?.manifest?.homes?.find(h=>h.playerId===playerId)?.worldId,receipt=state.revision?.activation?.receipts?.find(r=>r.worldId===worldId),member=receipt?.homeMembers?.find(m=>m.playerId===playerId);return member?{worldId,...structuredClone(member)}:null;}
 /** One process and one FULL-synchronous SQLite ledger per independently owned world. */
 export class OwnerWorldLedger {
  #path; #state; #queue=Promise.resolve(); #lock; #fatal; #db;
+ static async inspect(path){
+  path=resolve(path);const info=await lstat(path);check(info.isFile()&&!info.isSymbolicLink(),'Ledger must be an ordinary SQLite file');const db=new DatabaseSync(path,{readOnly:true});try{const tables=db.prepare("SELECT name,type,sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'").all();check(tables.length===1&&tables[0].name==='owner_ledger'&&tables[0].sql===schema&&db.prepare('PRAGMA user_version').get().user_version===1,'Unexpected ledger schema/version');const rows=db.prepare('SELECT id,payload FROM owner_ledger').all();check(rows.length===1&&rows[0].id===1,'Unexpected ledger payload');const state=JSON.parse(rows[0].payload);check(state.version===1,'Unexpected ledger version');return state;}finally{db.close();}
+ }
  static async open(path,binding){
   const ledger=new OwnerWorldLedger();ledger.#path=resolve(path);
   await mkdir(dirname(ledger.#path),{recursive:true,mode:0o700});
