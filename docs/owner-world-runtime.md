@@ -120,3 +120,24 @@ cancellation, committed transfer recovery after source restart, remote bootstrap
 return travel, generation/sequence continuity, explicit remote ENTER/capacity/occupied rejection, physical occupancy rejection, and
 rotated portal yaw/velocity mapping. It manually signs the same browser request
 protocol for the two-owner travel sequence; it also exercises an actual fresh OwnerWorldTransport/WebCrypto bootstrap after a ready request is lost before destination delivery and source restart, proving signed no-commit cancellation and delayed-ready rejection. It does not exercise the renderer.
+
+## Collision correction for normal movement
+
+An authenticated normal `state` request blocked by player clearance receives a
+signed `pose-corrected` receipt containing the last accepted pose. It binds the
+original signed request, authority epoch, player, world, session, generation and
+attempted/accepted sequences; it expires within five seconds. Rejected motion
+never advances the ledger sequence. The browser validates the receipt, rechecks
+its current context after signature verification, and resets physics position,
+velocity and crossing history while preserving the current look direction.
+Pending transfers and frozen/offline clients ignore corrections; a correction
+cannot resume a frozen player. Authentication errors and actual transport loss
+retain the existing fail-closed behavior.
+
+This applies only to ordinary movement. Strict `accepted-state` rejection before
+portal preparation still throws and can mark the owner offline; it cannot grant
+a crossing or prepare/commit a transfer. That recovery limitation remains.
+
+HP protocol/host checks: `node --test test/owner-motion-correction.mjs
+ test/owner-motion-application.mjs` (11 cases). Real native collision and travel
+acceptance must be reported separately from these tests.

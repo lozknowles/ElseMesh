@@ -65,7 +65,12 @@ export async function createOwnerWorldRuntime({root,config,identity,host='127.0.
   if(op==='unsubscribe'){s.grants.delete(world.worldId);return true;}
   if(op==='state'||op==='accepted-state'){
    const state=p.state??p;check(state.worldId===world.worldId&&Number.isSafeInteger(state.sequence)&&state.sequence>s.sequence,'State sequence/world mismatch');check(state.generation===s.generation,'State generation mismatch');validateAppearance(state.appearance);const motion={position:state.position,velocity:state.velocity,yaw:state.yaw,pitch:0};
-   await invoke('accepted-state',{grantId:grant.grantId,playerId:s.playerId,sessionId:s.sessionId,motion,sequence:state.sequence,generation:state.generation});s.motion=motion;s.sequence=state.sequence;s.appearance=state.appearance;
+   const accepted=await authority.acceptedState({grantId:grant.grantId,playerId:s.playerId,sessionId:s.sessionId,motion,sequence:state.sequence,generation:state.generation},{allowCollisionCorrection:op==='state'});
+   if(accepted.corrected){
+    const member=accepted.member,issuedAt=Date.now();
+    return signObject({protocol:'elsemesh.world-wss/2',type:'pose-corrected',reason:'movement-clearance',requestId:envelope.requestId,authorityEpoch:localDescriptor.epoch,playerNodeId:s.nodeId,authoredWorldId:world.worldId,sessionId:member.sessionId,generation:member.generation,rejectedSequence:accepted.rejectedSequence,acceptedSequence:member.sequence,position:[...member.motion.position],velocity:[0,0,0],yaw:member.motion.yaw??0,issuedAt,expiresAt:issuedAt+5000},identity);
+   }
+   s.motion=motion;s.sequence=state.sequence;s.appearance=state.appearance;
    return signObject({protocol:'elsemesh.world-wss/2',type:'pose-accepted',playerNodeId:s.nodeId,authoredWorldId:world.worldId,sessionId:s.sessionId,generation:s.generation,sequence:s.sequence,...motion,appearance:state.appearance,portalCrossings:world.portals.filter(p=>p.enabled&&(()=>{const q=portalLocalPoint(p,motion.position);return Math.abs(q[2])<1&&Math.abs(q[0])<p.width/2&&q[1]>-p.height/2-.1&&q[1]+1.8<p.height/2+.1;})()).map(p=>p.id)},identity);
   }
   if(op==='owner-portal-target'){const portal=world.portals.find(x=>x.id===p.portalId);check(portal?.enabled,'Portal unavailable');return {worldId:portal.destination.worldId};}

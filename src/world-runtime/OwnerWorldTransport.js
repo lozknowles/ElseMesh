@@ -4,7 +4,7 @@ import {canonical} from './vendor/world-engine-contract.js';
 const encoder=new TextEncoder(),base64=bytes=>{let out='';for(const byte of bytes)out+=String.fromCharCode(byte);return btoa(out);};
 /** One same-origin connection. Every destination still authorizes its own world. */
 export class OwnerWorldTransport extends PortalTransport {
- constructor(options={}){super(options);this.ownerConfig=options.config;this.ownerRequestSequence=0;this.ownerHandoffCommits=true;this.ownerViews=new Set();this.ownerGrantExpiry=new Map();this.ownerLanes=new Map();this.ownerViewRenewals=new Map();this.ownerViewFresh=new Map();this.ownerWorldEpoch=new Map();this.ownerWorldOnline=new Map();this.events.worldStatus=options.worldStatus??(()=>{});this.ownerRequestTimeoutMs=options.ownerRequestTimeoutMs??5000;if(!Number.isSafeInteger(this.ownerRequestTimeoutMs)||this.ownerRequestTimeoutMs<100||this.ownerRequestTimeoutMs>20000)throw Error('Invalid owner request timeout');}
+ constructor(options={}){super(options);this.ownerConfig=options.config;this.ownerRequestSequence=0;this.ownerHandoffCommits=true;this.ownerViews=new Set();this.ownerGrantExpiry=new Map();this.ownerLanes=new Map();this.ownerViewRenewals=new Map();this.ownerViewFresh=new Map();this.ownerWorldEpoch=new Map();this.ownerWorldOnline=new Map();this.events.worldStatus=options.worldStatus??(()=>{});this.events.stateCorrection=options.stateCorrection??(()=>{});this.ownerCorrections=new Set();this.ownerRequestTimeoutMs=options.ownerRequestTimeoutMs??5000;if(!Number.isSafeInteger(this.ownerRequestTimeoutMs)||this.ownerRequestTimeoutMs<100||this.ownerRequestTimeoutMs>20000)throw Error('Invalid owner request timeout');}
  close(){this.disconnect();}
  async sign(value){const payload={...JSON.parse(JSON.stringify(value)),signer:this.identity.nodeId,publicKey:this.identity.publicKeyPEM??this.identity.publicKey};return {...payload,signature:base64(new Uint8Array(await crypto.subtle.sign('Ed25519',this.identity.privateCryptoKey??this.identity.privateKey,encoder.encode(canonical(payload)))))};}
  localOwnerWorld(){return this.ownerConfig?.defaultWorldId??this.ownerConfig?.contacts?.find(c=>c.authorityNodeId===this.ownerConfig?.serverNodeId)?.worldId;}
@@ -32,13 +32,24 @@ export class OwnerWorldTransport extends PortalTransport {
   });
   const result=lane.tail.then(work,work);lane.tail=result.catch(()=>{});return result.finally(()=>{lane.queued--;if(!lane.queued&&this.ownerLanes.get(laneId)===lane)this.ownerLanes.delete(laneId);});
  }
+ async verifyStateCorrection(result,{type,requestId,state,connection,context}){
+  const current=()=>connection===this.connectionEpoch&&this.worldId===context.worldId&&this.generation===context.generation&&this.membership?.sessionId===context.sessionId;
+  if(!current())return false;
+  const contact=this.ownerConfig?.contacts?.find(c=>c.worldId===state.worldId),now=Date.now(),vec=v=>Array.isArray(v)&&v.length===3&&v.every(n=>Number.isFinite(n)&&Math.abs(n)<=1e6);
+  if(type!=='state'||result.protocol!=='elsemesh.world-wss/2'||result.type!=='pose-corrected'||result.reason!=='movement-clearance'||!contact||result.signer!==contact.authorityNodeId||result.requestId!==requestId||result.playerNodeId!==this.identity.nodeId||result.authoredWorldId!==state.worldId||result.sessionId!==context.sessionId||result.generation!==state.generation||result.authorityEpoch!==context.authorityEpoch||result.rejectedSequence!==state.sequence||!Number.isSafeInteger(result.acceptedSequence)||result.acceptedSequence<0||result.acceptedSequence>=result.rejectedSequence||!vec(result.position)||!vec(result.velocity)||result.velocity.some(n=>n!==0)||!Number.isFinite(result.yaw)||!Number.isSafeInteger(result.issuedAt)||!Number.isSafeInteger(result.expiresAt)||result.issuedAt>now+1000||result.expiresAt<=now||result.expiresAt-result.issuedAt<=0||result.expiresAt-result.issuedAt>5000||this.ownerCorrections.has(requestId)||!await verifyRuntimeSignature(result,new Set([contact.authorityNodeId])))throw Error('Invalid authoritative movement correction');
+  if(!current())return false;
+  if(result.expiresAt<=Date.now()||this.ownerCorrections.has(requestId))throw Error('Expired or replayed authoritative movement correction');
+  this.ownerCorrections.add(requestId);if(this.ownerCorrections.size>256)this.ownerCorrections.delete(this.ownerCorrections.values().next().value);
+  this.events.stateCorrection(result);return true;
+ }
  async request(type,data={}){
   if(data.reservationId&&this.recoveryContext?.reservation?.id===data.reservationId)data={...data,sourceWorldId:this.recoveryContext.reservation.sourceWorldId};
   const target=data.worldId??data.sourceWorldId??this.worldId,connection=this.connectionEpoch;
   try{
    if(['read','presence','describe','state','accepted-state'].includes(type)&&(this.ownerGrantExpiry.get(target)??0)<Date.now()+30000)await this.subscribe(target);
-   const epoch=this.ownerWorldEpoch.get(target)??0,requestId=this.identity.nodeId+':'+Date.now()+':'+(++this.ownerRequestSequence);
+   const epoch=this.ownerWorldEpoch.get(target)??0,requestId=this.identity.nodeId+':'+Date.now()+':'+(++this.ownerRequestSequence),state=data.state??data,context={worldId:this.worldId,generation:this.generation,sessionId:this.membership?.sessionId,authorityEpoch:this.membership?.world?.epoch};
    const result=await this.sendOwnerEnvelope(await this.sign({protocol:'elsemesh.owner-browser-request/1',requestId,issuedAt:Date.now(),operation:type,payload:data}),target);
+   if(result?.type==='pose-corrected'||result?.rejectedSequence!==undefined||result?.acceptedSequence!==undefined)await this.verifyStateCorrection(result,{type,requestId,state,connection,context});
    if(type==='presence')this.markWorldLive(target,epoch,connection);
    return result;
   }catch(error){if(connection===this.connectionEpoch)this.markWorldOffline(target);throw error;}

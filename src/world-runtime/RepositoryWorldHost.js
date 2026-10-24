@@ -102,6 +102,16 @@ export class RepositoryWorldHost {
   if(token!==this.generation||this.disposed){this.discardPrepared(prepared);return false;}
   return this.activatePrepared(prepared,token);
  }
+ // Reconcile a validated authority pose without consuming input or rewinding look.
+ correctPosition(position){
+  const active=this.active;if(!active||this.disposed)return false;
+  if(!Array.isArray(position)||position.length!==3||!position.every(Number.isFinite))throw Error('Invalid motion correction position');
+  const player=active.player,floor=player.groundAt(position[0],position[2],position[1]+.001);
+  if(!Number.isFinite(floor)||position[1]<floor-.001)throw Error('Motion correction intersects terrain');
+  player.position.fromArray(position);player.velocity.set(0,0,0);player.grounded=Math.abs(position[1]-floor)<.06;
+  player.camOff=0;player.camOffV=0;player._camY=null;player.camInit=false;player.bob=0;player.stepDist=0;player.waterMean=null;
+  player.query.setPoint(player.slot,position[0],position[2]);return true;
+ }
  getAuthoredProject(){return this.active?structuredClone(this.active.project):null;}
  setRuntimeOverlay(snapshot){
   this.overlay=snapshot?structuredClone(snapshot):null;if(!this.active)return;
