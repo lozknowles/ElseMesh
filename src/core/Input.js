@@ -9,12 +9,15 @@ const ownsKeyboard = target => Boolean( target && (
 
 export class Input {
 
-	constructor( dom, { keyboardLookBlocked = () => false } = {} ) {
+	constructor( dom, { keyboardLookBlocked = () => false, touchRoot = null } = {} ) {
 
 		this.dom = dom;
 		this.keys = new Set();
 		this.pressed = new Set();
 		this._touchHeld = new Map();
+		this._touchActionHeld = new Map();
+		this._touchActionResetters = [];
+		this.touchRoot = touchRoot;
 		this._helicopterTouchMode = false;
 		this._touchFlightResetters = [];
 		this.look = { x: 0, y: 0 };
@@ -137,7 +140,7 @@ export class Input {
 
 	}
 
-	get touchInterface() { return Boolean( window.matchMedia?.( '(pointer: coarse)' ).matches ); }
+	get touchInterface() { return Boolean( window.matchMedia?.( '(any-pointer: coarse)' ).matches || window.matchMedia?.( '(pointer: coarse)' ).matches ); }
 
 	setHelicopterTouchMode( active ) {
 
@@ -151,7 +154,7 @@ export class Input {
 
 	_createTouchSticks() {
 
-		const root = document.querySelector( '.tw-root' );
+		const root = this.touchRoot || document.querySelector( '.tw-root' );
 		if ( ! root ) return;
 
 		const controls = document.createElement( 'div' );
@@ -174,10 +177,12 @@ export class Input {
 
 			const reset = () => {
 
+				const captured = pointerId;
 				pointerId = null;
 				state.x = state.y = 0;
 				stick.classList.remove( 'is-active' );
 				knob.style.transform = 'translate( -50%, -50% )';
+				if ( captured !== null && stick.hasPointerCapture?.( captured ) ) stick.releasePointerCapture( captured );
 
 			};
 			this._touchStickResetters.push( reset );
@@ -195,11 +200,11 @@ export class Input {
 
 			stick.addEventListener( 'pointerdown', ( e ) => {
 
-				if ( pointerId !== null ) return;
 				e.preventDefault();
 				e.stopPropagation();
+				if ( ! this.enabled || pointerId !== null ) return;
+				try { stick.setPointerCapture( e.pointerId ); } catch { return; }
 				pointerId = e.pointerId;
-				stick.setPointerCapture( pointerId );
 				stick.classList.add( 'is-active' );
 				update( e );
 
@@ -208,6 +213,7 @@ export class Input {
 
 				if ( e.pointerId !== pointerId ) return;
 				e.preventDefault();
+				if ( ! this.enabled ) { reset(); return; }
 				update( e );
 
 			} );
@@ -216,8 +222,8 @@ export class Input {
 				if ( e.pointerId === pointerId ) reset();
 
 			} );
-			stick.addEventListener( 'pointercancel', reset );
-			stick.addEventListener( 'lostpointercapture', reset );
+			stick.addEventListener( 'pointercancel', e => { if ( e.pointerId === pointerId ) reset(); } );
+			stick.addEventListener( 'lostpointercapture', e => { if ( e.pointerId === pointerId ) reset(); } );
 			controls.append( stick );
 
 		}
@@ -273,6 +279,51 @@ export class Input {
 
 	}
 
+	bindTouchAction( button, { code = null, hold = false, onPress = () => {}, allowed = () => true } = {} ) {
+
+		if ( ! button ) return () => {};
+		const pointers = new Set();
+		const held = hold && code ? ( this._touchActionHeld.get( code ) || new Set() ) : null;
+		if ( held ) this._touchActionHeld.set( code, held );
+		const reset = () => {
+
+			const captured = [ ...pointers ];
+			pointers.clear();
+			if ( held ) held.clear();
+			button.classList.remove( 'is-active' );
+			for ( const id of captured ) if ( button.hasPointerCapture?.( id ) ) button.releasePointerCapture( id );
+
+		};
+		this._touchActionResetters.push( reset );
+		const stop = e => { e.preventDefault(); e.stopPropagation(); };
+		button.addEventListener( 'pointerdown', e => {
+
+			stop( e );
+			if ( ! this.enabled || ! allowed() || pointers.size ) return;
+			try { button.setPointerCapture( e.pointerId ); } catch { return; }
+			pointers.add( e.pointerId );
+			if ( held ) held.add( e.pointerId );
+			button.classList.add( 'is-active' );
+			if ( code ) this.press( code );
+			onPress();
+
+		} );
+		button.addEventListener( 'pointermove', e => { if ( pointers.has( e.pointerId ) ) stop( e ); } );
+		for ( const event of [ 'pointerup', 'pointercancel', 'lostpointercapture' ] ) button.addEventListener( event, e => {
+
+			if ( ! pointers.has( e.pointerId ) ) return;
+			stop( e );
+			pointers.delete( e.pointerId );
+			if ( held ) held.delete( e.pointerId );
+			if ( event !== 'lostpointercapture' && button.hasPointerCapture?.( e.pointerId ) ) button.releasePointerCapture( e.pointerId );
+			button.classList.toggle( 'is-active', pointers.size > 0 );
+
+		} );
+		button.addEventListener( 'click', stop );
+		return reset;
+
+	}
+
 	_clearTransientInput() {
 
 		this.keys.clear();
@@ -284,6 +335,7 @@ export class Input {
 		this.lookStick.x = this.lookStick.y = 0;
 		for ( const reset of this._touchStickResetters || [] ) reset();
 		for ( const reset of this._touchFlightResetters ) reset();
+		for ( const reset of this._touchActionResetters ) reset();
 
 	}
 
@@ -341,7 +393,7 @@ export class Input {
 
 		if ( ! this.enabled ) return false;
 		if ( this.keys.has( code ) ) return true;
-		if ( this._touchHeld.get( code )?.size ) return true;
+		if ( this._touchHeld.get( code )?.size || this._touchActionHeld.get( code )?.size ) return true;
 		const { x, y } = this.moveStick;
 		if ( code === 'KeyW' ) return y > 0.18;
 		if ( code === 'KeyS' ) return y < - 0.18;

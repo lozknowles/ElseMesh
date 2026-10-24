@@ -1,3 +1,4 @@
+import './MobileControls.css';
 import {OpeningProgress} from './OpeningProgress.js';
 import { repositoryWeatherShelters, setMistShelters } from './WeatherShelter.js';
 import {MediaScreen,collectMediaScreenOccluders,mediaScreenCellVisibility} from './MediaScreen.js';
@@ -48,6 +49,7 @@ import { effectiveObjectState,parseGitHubWorldLocation, resolveGitHubWorldSource
 
 const status=document.querySelector('#status'),hud=document.querySelector('#hud'),terminal=document.querySelector('#terminal');
 const openingSplash=document.querySelector('#opening-splash');
+const touchLayer=document.querySelector('#repository-touch-layer');
 const openingProgress=new OpeningProgress({root:openingSplash,label:document.querySelector('#opening-splash-status'),bar:document.querySelector('#opening-splash-progress'),percent:document.querySelector('#opening-splash-percent')});
 const report=message=>{status.textContent=message;};
 const hideOpeningSplash=()=>{if(openingSplash)openingSplash.hidden=true;};
@@ -60,7 +62,7 @@ async function init(){
  let openingLoading=false,pendingOpeningReady=null,openingTargetWorldId=null,openingTargetDigest=null,openingExpectedGeneration=null;
  const captureQuality=new URLSearchParams(location.search).get('quality')==='capture';engine.maxOutputPixels=captureQuality?2100000:1000000;engine.resize();
  let media,mediaContext=null,objectAccess,accessPanel,controlsHelp,worldWelcome,welcomeView,activeComputerId=null,interactionPending=false,interactionContext=null;
- const input=new Input(engine.canvas,{keyboardLookBlocked:()=>terminal.open||retro.active||!!media?.controlsOpen||controlsHelp?.open||accessPanel?.root.open});
+ const input=new Input(engine.canvas,{touchRoot:touchLayer,keyboardLookBlocked:()=>terminal.open||retro.active||!!media?.controlsOpen||controlsHelp?.open||accessPanel?.root.open});
  const ownerMode=()=>portals.config?.protocol==='elsemesh.owner-runtime/1';
  const interactionState=()=>({active:host.active,hostGeneration:host.generation,inputEnabled:input.enabled,transport:portals.transport,connection:portals.transport.connectionEpoch,sessionId:portals.transport.membership?.sessionId,generation:portals.transport.generation});
  const canResume=()=>canResumeObjectInteraction(interactionContext,{active:host.active,hostGeneration:host.generation,pending:portals.pending,authorityOffline:portals.authorityOffline,transport:portals.transport,connected:portals.connected,ownerMode:ownerMode()});
@@ -144,7 +146,13 @@ async function init(){
  const avatarChooser=new AvatarChooser({app});app.avatarChooser=avatarChooser;
  window.addEventListener('keydown',event=>{if(event.code==='KeyK'&&!retro.active&&!terminal.open&&!media?.controlsOpen&&!portals.pending)avatarChooser.show();});
  const followButton=document.querySelector('#follow-player');const setFollow=enabled=>{if(enabled)alignAvatarToPlayerView(avatar,host.active?.player);followCamera.setEnabled(enabled);followButton.textContent=enabled?'First-person view · V':'Follow player · V';post?.taau.resetHistory();engine.canvas.focus();};followButton.onclick=()=>setFollow(!followCamera.enabled);followButton.textContent=followCamera.enabled?'First-person view · V':'Follow player · V';
- window.addEventListener('keydown',event=>{if(event.code==='KeyV'&&input.enabled&&!retro.active&&!terminal.open&&!media?.controlsOpen&&!avatarChooser.dialog.open)setFollow(!followCamera.enabled);});
+ const canToggleView=()=>input.enabled&&!retro.active&&!terminal.open&&!media?.controlsOpen&&!avatarChooser.dialog.open&&!portals.pending&&!portals.authorityOffline;
+ window.addEventListener('keydown',event=>{if(event.code==='KeyV'&&canToggleView())setFollow(!followCamera.enabled);});
+ const touchGameplayReady=()=>!!host.active&&input.enabled&&!terminal.open&&!retro.active&&!media?.controlsOpen&&!interactionPending&&!controlsHelp.open&&!accessPanel.root.open&&!portals.pending&&!portals.authorityOffline&&!avatarChooser.dialog.open&&!app.freeCam&&!document.querySelector('dialog[open]');
+ input.bindTouchAction(document.querySelector('#touch-use'),{code:'KeyE',allowed:touchGameplayReady});
+ input.bindTouchAction(document.querySelector('#touch-jump'),{code:'Space',hold:true,allowed:touchGameplayReady});
+ input.bindTouchAction(document.querySelector('#touch-view'),{allowed:()=>touchGameplayReady()&&canToggleView(),onPress:()=>setFollow(!followCamera.enabled)});
+ let touchWasActive=false;
  window.__repositoryWorldApp=app;
  const sessionStatus=document.querySelector('#session-status');
  host.beforeActivate=async()=>{media?.exit();worldWelcome?.reset();objectAccess.invalidate();controlsHelp.close();accessPanel.root.open=false;accessPanel.render(null);if(retro.active)retro.clear();document.querySelector('#apply-update').disabled=true;document.querySelector('#update-status').textContent='';app.session?.disconnect();if(terminal.open)terminal.close();};
@@ -174,6 +182,9 @@ async function init(){
    if(!isWebGL){GPU.beginFrame();G.time.value=time;G.dt.value=dt;G.exposure.value=.55;}
    if(!terminal.open&&!retro.active&&!media?.active&&!interactionPending){objectAccess.lease=null;interactionContext=null;activeComputerId=null;}
    if(ownerMode())objectAccess.tick();
+   const touchActive=input.touchInterface&&touchGameplayReady();
+   if(touchWasActive&&!touchActive)input._clearTransientInput();
+   touchWasActive=touchActive;if(touchLayer)touchLayer.hidden=!touchActive;
    const canMove=!terminal.open&&!retro.active&&!media?.controlsOpen&&!interactionPending&&!controlsHelp.open&&!accessPanel.root.open&&!portals.pending&&!portals.authorityOffline&&!app.freeCam;
     if(!app.freeCam)host.update(dt,time,{move:canMove});
     if(canMove){const device=retro.nearest(engine.camera.position),tv=nearestMedia();if(input.hit('KeyE')){if(device){const computer=host.active.project.objects.find(o=>o.id===device.objectId);if(computer)void openComputer(computer,host.active,device);else if(!ownerMode()){interactionContext=interactionState();retro.open(device);}else report('Access restricted');}else if(tv)void openMedia(tv,host.active);}}

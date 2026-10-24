@@ -25,7 +25,7 @@ function fixture(){
   globalThis.window=win;globalThis.document=doc;
   const input=new Input(new Element(captures)),flight=root.children[0].children.find(e=>e.className==='tw-touch-flight');
   const [up,down]=flight.children;
-  return {input,up,down,flight,win,doc,captures,
+  return {input,up,down,flight,win,doc,root,captures,
     pointer:(target,name,id,data={})=>(captures.get(id)||target).dispatch(name,{pointerId:id,...data}),
     restore(){for(const [key,value]of Object.entries(previous))if(value===undefined)delete globalThis[key];else globalThis[key]=value;}};
 }
@@ -101,3 +101,45 @@ test('real helicopter exit keeps airborne/moving/water gates and clears buttons 
     assert.equal(f.flight.hidden,true);assert.equal(f.input.down('Space'),false);assert.equal(f.captures.size,0);
   } finally {f.restore();}
 });
+
+test('repository touch root allows two sticks and actions together, then clears on interruption',()=>run(f=>{
+  const {input,win,root,captures}=f;
+  const [move,look]=root.children[0].children;
+  const use=new Element(captures),jump=new Element(captures),view=new Element(captures);
+  let views=0;
+  input.bindTouchAction(use,{code:'KeyE'});
+  input.bindTouchAction(jump,{code:'Space',hold:true});
+  input.bindTouchAction(view,{onPress:()=>views++});
+  f.pointer(move,'pointerdown',11,{clientX:50,clientY:50});
+  f.pointer(move,'pointermove',11,{clientX:50,clientY:15});
+  f.pointer(look,'pointerdown',12,{clientX:50,clientY:50});
+  f.pointer(look,'pointermove',12,{clientX:80,clientY:50});
+  f.pointer(jump,'pointerdown',13);
+  assert.equal(input.down('KeyW'),true);
+  assert.ok(input.consumeLook().x>0);
+  assert.equal(input.hit('Space'),true);
+  assert.equal(input.down('Space'),true);
+  f.pointer(use,'pointerdown',14);
+  assert.equal(input.hit('KeyE'),true);
+  f.pointer(view,'pointerdown',15);
+  assert.equal(views,1);
+  win.dispatch('blur');
+  assert.equal(input.down('KeyW'),false);
+  assert.equal(input.down('Space'),false);
+  assert.equal(captures.size,0);
+  assert.equal(move.classes.has('is-active'),false);
+  assert.equal(jump.classes.has('is-active'),false);
+}));
+
+test('repository action is inert when suspended or disallowed, and a cancelled press releases hold',()=>run(f=>{
+  const button=new Element(f.captures);let allowed=false;
+  f.input.bindTouchAction(button,{code:'Space',hold:true,allowed:()=>allowed});
+  f.pointer(button,'pointerdown',21);
+  assert.equal(f.input.down('Space'),false);
+  allowed=true;f.pointer(button,'pointerdown',21);
+  assert.equal(f.input.down('Space'),true);
+  f.pointer(button,'pointercancel',21);
+  assert.equal(f.input.down('Space'),false);
+  f.input.suspend();f.pointer(button,'pointerdown',22);
+  assert.equal(f.captures.size,0);
+}));
