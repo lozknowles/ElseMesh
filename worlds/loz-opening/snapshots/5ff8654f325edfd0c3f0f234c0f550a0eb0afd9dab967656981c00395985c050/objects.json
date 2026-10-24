@@ -5809,11 +5809,11 @@
   },
   {
     "id": "warehouse:object:0242",
-    "name": "brick wall lower",
+    "name": "south brick wall, left of beach exit",
     "kind": "glb",
     "assetId": "warehouse:box-brick",
     "position": [
-      0,
+      -8.85,
       5,
       -62
     ],
@@ -5823,7 +5823,7 @@
       0
     ],
     "scale": [
-      32,
+      14.3,
       4,
       0.38
     ],
@@ -41163,5 +41163,365 @@
       "videoId": "N-V7VpmoPkU",
       "width": 6.4
     }
+  },
+  {
+    "id": "warehouse:exit:wall-right",
+    "name": "south brick wall, right of beach exit",
+    "kind": "glb",
+    "assetId": "warehouse:box-brick",
+    "position": [
+      8.85,
+      5,
+      -62
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      14.3,
+      4,
+      0.38
+    ],
+    "color": "#70453b",
+    "visible": true,
+    "collision": "solid"
+  },
+  {
+    "id": "warehouse:exit:lintel",
+    "name": "brick lintel above beach exit",
+    "kind": "glb",
+    "assetId": "warehouse:box-brickDark",
+    "position": [
+      0,
+      6.62,
+      -62
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      3.4,
+      0.76,
+      0.38
+    ],
+    "color": "#49322e",
+    "visible": true,
+    "collision": "solid"
+  },
+  {
+    "id": "warehouse:exit:jamb-left",
+    "name": "steel beach exit frame, left",
+    "kind": "glb",
+    "assetId": "warehouse:box-steel",
+    "position": [
+      -1.65,
+      4.6,
+      -61.78
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      0.14,
+      3.2,
+      0.14
+    ],
+    "color": "#45616b",
+    "visible": true,
+    "collision": "solid"
+  },
+  {
+    "id": "warehouse:exit:jamb-right",
+    "name": "steel beach exit frame, right",
+    "kind": "glb",
+    "assetId": "warehouse:box-steel",
+    "position": [
+      1.65,
+      4.6,
+      -61.78
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      0.14,
+      3.2,
+      0.14
+    ],
+    "color": "#45616b",
+    "visible": true,
+    "collision": "solid"
+  },
+  {
+    "id": "warehouse:exit:door-left",
+    "name": "open beach exit door, left",
+    "kind": "glb",
+    "assetId": "warehouse:box-steel",
+    "position": [
+      -1.68,
+      4.6,
+      -61.2
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      0.08,
+      3.2,
+      1.45
+    ],
+    "color": "#274957",
+    "visible": true,
+    "collision": "solid"
+  },
+  {
+    "id": "warehouse:exit:door-right",
+    "name": "open beach exit door, right",
+    "kind": "glb",
+    "assetId": "warehouse:box-steel",
+    "position": [
+      1.68,
+      4.6,
+      -61.2
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      0.08,
+      3.2,
+      1.45
+    ],
+    "color": "#274957",
+    "visible": true,
+    "collision": "solid"
+  },
+  {
+    "id": "warehouse:exit:threshold",
+    "name": "beach exit threshold",
+    "kind": "glb",
+    "assetId": "warehouse:box-polishedTile",
+    "position": [
+      0,
+      2.9,
+      -61.53
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      3.08,
+      0.2,
+      0.84
+    ],
+    "color": "#9fabb0",
+    "visible": true,
+    "collision": "walkable"
+  },
+  {
+    "id": "warehouse:exit:exit-sign",
+    "name": "beach exit sign above doors",
+    "kind": "glb",
+    "assetId": "warehouse:box-steel",
+    "position": [
+      0,
+      7.04,
+      -61.72
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      1.85,
+      0.27,
+      0.06
+    ],
+    "color": "#4bd4aa",
+    "visible": true,
+    "collision": "none"
+  },
+  {
+    "id": "warehouse:exit:step-1",
+    "name": "beach exit stair 1",
+    "kind": "glb",
+    "assetId": "warehouse:box-polishedTile",
+    "position": [
+      0,
+      1.6549999999999998,
+      -60.65
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      3.08,
+      2.21,
+      0.87
+    ],
+    "color": "#9fabb0",
+    "visible": true,
+    "collision": "walkable"
+  },
+  {
+    "id": "warehouse:exit:step-2",
+    "name": "beach exit stair 2",
+    "kind": "glb",
+    "assetId": "warehouse:box-polishedTile",
+    "position": [
+      0,
+      1.5350000000000001,
+      -59.8
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      3.08,
+      1.97,
+      0.87
+    ],
+    "color": "#9fabb0",
+    "visible": true,
+    "collision": "walkable"
+  },
+  {
+    "id": "warehouse:exit:step-3",
+    "name": "beach exit stair 3",
+    "kind": "glb",
+    "assetId": "warehouse:box-polishedTile",
+    "position": [
+      0,
+      1.415,
+      -58.949999999999996
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      3.08,
+      1.7299999999999998,
+      0.87
+    ],
+    "color": "#9fabb0",
+    "visible": true,
+    "collision": "walkable"
+  },
+  {
+    "id": "warehouse:exit:step-4",
+    "name": "beach exit stair 4",
+    "kind": "glb",
+    "assetId": "warehouse:box-polishedTile",
+    "position": [
+      0,
+      1.295,
+      -58.1
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      3.08,
+      1.49,
+      0.87
+    ],
+    "color": "#9fabb0",
+    "visible": true,
+    "collision": "walkable"
+  },
+  {
+    "id": "warehouse:exit:step-5",
+    "name": "beach exit stair 5",
+    "kind": "glb",
+    "assetId": "warehouse:box-polishedTile",
+    "position": [
+      0,
+      1.175,
+      -57.25
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      3.08,
+      1.25,
+      0.87
+    ],
+    "color": "#9fabb0",
+    "visible": true,
+    "collision": "walkable"
+  },
+  {
+    "id": "warehouse:exit:step-6",
+    "name": "beach exit stair 6",
+    "kind": "glb",
+    "assetId": "warehouse:box-polishedTile",
+    "position": [
+      0,
+      1.0550000000000002,
+      -56.4
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      3.08,
+      1.01,
+      0.87
+    ],
+    "color": "#9fabb0",
+    "visible": true,
+    "collision": "walkable"
+  },
+  {
+    "id": "warehouse:exit:step-7",
+    "name": "beach exit stair 7",
+    "kind": "glb",
+    "assetId": "warehouse:box-polishedTile",
+    "position": [
+      0,
+      0.935,
+      -55.55
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      3.08,
+      0.77,
+      0.87
+    ],
+    "color": "#9fabb0",
+    "visible": true,
+    "collision": "walkable"
   }
 ]

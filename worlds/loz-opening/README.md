@@ -1,6 +1,6 @@
 # Loz's Warehouse Island
 
-Prepared release candidate; no push, deployment, private runtime migration or new live acceptance is implied.
+Public authored snapshot for Loz’s warehouse island. The playable game pins an immutable content revision; this repository contains no owner credentials or runtime session state.
 
 World ID: `elsemesh.world:2842c4f2-93a0-4492-b942-e53e524de319`  
 Region ID: `elsemesh.region:3c498d61-7d1f-478a-8a85-d9e66d3b63fb`  
@@ -26,6 +26,12 @@ See ATTRIBUTION.md and retained source/licence notices. Asset-specific licences 
 Authored TV clearance placement: east wall at [15.6, 5.2, -77], yaw -PI/2, width 6.4 metres. Native clear-view and provider-playback acceptance is recorded separately from this content snapshot.
 
 Warehouse native grass-mask apron cleared at x[-30,30], z[-100,-54]; terrain, objects and vegetation records preserved. Native TV picture and provider playback accepted on MSI before this publication.
+
+## Beach exit and television
+
+From the warehouse spawn at [-4, 3, -75], turn around and walk towards the south wall at z = -62. Open double steel doors under the green exit marker lead to seven shallow steps and the beach terrain. The original south-wall object ID remains on the left segment; the frame, doors, threshold and steps have stable warehouse:exit IDs. The door leaves and frame are solid, while the threshold and steps are both solid and walkable. The world’s terrain and warehouse floor stay in place.
+
+The east-wall television streams the named YouTube video using the installed media-screen/1 capability. Approach it, press E, then Play on TV. Return to game resumes walking while playback continues. Complete obstruction or an offscreen view hides the picture but keeps the same player running; returning to view reveals the ongoing video. Stop TV, using a computer, leaving the world, losing access, or hiding the browser tab stops the player. Starting playback needs a user gesture, and audio depends on the browser and provider.
 
 ## Warehouse dining scale
 
