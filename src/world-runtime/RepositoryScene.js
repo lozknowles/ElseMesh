@@ -33,6 +33,7 @@ export function disposeRepositoryScene(candidate) {
  for(const m of materials)if(!m.userData.sharedBuilderTreeMaterial)m.dispose();
 }
 export async function buildRepositoryScene(descriptor,camera,options={}) {
+ if(descriptor.project?.splatScene)throw Error('Sunset splat worlds require the WebGL graphics mode.');
  const project=descriptor.project, root=new N.Group(),candidate={root,descriptor,terrain:descriptor.terrain,colliders:new Colliders(),assets:[],query:repositoryWaterQuery(project.water,project)};
  root.name='repository-world:'+descriptor.worldId;
  try {

@@ -1,6 +1,16 @@
 import * as THREE from '../engine/index.js';
 import { ColliderGrid } from './ColliderGrid.js';
 
+// Inclusive walkable footprints need a rounding allowance at shared fitted-cell
+// edges. It is horizontal only: maxY, walkability and capsule resolution stay exact.
+// The 1e-8 cap preserves real gaps. Beyond roughly 1.4e6 world-unit magnitudes,
+// floating-point uncertainty may exceed this cap: use local coordinates rather
+// than widening support to cover arbitrarily large-coordinate rounding errors.
+const groundFootprintEpsilon = ( x, z, box, pad ) => Math.min( 1e-8,
+	32 * Number.EPSILON * Math.max( 1, Math.abs( x ), Math.abs( z ),
+		Math.abs( box.center.x ), Math.abs( box.center.z ), box.half.x, box.half.z, Math.abs( pad ) ) );
+
+
 // Lightweight collision world for the character controller and boat.
 // Boxes are oriented around Y only. Walkable boxes (decks, floors, stairs) act as ground.
 export class Colliders {
@@ -100,7 +110,8 @@ export class Colliders {
 			if ( ! b.walkable || b.top > maxY ) continue;
 			if ( Math.abs( x - b.center.x ) > b.radius + pad + 0.01 || Math.abs( z - b.center.z ) > b.radius + pad + 0.01 ) continue;
 			const [ lx, lz ] = this._toLocal( b, x, z );
-			if ( Math.abs( lx ) <= b.half.x + pad && Math.abs( lz ) <= b.half.z + pad ) best = Math.max( best, b.top );
+			const epsilon = groundFootprintEpsilon( x, z, b, pad );
+			if ( Math.abs( lx ) <= b.half.x + pad + epsilon && Math.abs( lz ) <= b.half.z + pad + epsilon ) best = Math.max( best, b.top );
 
 		}
 
@@ -109,9 +120,11 @@ export class Colliders {
 	}
 
 	// Push a vertical capsule (feet at pos.y) out of solid geometry. Returns true if collided.
-	resolveCapsule( pos, radius, height, stepHeight = 0.35 ) {
+	// Optional onContact reports each EXISTING narrow-phase contribution before its
+	// push. Position is a snapshot; collider identity stays native. No contact math changes.
+	resolveCapsule( pos, radius, height, stepHeight = 0.35, onContact = null ) {
 
-		if ( this.optimizeSpatialQueries ) return this._resolveCapsuleIndexed( pos, radius, height, stepHeight );
+		if ( this.optimizeSpatialQueries ) return this._resolveCapsuleIndexed( pos, radius, height, stepHeight, onContact );
 		const stats = this.queryStats.enabled ? this.queryStats : null;
 		if ( stats ) { stats.capsuleQueries ++; stats.boxCandidates += this.boxes.length; stats.cylinderCandidates += this.cylinders.length; }
 
@@ -142,6 +155,7 @@ export class Colliders {
 			}
 
 			const [ wx, wz ] = this._toWorldDir( b, nx, nz );
+			if ( onContact ) onContact( { type: 'box', collider: b, position: [ pos.x, pos.y, pos.z ], localPosition: [ lx, lz ], normal: [ nx, nz ], radius, height, stepHeight, penetration: pen } );
 			pos.x += wx * pen;
 			pos.z += wz * pen;
 			hit = true;
@@ -155,7 +169,8 @@ export class Colliders {
 			const r = c.radius + radius;
 			const d2 = dx * dx + dz * dz;
 			if ( d2 >= r * r ) continue;
-			const d = Math.sqrt( d2 ) || 1e-4;
+			const distance = Math.sqrt( d2 ), d = distance || 1e-4;
+			if ( onContact ) onContact( { type: 'cylinder', collider: c, position: [ pos.x, pos.y, pos.z ], localPosition: [ dx, dz ], normal: [ dx / d, dz / d ], radius: r, height, stepHeight, penetration: r - distance } );
 			pos.x = c.x + dx / d * r;
 			pos.z = c.z + dz / d * r;
 			hit = true;
@@ -218,7 +233,8 @@ export class Colliders {
 			if ( ! b.walkable || b.top > maxY ) continue;
 			if ( Math.abs( x - b.center.x ) > b.radius + pad + 0.01 || Math.abs( z - b.center.z ) > b.radius + pad + 0.01 ) continue;
 			const [ lx, lz ] = this._toLocal( b, x, z );
-			if ( Math.abs( lx ) <= b.half.x + pad && Math.abs( lz ) <= b.half.z + pad ) best = Math.max( best, b.top );
+			const epsilon = groundFootprintEpsilon( x, z, b, pad );
+			if ( Math.abs( lx ) <= b.half.x + pad + epsilon && Math.abs( lz ) <= b.half.z + pad + epsilon ) best = Math.max( best, b.top );
 
 		}
 
@@ -227,7 +243,7 @@ export class Colliders {
 	}
 
 	// Push a vertical capsule (feet at pos.y) out of solid geometry. Returns true if collided.
-	_resolveCapsuleIndexed( pos, radius, height, stepHeight = 0.35 ) {
+	_resolveCapsuleIndexed( pos, radius, height, stepHeight = 0.35, onContact = null ) {
 
 		const stats = this.queryStats.enabled ? this.queryStats : null;
 		if ( stats ) stats.capsuleQueries ++;
@@ -265,6 +281,7 @@ export class Colliders {
 			}
 
 			const [ wx, wz ] = this._toWorldDir( b, nx, nz );
+			if ( onContact ) onContact( { type: 'box', collider: b, position: [ pos.x, pos.y, pos.z ], localPosition: [ lx, lz ], normal: [ nx, nz ], radius, height, stepHeight, penetration: pen } );
 			pos.x += wx * pen;
 			pos.z += wz * pen;
 			hit = true;
@@ -292,7 +309,8 @@ export class Colliders {
 			const r = c.radius + radius;
 			const d2 = dx * dx + dz * dz;
 			if ( d2 >= r * r ) continue;
-			const d = Math.sqrt( d2 ) || 1e-4;
+			const distance = Math.sqrt( d2 ), d = distance || 1e-4;
+			if ( onContact ) onContact( { type: 'cylinder', collider: c, position: [ pos.x, pos.y, pos.z ], localPosition: [ dx, dz ], normal: [ dx / d, dz / d ], radius: r, height, stepHeight, penetration: r - distance } );
 			pos.x = c.x + dx / d * r;
 			pos.z = c.z + dz / d * r;
 			hit = true;

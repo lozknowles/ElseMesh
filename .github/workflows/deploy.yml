@@ -17,6 +17,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      pages_build_type: ${{ steps.pages-mode.outputs.type }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,16 +36,42 @@ jobs:
           echo "VK_DRIVER_FILES=$VK_DRIVER_FILES" >> "$GITHUB_ENV"
           echo "XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR" >> "$GITHUB_ENV"
           vulkaninfo --summary
+      - name: Read configured Pages publication mode
+        id: pages-mode
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "type=$(gh api repos/${{ github.repository }}/pages --jq .build_type)" >> "$GITHUB_OUTPUT"
       - run: npm ci
       - run: npm test && npm run test:network && npm run test:security && npm run test:cargo && npm run test:vehicle-steering && npm run test:vehicle-material && npm run test:graphics && npm run test:renderer && npm run test:terrain-quality && npm run test:architecture && npm run test:publication
+      - run: npm run test:published-worlds && npm run test:portals && npm run test:worlds
       - run: npm run build
+      - name: Read immutable public world revision
+        id: world-pin
+        run: |
+          node --input-type=module -e 'import fs from "node:fs"; import {validateOpeningWorld} from "./src/world-runtime/OpeningWorld.js"; const {source}=validateOpeningWorld(JSON.parse(fs.readFileSync("public/opening-world.json","utf8"))); if(source.owner!=="lozknowles"||source.repository!=="elsemesh-world-loz-opening-island"||source.path)throw Error("Unexpected public world source"); console.log("revision="+source.ref);' >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: lozknowles/elsemesh-world-loz-opening-island
+          ref: ${{ steps.world-pin.outputs.revision }}
+          path: pinned-public-world
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: previous-pages
+          sparse-checkout: editor
+      - name: Package pinned public worlds and preserve editor
+        run: |
+          node tools/package-published-worlds.mjs dist pinned-public-world public-dist previous-pages
+          PUBLIC_SUNSET_PACKAGE=public-dist node --test test/published-world-package.mjs
       - uses: actions/configure-pages@v5
+        if: steps.pages-mode.outputs.type == 'workflow'
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: public-dist
 
   deploy:
     needs: build
+    if: needs.build.outputs.pages_build_type == 'workflow'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

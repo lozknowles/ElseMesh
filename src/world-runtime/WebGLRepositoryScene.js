@@ -1,3 +1,4 @@
+import {createSplatSceneAdapter} from './SplatSceneAdapter.js';
 import {buildMediaScreenHousing} from './MediaScreen.js';
 import {buildWebGLNativeIsland} from './WebGLNativeIsland.js';
 import {buildRepositoryTraffic} from './RepositoryTraffic.js';
@@ -43,6 +44,7 @@ export function buildWebGLNeon(config){
 }
 export function disposeWebGLRepositoryScene(candidate){
  if(!candidate||candidate.disposed)return;candidate.disposed=true;
+ candidate.splatScene?.dispose();
  candidate.nativeIsland?.dispose();
  candidate.root?.removeFromParent();const geometries=new Set(),materials=new Set(),textures=new Set();
  candidate.root?.traverse(n=>{if(n.geometry)geometries.add(n.geometry);for(const m of Array.isArray(n.material)?n.material:[n.material])if(m){materials.add(m);for(const value of Object.values(m))if(value?.isTexture)textures.add(value);}});
@@ -106,9 +108,10 @@ export async function buildWebGLRepositoryScene(descriptor,camera,options={}){
  const project=descriptor.project,root=new T.Group(),candidate={root,descriptor,terrain:descriptor.terrain,colliders:new Colliders(),query:repositoryWaterQuery(project.water,project),assets:[],loadedAssets:new Set()};
  candidate.project=project;root.name='repository-world:'+descriptor.worldId;const time={value:0};root.userData.updateWebGL=t=>{time.value=t;};
  try{
+  if(project.splatScene){candidate.splatScene=await createSplatSceneAdapter(project,{...options.splatScene,camera});candidate.terrain=candidate.splatScene.terrain;candidate.colliders=candidate.splatScene.colliders;candidate.clearance=candidate.splatScene.clearance;candidate.query=repositoryWaterQuery(null,null);Object.defineProperty(candidate,'backendQualification',{enumerable:true,get:()=>candidate.splatScene.diagnostics()});root.add(candidate.splatScene.root);}
   for(const b of descriptor.boxes)candidate.colliders.addBox(new Vector3(...b.center),new Vector3(...b.half),0,{walkable:b.walkable,solid:b.solid,tag:b.id});
   if(project.nativeIsland){candidate.nativeIsland=await buildWebGLNativeIsland({project,root,camera,options:options.nativeIsland??{}});candidate.terrain=candidate.nativeIsland.data;candidate.query=candidate.nativeIsland.query;candidate.backendQualification=candidate.nativeIsland.stats();const update=root.userData.updateWebGL;root.userData.updateWebGL=t=>{update(t);candidate.nativeIsland.query.setTime(t);};}
-  else {const ground=terrainGeometry(project);root.add(new T.Mesh(ground,await terrainMaterial(project,ground)));}
+  else if(!project.splatScene){const ground=terrainGeometry(project);root.add(new T.Mesh(ground,await terrainMaterial(project,ground)));}
   const generatedAssets=landscapeAssets(project),allObjects=[...project.objects,...generatedAssets],matrices=resolveWorldMatrices(allObjects);candidate.matrices=matrices;
   const add=(parent,geometry,color)=>parent.add(new T.Mesh(geometry,standard(color)));
   for(const object of project.objects){
@@ -139,7 +142,7 @@ export async function buildWebGLRepositoryScene(descriptor,camera,options={}){
    });for(const object of objects)candidate.assets.push({objectId:object.id,primitives,kind,backend:'webgl2'});
   }
   candidate.assetBatchCount=groups.size;if(!project.nativeIsland){candidate.forest=forest(project,matrices,time);root.add(candidate.forest);}
-  const water=project.nativeIsland?null:sea(project,time);if(water)root.add(water);
+  const water=project.nativeIsland||project.splatScene?null:sea(project,time);if(water)root.add(water);
   for(const feature of project.features??[]){if(feature.visible===false)continue;for(const part of buildFeatureGeometry(feature,project)){const wet=['water','foam'].includes(part.semantic);root.add(new T.Mesh(part.geometry,standard(part.color,wet?{roughness:.22,transparent:true,opacity:.9,metalness:.1}:{})));}}
   const landscape=buildRepositoryLandscape(project);root.add(landscape);candidate.landscape=landscape;candidate.landscapeCollisions=addLandscapeCollisions(project,candidate.colliders);const update=root.userData.updateWebGL;root.userData.updateWebGL=t=>{update(t);landscape.userData.updateLandscape(t);};
   candidate.traffic=await buildRepositoryTraffic(project,candidate);

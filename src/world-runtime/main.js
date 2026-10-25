@@ -39,6 +39,10 @@ import { localRepositorySource } from './LocalRepositoryFiles.js';
 import { RepositorySession } from './RepositorySession.js';
 import { RepositoryWorldHost } from './RepositoryWorldHost.js';
 import {RefractionPass,REFRACTION_PREPARE_DEFINES} from '../ocean/RefractionPass.js';
+import {resolveInstallationMode} from './InstallationMode.js';
+import {PublicPortalRuntime} from './PublicPortalRuntime.js';
+import {repositorySceneOptions} from './RepositorySceneOptions.js';
+import {withSplatMovementBoundary} from './SplatMovementBoundary.js';
 import { RepositoryPortalRuntime } from './RepositoryPortalRuntime.js';
 import {OwnerObjectAccessClient,canResumeObjectInteraction} from './OwnerObjectAccessClient.js';
 import {WorldWelcomeController,WorldWelcomeView,LocalWelcomeSpeech,validWorldWelcome} from './WorldWelcome.js';
@@ -55,8 +59,9 @@ const report=message=>{status.textContent=message;};
 const hideOpeningSplash=()=>{if(openingSplash)openingSplash.hidden=true;};
 document.querySelector('#opening-recover')?.addEventListener('click',hideOpeningSplash);
 async function init(){
+ const installation=await resolveInstallationMode();
  const container=document.querySelector('#app');let attempted;
- const selected=await initializeRenderBackend({webgpu:async()=>{if(new URLSearchParams(location.search).get('renderer')==='webgl2')throw Error('WebGL2 selected');attempted=new Engine(container);attempted.maxOutputPixels=1000000;await attempted.init();attempted.meshRenderer.syncPipelines=true;attempted.backend='webgpu';return attempted;},webgl2:async()=>{attempted?.stop();attempted?.canvas?.remove();GPU.device?.destroy();return createWebGLRepositoryEngine(container);}});
+ const selected=await initializeRenderBackend({webgpu:async()=>{if(installation.kind==='published'||new URLSearchParams(location.search).get('renderer')==='webgl2')throw Error('WebGL2 selected');attempted=new Engine(container);attempted.maxOutputPixels=1000000;await attempted.init();attempted.meshRenderer.syncPipelines=true;attempted.backend='webgpu';return attempted;},webgl2:async()=>{attempted?.stop();attempted?.canvas?.remove();GPU.device?.destroy();return createWebGLRepositoryEngine(container);}});
  const engine=selected.value,isWebGL=selected.backend==='webgl2';
  openingProgress.advance('renderer-ready');
  let openingLoading=false,pendingOpeningReady=null,openingTargetWorldId=null,openingTargetDigest=null,openingExpectedGeneration=null;
@@ -73,7 +78,7 @@ async function init(){
   const {WebGLPortalViews}=await import('./WebGLPortalViews.js');
   configureWebGLRepositoryScene(engine.scene);
   engine.repositoryReadinessSignature=webGLRepositoryReadinessSignature;engine.prepareRepositoryResources=root=>prepareWebGLRepositoryResources({renderer:engine.renderer,camera:engine.camera,root,targetScene:engine.scene});
-  const buildGL=(descriptor,camera,{loaded}={})=>buildWebGLRepositoryScene(descriptor,camera,nativeIslandSceneOptions(descriptor.project,loaded));
+  const buildGL=async(descriptor,camera,{loaded}={})=>{const candidate=await buildWebGLRepositoryScene(descriptor,camera,repositorySceneOptions(descriptor.project,loaded,{renderer:engine.renderer,backend:'webgl2'}));try{if(candidate.splatScene){candidate.terrain=withSplatMovementBoundary(candidate.splatScene.physics);const warm=camera.clone();warm.position.fromArray(descriptor.project.spawn.position);warm.position.y+=1.62;warm.rotation.set(candidate.splatScene.physics.qualification.spawn.pitch??0,descriptor.project.spawn.yaw,0,'YXZ');warm.updateMatrixWorld(true);await candidate.splatScene.prepareResources(warm);}return candidate;}catch(error){disposeWebGLRepositoryScene(candidate);throw error;}};
   backendHost={buildCandidate:buildGL,disposeCandidate:disposeWebGLRepositoryScene,buildNeon:buildWebGLNeon};
   backendPortals={buildScene:buildGL,disposeCandidate:disposeWebGLRepositoryScene,createPeerLayer:(scene,id)=>createWebGLRepositoryPeerLayer(scene,id,engine.prepareRepositoryResources),addPortalFrame:addWebGLPortalFrame,views:new WebGLPortalViews({engine,mainCamera:engine.camera,configureScene:configureWebGLRepositoryScene})};
   renderer=engine.renderer;
@@ -104,13 +109,28 @@ async function init(){
  }});
  document.querySelector('#terminal-close').onclick=()=>{terminal.close();engine.canvas.focus();};
  let arrivals;
- const portals=new RepositoryPortalRuntime({onPresence:packet=>arrivals?.receive(packet),onActivated:active=>arrivals?.activated(active),engine,host,input,...backendPortals,getAppearance:()=>app.avatarChooser?.value??loadAppearance(),onStatus:s=>{document.querySelector('#portal-status').textContent=s;}});
+ const portalOptions={onPresence:packet=>arrivals?.receive(packet),onActivated:active=>arrivals?.activated(active),engine,host,input,...backendPortals,getAppearance:()=>app.avatarChooser?.value??loadAppearance(),onStatus:s=>{document.querySelector('#portal-status').textContent=s;}};
+ const portals=installation.kind==='published'?new PublicPortalRuntime({...portalOptions,catalog:installation.catalog}):new RepositoryPortalRuntime(portalOptions);
  objectAccess=new OwnerObjectAccessClient({getContext:()=>{const t=portals.transport,a=host.active;return {transport:t,active:a,connection:t.connectionEpoch,worldId:a?.identity.worldId,contentDigest:a?.identity.contentDigest,sessionId:t.membership?.sessionId,generation:t.generation,authorityEpoch:t.membership?.world?.epoch,ready:ownerMode()&&portals.connected&&!portals.pending&&!portals.authorityOffline&&!t.closed&&!t.frozen&&t.worldId===a?.identity.worldId};},onLost:()=>{media?.exit();if(terminal.open)terminal.close();retro.clear({resume:false});if(canResume())input.resume();interactionContext=null;activeComputerId=null;document.querySelector('#computer-controls').textContent='Access restricted';},onSnapshot:snapshot=>{accessPanel?.render(snapshot);if(snapshot?.overlay)host.setRuntimeOverlay(snapshot.overlay);if(controlsHelp?.open)controlsHelp.render();}});
  accessPanel=new ObjectAccessPanel({client:objectAccess,host,parent:document.querySelector('#panel'),onStatus:report});
+ if(installation.kind==='published'){
+  accessPanel.root.hidden=true;document.querySelector('#session-url')?.closest('details')?.setAttribute('hidden','');document.querySelector('#coordinator-controls').hidden=true;
+  const list=document.querySelector('#player-tips ul');if(list){list.replaceChildren();for(const tip of [
+   'WASD to walk, Space to jump and Shift to run. On a phone or tablet, use the movement, look, jump and Use controls.',
+   'Drag the mouse or use arrow keys to look. Press V to switch between first-person and follow view.',
+   'Find the gold Sunset doorway beside the Dock portal in the warehouse. Move around it to see Sunset, then walk through when its view is ready.',
+   'In Sunset, keep to the lawn near the doorway. Walk a few steps forward, then turn around and walk through the same doorway to return to the warehouse.',
+   'The Dock doorway keeps its existing appearance; this single-player tour connects only the gold Sunset doorway.',
+   'Press E near a computer. At the TV, press E, then Play on TV. Return to game keeps it playing; press E again to control or stop it. Using a computer stops the TV.',
+   'This is a public single-player tour. No owner connection or visitor permission setup is needed.',
+   'Open world remains available if you want to leave the tour and open another repository.'
+  ]){const item=document.createElement('li');item.textContent=tip;list.append(item);}}
+ }
+
  let panelInputContext=null,helpInputContext=null;
  const resumeUI=context=>{if(canResumeObjectInteraction(context,{active:host.active,hostGeneration:host.generation,pending:portals.pending,authorityOffline:portals.authorityOffline,transport:portals.transport,connected:portals.connected,ownerMode:ownerMode()}))input.resume();};
  accessPanel.root.addEventListener('toggle',()=>{if(accessPanel.root.open){panelInputContext=interactionState();input.suspend();document.exitPointerLock?.();}else{resumeUI(panelInputContext);panelInputContext=null;}});
- controlsHelp=new ObjectControlsHelp({replayWelcome:()=>worldWelcome?.replay(),hasWelcome:()=>validWorldWelcome(host.active?.project.welcome),getProject:()=>host.active?.project,getSnapshot:()=>objectAccess.snapshot,getPlayerNodeId:()=>portals.transport.identity?.nodeId,isFresh:()=>!!objectAccess.snapshot&&objectAccess.same(objectAccess.snapshot.context)&&objectAccess.snapshot.expiresAt>Date.now(),canOpen:()=>!terminal.open&&!retro.active&&!media?.controlsOpen&&!accessPanel.root.open,onOpen:()=>{helpInputContext=interactionState();input.suspend();},onClose:()=>{resumeUI(helpInputContext);helpInputContext=null;}});
+ controlsHelp=new ObjectControlsHelp({replayWelcome:()=>worldWelcome?.replay(),hasWelcome:()=>validWorldWelcome(host.active?.project.welcome),getProject:()=>host.active?.project,getSnapshot:()=>objectAccess.snapshot,getPlayerNodeId:()=>portals.transport.identity?.nodeId,isFresh:()=>!!objectAccess.snapshot&&objectAccess.same(objectAccess.snapshot.context)&&objectAccess.snapshot.expiresAt>Date.now(),canOpen:()=>installation.kind!=='published'&&!terminal.open&&!retro.active&&!media?.controlsOpen&&!accessPanel.root.open,onOpen:()=>{helpInputContext=interactionState();input.suspend();},onClose:()=>{resumeUI(helpInputContext);helpInputContext=null;}});
  async function openComputer(computer,active,device=null){
   if(interactionPending||terminal.open||retro.active||media?.controlsOpen)return;media?.exit();interactionPending=true;
   try{
@@ -119,7 +139,7 @@ async function init(){
    activeComputerId=computer.id;interactionContext=interactionState();
    const retroDevice=device??active.project.terminals?.find(t=>t.objectId===computer.id&&t.kind==='c64');
    if(retroDevice){retro.open(retroDevice);return;}
-   input._clearTransientInput();document.exitPointerLock?.();document.querySelector('#computer-info').textContent='Computer '+computer.id+' · '+(ownerMode()?'Owner session':'Local preview')+' · sign '+(computer.computer.targetSignId??'not assigned');
+   input._clearTransientInput();document.exitPointerLock?.();document.querySelector('#computer-info').textContent='Computer '+computer.id+' · '+(ownerMode()?'Owner session':installation.kind==='published'?'Single player':'Local preview')+' · sign '+(computer.computer.targetSignId??'not assigned');
    document.querySelector('#computer-controls').textContent='';terminal.showModal();window.dispatchEvent(new CustomEvent('repository-computer',{detail:{computer,active}}));
   }catch(error){report(error.message);}finally{interactionPending=false;}
  }
@@ -158,7 +178,7 @@ async function init(){
  host.beforeActivate=async()=>{media?.exit();worldWelcome?.reset();objectAccess.invalidate();controlsHelp.close();accessPanel.root.open=false;accessPanel.render(null);if(retro.active)retro.clear();document.querySelector('#apply-update').disabled=true;document.querySelector('#update-status').textContent='';app.session?.disconnect();if(terminal.open)terminal.close();};
  const makeSession=()=>new RepositorySession(host,{trustedOwners:new Set([document.querySelector('#session-url').value.trim()]),onStatus:value=>sessionStatus.textContent=value});
  document.querySelector('#session-identity').onclick=()=>void(async()=>{const session=app.session??makeSession();document.querySelector('#public-identity').textContent=JSON.stringify(await session.publicIdentity(),null,2);})().catch(error=>sessionStatus.textContent=error.message);
- document.querySelector('#session-connect').onclick=()=>void(async()=>{const file=document.querySelector('#admission').files[0];if(!file||file.size>100000)throw Error('Select an operator admission JSON under 100 KB.');const proof=JSON.parse(await file.text());app.session?.disconnect();app.session=makeSession();await app.session.connect(proof);})().catch(error=>sessionStatus.textContent=error.message);
+ document.querySelector('#session-connect').onclick=()=>void(async()=>{const file=document.querySelector('#admission').files[0];if(!file||file.size>100000)throw Error('Select an operator admission JSON under 100 KB.');const proof=JSON.parse(await file.text());if(portals.mode==='published')portals.disconnect();app.session?.disconnect();app.session=makeSession();await app.session.connect(proof);})().catch(error=>sessionStatus.textContent=error.message);
  document.querySelector('#session-disconnect').onclick=()=>app.session?.disconnect();
  window.addEventListener('repository-computer',event=>{
   const target=event.detail.computer.computer.targetSignId,controls=document.querySelector('#computer-controls');controls.textContent='';
@@ -213,7 +233,7 @@ async function init(){
  document.querySelector('#panel-toggle').onclick=()=>{document.querySelector('#panel').hidden=true;engine.canvas.focus();};
  window.addEventListener('keydown',event=>{if(event.code==='KeyH'&&!retro.active&&!terminal.open)document.querySelector('#panel').hidden=!document.querySelector('#panel').hidden;});
  document.querySelector('#portal-connect').onclick=()=>void connectOpening().catch(error=>{document.querySelector('#portal-status').textContent=error.message;});
- async function connectOpening(){const response=await fetch('/runtime-config',{credentials:'same-origin',cache:'no-store'});if(response.status===404)return false;if(!response.ok)throw Error('World runtime configuration unavailable ('+response.status+').');const config=await response.json();if(!['elsemesh.repository-runtime/1','elsemesh.owner-runtime/1'].includes(config.protocol)||!Array.isArray(config.trustedOwners)||config.endpoint!=='/__worlds')throw Error('Unsupported runtime installation configuration');await portals.connect(config);return true;}
+ async function connectOpening(){if(installation.kind!=='network')return false;await portals.connect(installation.runtimeConfig);return true;}
  document.querySelector('#choose-world').onclick=()=>{const tools=document.querySelector('#repository-tools');tools.hidden=!tools.hidden;};
  const openingGeneration=host.generation;
  void (async()=>{
@@ -221,12 +241,12 @@ async function init(){
   openingProgress.advance('reading-world');
   const config=await readOpeningWorld();if(!config){hideOpeningSplash();return;}if(host.generation!==openingGeneration)return;
   openingLoading=true;openingTargetWorldId=config.worldId;openingTargetDigest=config.contentDigest;openingExpectedGeneration=openingGeneration+1;
-  report('Loading published opening island…');
-  const active=await loadOpeningWorld(app,config,{onProgress:stage=>{if(openingLoading&&host.generation<=openingExpectedGeneration)openingProgress.advance(stage);}});if(!active)return;
+  report(installation.kind==='published'?'Loading Warehouse and Sunset single-player tour…':'Loading published opening island…');
+  const active=await loadOpeningWorld(app,config,{publishedCatalog:installation.kind==='published'?installation.catalog:null,onProgress:stage=>{if(openingLoading&&host.generation<=openingExpectedGeneration)openingProgress.advance(stage);}});if(!active)return;
   pendingOpeningReady=active;
   document.querySelector('#repository-tools').hidden=true;document.querySelector('#choose-world').hidden=false;document.querySelector('#coordinator-controls').hidden=true;
   document.querySelector('#panel h1').textContent=active.project.metadata.name;
-  report('Published island · revision '+(active.identity.resolvedCommit??validateOpeningWorld(config).source.ref).slice(0,12)+' · '+selected.backend);
+  if(installation.kind==='published'){report('Warehouse and Sunset · single player');document.querySelector('#portal-status').textContent='Walk through the gold Sunset door beside the Dock portal. Return through the doorway in Sunset.';}else report('Published island · revision '+(active.identity.resolvedCommit??validateOpeningWorld(config).source.ref).slice(0,12)+' · '+selected.backend);
  })().catch(error=>{openingProgress.fail(error.message);report('Opening world could not load: '+error.message);document.querySelector('#portal-status').textContent='Opening world unavailable. Retry by reloading, or choose a repository.';});
  window.addEventListener('pagehide',()=>{media.dispose();refraction?.dispose();objectAccess.invalidate();worldWelcome.dispose();welcomeView.dispose();controlsHelp.dispose();portals.dispose();portalEffects.dispose();retro.dispose();avatar.dispose();host.dispose();engine.stop();if(isWebGL)engine.dispose();else GPU.device?.destroy();});report('ElseMesh '+selected.backend+' ready. Open a world repository folder or public GitHub source.');
  window.dispatchEvent(new CustomEvent('repository-world-ready',{detail:app}));

@@ -133,6 +133,8 @@ export class Player {
 
 	update( dt ) {
 
+		this.terrain.assertMovementMode?.( this.mode );
+
 		const inp = this.input;
 		this.query.setPoint( this.slot, this.position.x, this.position.z );
 		this.waterH = this.waterHeight();
@@ -236,6 +238,10 @@ export class Player {
 		// Measure a grounded step from the accepted feet height, before this frame's gravity.
 		const stepHeight = this.grounded ? 0.4 + Math.max( 0, old.y - p.y ) : 0.4;
 		this.colliders.resolveCapsule( p, RADIUS, HEIGHT, stepHeight );
+        // Validate the FINAL displacement: solid resolution can push X/Z too.
+        if ( this.terrain.constrainPlayer?.( old, p, { radius: RADIUS, height: HEIGHT, mode: this.mode } ) === false ) {
+            this.velocity.x = 0; this.velocity.z = 0;
+        }
 		if ( this.landOnBoat( old, p ) ) return;
 		const g = this.groundAt( p.x, p.z, p.y + 0.45 );
 		if ( p.y <= g ) {

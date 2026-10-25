@@ -43,3 +43,5 @@ test('return-trip restoration requires fresh VIEW and denied subscription cannot
  views.restore({identity:{worldId:'source'}},entries);assert.equal(e.authorizedView,false);assert.equal(e.hasImage,false);assert.equal(e.candidate,null);assert.equal(root.parent,null);assert.equal(e.target,target);
  views.render({width:640,height:480});assert.equal(draws,1);assert.equal(e.aperture.userData.portalViewState,'loading');views.setState('return','restricted');views.render({width:640,height:480});assert.equal(draws,1);assert.equal(e.aperture.userData.portalViewState,'restricted');views.dispose();
 });
+
+test('ordinary portal targets use physical dimensions divided by pixel ratio and restore live state',()=>{const {views,renderer:r}=setup();r.getPixelRatio=()=>2;const before=r.viewport.clone();views.setDestination('dpr2',{candidate:{root:new T.Group()},authorizedView:true,source:pose(),destination:pose([10,0,0]),state:'live'});let viewport; r.render=()=>{viewport=r.viewport.clone();};views.render({width:1600,height:900});assert.deepEqual(viewport.toArray(),[0,0,256,144]);assert.deepEqual(r.viewport,before);views.dispose();});

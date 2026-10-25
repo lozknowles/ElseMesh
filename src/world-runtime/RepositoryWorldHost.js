@@ -60,6 +60,7 @@ export class RepositoryWorldHost {
    if(!player.position.toArray().every(Number.isFinite))throw Error('World spawn is not finite.');
    const probe=player.position.clone();candidate.colliders.resolveCapsule(probe,.3,1.75,pose ? .001 : .4);
    if(!probe.toArray().every(Number.isFinite)||probe.distanceTo(player.position)>(pose ? .001 : .05))throw Error(pose?'World arrival intersects solid geometry.':'World spawn intersects solid geometry.');
+   candidate.terrain.assertPlayerPose?.(player.position,{mode:player.mode,arrival:true});
    // Prepare view state directly: Player.update would consume live input and may adjust an arrival.
    camera.position.copy(player.position);camera.position.y+=1.62;
    camera.quaternion.setFromEuler(new Euler(player.pitch,player.yaw,0,'YXZ'));camera.updateMatrixWorld();

@@ -40,11 +40,13 @@ export async function readOpeningWorld({fetcher=fetch,baseURL=location.href}={})
   throw error;
  }
 }
-export async function loadOpeningWorld(app,config,{fetcher=fetch,baseURL=location.href,onProgress=()=>{}}={}){
+export async function loadOpeningWorld(app,config,{fetcher=fetch,baseURL=location.href,onProgress=()=>{},publishedCatalog=null}={}){
  const progress=stage=>{try{onProgress(stage);}catch(error){console.warn('Opening progress callback failed',error);}};
  const generation=app.host.generation;
- const {source,bundled}=validateOpeningWorld(config);
- const pinned=bundled?hostedRepositorySource(config.bundlePath,{baseURL,origin:new URL(baseURL).origin,fetch:fetcher}):await resolveGitHubWorldSource(source);
+ const {source,bundled:configuredBundle}=validateOpeningWorld(config),entry=publishedCatalog?.worlds.find(w=>w.worldId===config.worldId);
+ if(publishedCatalog&&(publishedCatalog.openingWorldId!==config.worldId||entry?.contentDigest!==config.contentDigest))throw Error('Opening world and published catalog disagree.');
+ const bundled=!!entry||configuredBundle;
+ const pinned=bundled?hostedRepositorySource(entry?.bundlePath??config.bundlePath,{baseURL,origin:new URL(baseURL).origin,fetch:fetcher}):await resolveGitHubWorldSource(source);
  const manifestURL=bundled?null:`https://raw.githubusercontent.com/${pinned.owner}/${pinned.repository}/${pinned.commit}/${pinned.path?pinned.path+'/':''}world.json`;
  const bytes=bundled?await pinned.read('world.json',MAX_MANIFEST_BYTES):await boundedBytes(manifestURL,MAX_MANIFEST_BYTES,fetcher,{error:'Published world manifest is unavailable.'});
  if(await repositoryDigest(bytes)!==config.contentDigest)throw Error('World manifest does not match the deployment pin.');

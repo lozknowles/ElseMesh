@@ -4,7 +4,8 @@ import {spawnSync} from 'node:child_process';
 import {validateOpeningWorld} from '../src/world-runtime/OpeningWorld.js';
 import {loadWorldSource,repositoryDigest} from '../src/world-runtime/vendor/world-engine-contract.js';
 
-const [buildArg,worldArg,outputArg]=process.argv.slice(2);
+const [buildArg,worldArg,outputArg,bundlePath='worlds/loz-opening/']=process.argv.slice(2);
+if(!/^worlds\/[a-z0-9][a-z0-9-]{0,63}\/$/.test(bundlePath))throw Error('Invalid opening bundle path');
 if(!buildArg||!worldArg||!outputArg)throw Error('Usage: node tools/package-opening-world.mjs BUILD PINNED_PUBLIC_WORLD_REPOSITORY NEW_OUTPUT_DIRECTORY');
 const build=await fs.realpath(path.resolve(buildArg)),world=await fs.realpath(path.resolve(worldArg));
 const requestedOutput=path.resolve(outputArg);
@@ -59,12 +60,12 @@ for(const name of characterFiles)await inspect(path.join(build,'models/character
 await fs.mkdir(output);
 for(const name of buildFiles){const target=path.join(output,name);await fs.mkdir(path.dirname(target),{recursive:true});await fs.cp(path.join(build,name),target,{recursive:true,force:false,errorOnExist:true});}
 for(const name of characterFiles){const target=path.join(output,'models/characters',name);await fs.mkdir(path.dirname(target),{recursive:true});await fs.copyFile(path.join(build,'models/characters',name),target);}
-const worldTarget=path.join(output,'worlds/loz-opening');await fs.mkdir(worldTarget,{recursive:true});
+const worldTarget=path.join(output,bundlePath);await fs.mkdir(worldTarget,{recursive:true});
 for(const relative of selected){const target=path.join(worldTarget,relative);await fs.mkdir(path.dirname(target),{recursive:true});await fs.copyFile(path.join(world,relative),target);}
 await fs.copyFile(new URL('../public/opening-credits.html',import.meta.url),path.join(output,'credits.html'));
 const notices=[['LICENSE','LICENSE'],['src/world-runtime/vendor/THREE-LICENSE.txt','licenses/THREE-LICENSE.txt'],['src/world-runtime/vendor/FONT-LICENSE.txt','licenses/FONT-LICENSE.txt'],['src/world-runtime/vendor/ESBUILD-LICENSE.txt','licenses/ESBUILD-LICENSE.txt'],['src/vendor/basic-m6502/LICENSE','licenses/BASIC-M6502-LICENSE.txt']];
 for(const [from,to] of notices){const target=path.join(output,to);await fs.mkdir(path.dirname(target),{recursive:true});await fs.copyFile(new URL('../'+from,import.meta.url),target);}
-await fs.writeFile(path.join(output,'opening-world.json'),JSON.stringify({...config,schema:'elsemesh.opening-world/2',bundlePath:'worlds/loz-opening/'},null,2)+'\n');
+await fs.writeFile(path.join(output,'opening-world.json'),JSON.stringify({...config,schema:'elsemesh.opening-world/2',bundlePath},null,2)+'\n');
 await fs.copyFile(new URL('./serve-opening-world.mjs',import.meta.url),path.join(output,'start-local.mjs'));
 await fs.writeFile(path.join(output,'.nojekyll'),'');
 console.log(JSON.stringify({worldId:config.worldId,repositoryCommit:source.ref,contentDigest:config.contentDigest,worldFiles:selected.length,worldBytes:total,output}));

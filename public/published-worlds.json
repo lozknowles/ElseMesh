@@ -1,0 +1,31 @@
+{
+  "schema": "elsemesh.published-world-catalog/1",
+  "renderer": "webgl2",
+  "openingWorldId": "elsemesh.world:2842c4f2-93a0-4492-b942-e53e524de319",
+  "worlds": [
+    {
+      "worldId": "elsemesh.world:2842c4f2-93a0-4492-b942-e53e524de319",
+      "contentDigest": "fcba18b28ac9b8bf7ef52a1fc8ba0d3dc489d0bd4c94c651cdc559a7617a0e5d",
+      "bundlePath": "worlds/fcba18b28ac9b8bf7ef52a1fc8ba0d3dc489d0bd4c94c651cdc559a7617a0e5d/"
+    },
+    {
+      "worldId": "elsemesh.world:0934ce76-df15-406f-914e-74209d48accf",
+      "contentDigest": "3d904b583d30a198311e0b64248b93c689cf6c2442259964f822794346778992",
+      "bundlePath": "worlds/3d904b583d30a198311e0b64248b93c689cf6c2442259964f822794346778992/"
+    }
+  ],
+  "routes": [
+    {
+      "sourceWorldId": "elsemesh.world:2842c4f2-93a0-4492-b942-e53e524de319",
+      "portalId": "elsemesh-portal:3b1b0e2d-bb73-4660-b916-2edf7678699a",
+      "destinationWorldId": "elsemesh.world:0934ce76-df15-406f-914e-74209d48accf",
+      "destinationPortalId": "elsemesh-portal:972286d8-9a0b-41c1-b100-1fe35fdf935d"
+    },
+    {
+      "sourceWorldId": "elsemesh.world:0934ce76-df15-406f-914e-74209d48accf",
+      "portalId": "elsemesh-portal:972286d8-9a0b-41c1-b100-1fe35fdf935d",
+      "destinationWorldId": "elsemesh.world:2842c4f2-93a0-4492-b942-e53e524de319",
+      "destinationPortalId": "elsemesh-portal:3b1b0e2d-bb73-4660-b916-2edf7678699a"
+    }
+  ]
+}

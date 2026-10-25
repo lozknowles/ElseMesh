@@ -1,3 +1,4 @@
+import {managedSparkTextureIdentity} from './SplatReadinessContract.js';
 import {T} from './vendor/world-engine-contract.js';
 /** Real tiny offscreen draws initialize both global-clipping program variants.
  * Renderer flags and root ownership are restored synchronously before any await.
@@ -29,14 +30,14 @@ const textureIdentity=t=>t?.isTexture?[t.id,t.mapping,t.channel,t.colorSpace,t.f
  * Per-frame transforms, ordinary uniforms and renderer-owned versions are excluded.
  */
 export function webGLRepositoryReadinessSignature(candidate){
- const nodes=[];candidate.root.traverse(node=>{
+ const nodes=[];try{candidate.root.traverse(node=>{
   if(!node.material)return;const geometry=node.geometry;
   const features={instanced:!!node.isInstancedMesh,skinned:!!node.isSkinnedMesh,batched:!!node.isBatchedMesh,attributes:Object.entries(geometry?.attributes??{}).map(([key,a])=>[key,a.itemSize,a.normalized,a.array?.constructor.name]).sort(),morph:Object.entries(geometry?.morphAttributes??{}).map(([key,a])=>[key,a.length,a[0]?.itemSize]).sort(),relative:geometry?.morphTargetsRelative};
   const materials=(Array.isArray(node.material)?node.material:[node.material]).map(m=>{
    if(!supportedMaterialTypes.has(m.type))throw Error('WebGL material requires explicit preparation support: '+m.type);
    const flags=Object.fromEntries(programFlags.map(k=>[k,m[k]])),textures=Object.entries(m).filter(([k,v])=>k==='map'||k.endsWith('Map')&&v?.isTexture).map(([k,v])=>[k,textureIdentity(v)]).sort();
-   const uniformTextures=Object.entries(m.uniforms??{}).filter(([,u])=>u?.value?.isTexture).map(([k,u])=>[k,textureIdentity(u.value)]).sort();
+   const uniformTextures=Object.entries(m.uniforms??{}).filter(([,u])=>u?.value?.isTexture).map(([k,u])=>[k,managedSparkTextureIdentity(candidate,node,m,k,u.value,textureIdentity(u.value))]).sort();
    return {id:m.id,type:m.type,flags,textures,uniformTextures,defines:Object.entries(m.defines??{}).sort(),vertexShader:m.vertexShader,fragmentShader:m.fragmentShader,cacheKey:m.customProgramCacheKey?.(),compileHook:functionIdentity(m.onBeforeCompile)};
   });nodes.push({features,materials});
- });return JSON.stringify({contract:'repository-webgl/main+global-clip+double-side/1',nodes});
+ });}catch(error){if(error?.reason){error.signatureCallSites=(new Error().stack??'').split('\n').slice(1,5).map(line=>line.trim().replace(/\?[^ )]*/g,''));error.message+=' Signature caller '+JSON.stringify(error.signatureCallSites);}throw error;}return JSON.stringify({contract:'repository-webgl/main+global-clip+double-side/1',nodes});
 }

@@ -12148,9 +12148,9 @@ var Mesh = class extends Object3D {
   updateMorphTargets() {
     const geometry = this.geometry;
     const morphAttributes = geometry.morphAttributes;
-    const keys5 = Object.keys(morphAttributes);
-    if (keys5.length > 0) {
-      const morphAttribute = morphAttributes[keys5[0]];
+    const keys6 = Object.keys(morphAttributes);
+    if (keys6.length > 0) {
+      const morphAttribute = morphAttributes[keys6[0]];
       if (morphAttribute !== void 0) {
         this.morphTargetInfluences = [];
         this.morphTargetDictionary = {};
@@ -15751,19 +15751,19 @@ var BatchedMesh = class extends Mesh {
     colorsTexture.colorSpace = ColorManagement.workingColorSpace;
     this._colorsTexture = colorsTexture;
   }
-  _initializeGeometry(reference2) {
+  _initializeGeometry(reference3) {
     const geometry = this.geometry;
     const maxVertexCount = this._maxVertexCount;
     const maxIndexCount = this._maxIndexCount;
     if (this._geometryInitialized === false) {
-      for (const attributeName in reference2.attributes) {
-        const srcAttribute = reference2.getAttribute(attributeName);
+      for (const attributeName in reference3.attributes) {
+        const srcAttribute = reference3.getAttribute(attributeName);
         const { array, itemSize, normalized } = srcAttribute;
         const dstArray = new array.constructor(maxVertexCount * itemSize);
         const dstAttribute = new BufferAttribute(dstArray, itemSize, normalized);
         geometry.setAttribute(attributeName, dstAttribute);
       }
-      if (reference2.getIndex() !== null) {
+      if (reference3.getIndex() !== null) {
         const indexArray = maxVertexCount > 65535 ? new Uint32Array(maxIndexCount) : new Uint16Array(maxIndexCount);
         geometry.setIndex(new BufferAttribute(indexArray, 1));
       }
@@ -16708,9 +16708,9 @@ var Line = class extends Object3D {
   updateMorphTargets() {
     const geometry = this.geometry;
     const morphAttributes = geometry.morphAttributes;
-    const keys5 = Object.keys(morphAttributes);
-    if (keys5.length > 0) {
-      const morphAttribute = morphAttributes[keys5[0]];
+    const keys6 = Object.keys(morphAttributes);
+    if (keys6.length > 0) {
+      const morphAttribute = morphAttributes[keys6[0]];
       if (morphAttribute !== void 0) {
         this.morphTargetInfluences = [];
         this.morphTargetDictionary = {};
@@ -16896,9 +16896,9 @@ var Points = class extends Object3D {
   updateMorphTargets() {
     const geometry = this.geometry;
     const morphAttributes = geometry.morphAttributes;
-    const keys5 = Object.keys(morphAttributes);
-    if (keys5.length > 0) {
-      const morphAttribute = morphAttributes[keys5[0]];
+    const keys6 = Object.keys(morphAttributes);
+    if (keys6.length > 0) {
+      const morphAttribute = morphAttributes[keys6[0]];
       if (morphAttribute !== void 0) {
         this.morphTargetInfluences = [];
         this.morphTargetDictionary = {};
@@ -17997,7 +17997,7 @@ var EdgesGeometry = class extends BufferGeometry {
           const vecHash1 = hashes[jNext];
           const v0 = _triangle[vertKeys[j]];
           const v1 = _triangle[vertKeys[jNext]];
-          const hash2 = `${vecHash0}_${vecHash1}`;
+          const hash3 = `${vecHash0}_${vecHash1}`;
           const reverseHash = `${vecHash1}_${vecHash0}`;
           if (reverseHash in edgeData && edgeData[reverseHash]) {
             if (_normal.dot(edgeData[reverseHash].normal) <= thresholdDot) {
@@ -18005,8 +18005,8 @@ var EdgesGeometry = class extends BufferGeometry {
               vertices.push(v1.x, v1.y, v1.z);
             }
             edgeData[reverseHash] = null;
-          } else if (!(hash2 in edgeData)) {
-            edgeData[hash2] = {
+          } else if (!(hash3 in edgeData)) {
+            edgeData[hash3] = {
               index0: indexArr[j],
               index1: indexArr[jNext],
               normal: _normal.clone()
@@ -18230,7 +18230,7 @@ var Curve = class {
     const tangents = [];
     const normals = [];
     const binormals = [];
-    const vec3 = new Vector3();
+    const vec4 = new Vector3();
     const mat = new Matrix4();
     for (let i = 0; i <= segments; i++) {
       const u = i / segments;
@@ -18253,24 +18253,24 @@ var Curve = class {
     if (tz <= min) {
       normal.set(0, 0, 1);
     }
-    vec3.crossVectors(tangents[0], normal).normalize();
-    normals[0].crossVectors(tangents[0], vec3);
+    vec4.crossVectors(tangents[0], normal).normalize();
+    normals[0].crossVectors(tangents[0], vec4);
     binormals[0].crossVectors(tangents[0], normals[0]);
     for (let i = 1; i <= segments; i++) {
       normals[i] = normals[i - 1].clone();
       binormals[i] = binormals[i - 1].clone();
-      vec3.crossVectors(tangents[i - 1], tangents[i]);
-      if (vec3.length() > Number.EPSILON) {
-        vec3.normalize();
+      vec4.crossVectors(tangents[i - 1], tangents[i]);
+      if (vec4.length() > Number.EPSILON) {
+        vec4.normalize();
         const theta = Math.acos(clamp(tangents[i - 1].dot(tangents[i]), -1, 1));
-        normals[i].applyMatrix4(mat.makeRotationAxis(vec3, theta));
+        normals[i].applyMatrix4(mat.makeRotationAxis(vec4, theta));
       }
       binormals[i].crossVectors(tangents[i], normals[i]);
     }
     if (closed === true) {
       let theta = Math.acos(clamp(normals[0].dot(normals[segments]), -1, 1));
       theta /= segments;
-      if (tangents[0].dot(vec3.crossVectors(normals[0], normals[segments])) > 0) {
+      if (tangents[0].dot(vec4.crossVectors(normals[0], normals[segments])) > 0) {
         theta = -theta;
       }
       for (let i = 1; i <= segments; i++) {
@@ -20077,9 +20077,9 @@ var ExtrudeGeometry = class _ExtrudeGeometry extends BufferGeometry {
         const ahole = holes[h];
         vertices = vertices.concat(ahole);
       }
-      function scalePt2(pt, vec3, size) {
-        if (!vec3) console.error("THREE.ExtrudeGeometry: vec does not exist");
-        return pt.clone().addScaledVector(vec3, size);
+      function scalePt2(pt, vec4, size) {
+        if (!vec4) console.error("THREE.ExtrudeGeometry: vec does not exist");
+        return pt.clone().addScaledVector(vec4, size);
       }
       const vlen = vertices.length;
       function getBevelVec(inPt, inPrev, inNext) {
@@ -21483,12 +21483,12 @@ var WireframeGeometry = class extends BufferGeometry {
 };
 function isUniqueEdge(start, end, edges) {
   const hash1 = `${start.x},${start.y},${start.z}-${end.x},${end.y},${end.z}`;
-  const hash2 = `${end.x},${end.y},${end.z}-${start.x},${start.y},${start.z}`;
-  if (edges.has(hash1) === true || edges.has(hash2) === true) {
+  const hash22 = `${end.x},${end.y},${end.z}-${start.x},${start.y},${start.z}`;
+  if (edges.has(hash1) === true || edges.has(hash22) === true) {
     return false;
   } else {
     edges.add(hash1);
-    edges.add(hash2);
+    edges.add(hash22);
     return true;
   }
 }
@@ -32983,8 +32983,8 @@ function WebGLBindingStates(gl, attributes) {
       }
     }
   }
-  function vertexAttribPointer(index, size, type, normalized, stride, offset, integer4) {
-    if (integer4 === true) {
+  function vertexAttribPointer(index, size, type, normalized, stride, offset, integer5) {
+    if (integer5 === true) {
       gl.vertexAttribIPointer(index, size, type, stride, offset);
     } else {
       gl.vertexAttribPointer(index, size, type, normalized, stride, offset);
@@ -33011,7 +33011,7 @@ function WebGLBindingStates(gl, attributes) {
           const buffer = attribute.buffer;
           const type = attribute.type;
           const bytesPerElement = attribute.bytesPerElement;
-          const integer4 = type === gl.INT || type === gl.UNSIGNED_INT || geometryAttribute.gpuType === IntType;
+          const integer5 = type === gl.INT || type === gl.UNSIGNED_INT || geometryAttribute.gpuType === IntType;
           if (geometryAttribute.isInterleavedBufferAttribute) {
             const data = geometryAttribute.data;
             const stride = data.stride;
@@ -33037,7 +33037,7 @@ function WebGLBindingStates(gl, attributes) {
                 normalized,
                 stride * bytesPerElement,
                 (offset + size / programAttribute.locationSize * i) * bytesPerElement,
-                integer4
+                integer5
               );
             }
           } else {
@@ -33062,7 +33062,7 @@ function WebGLBindingStates(gl, attributes) {
                 normalized,
                 size * bytesPerElement,
                 size / programAttribute.locationSize * i * bytesPerElement,
-                integer4
+                integer5
               );
             }
           }
@@ -36796,8 +36796,8 @@ function WebGLLights(extensions) {
     state.ambient[0] = r;
     state.ambient[1] = g;
     state.ambient[2] = b;
-    const hash2 = state.hash;
-    if (hash2.directionalLength !== directionalLength || hash2.pointLength !== pointLength || hash2.spotLength !== spotLength || hash2.rectAreaLength !== rectAreaLength || hash2.hemiLength !== hemiLength || hash2.numDirectionalShadows !== numDirectionalShadows || hash2.numPointShadows !== numPointShadows || hash2.numSpotShadows !== numSpotShadows || hash2.numSpotMaps !== numSpotMaps || hash2.numLightProbes !== numLightProbes) {
+    const hash3 = state.hash;
+    if (hash3.directionalLength !== directionalLength || hash3.pointLength !== pointLength || hash3.spotLength !== spotLength || hash3.rectAreaLength !== rectAreaLength || hash3.hemiLength !== hemiLength || hash3.numDirectionalShadows !== numDirectionalShadows || hash3.numPointShadows !== numPointShadows || hash3.numSpotShadows !== numSpotShadows || hash3.numSpotMaps !== numSpotMaps || hash3.numLightProbes !== numLightProbes) {
       state.directional.length = directionalLength;
       state.spot.length = spotLength;
       state.rectArea.length = rectAreaLength;
@@ -36815,16 +36815,16 @@ function WebGLLights(extensions) {
       state.spotLightMap.length = numSpotMaps;
       state.numSpotLightShadowsWithMaps = numSpotShadowsWithMaps;
       state.numLightProbes = numLightProbes;
-      hash2.directionalLength = directionalLength;
-      hash2.pointLength = pointLength;
-      hash2.spotLength = spotLength;
-      hash2.rectAreaLength = rectAreaLength;
-      hash2.hemiLength = hemiLength;
-      hash2.numDirectionalShadows = numDirectionalShadows;
-      hash2.numPointShadows = numPointShadows;
-      hash2.numSpotShadows = numSpotShadows;
-      hash2.numSpotMaps = numSpotMaps;
-      hash2.numLightProbes = numLightProbes;
+      hash3.directionalLength = directionalLength;
+      hash3.pointLength = pointLength;
+      hash3.spotLength = spotLength;
+      hash3.rectAreaLength = rectAreaLength;
+      hash3.hemiLength = hemiLength;
+      hash3.numDirectionalShadows = numDirectionalShadows;
+      hash3.numPointShadows = numPointShadows;
+      hash3.numSpotShadows = numSpotShadows;
+      hash3.numSpotMaps = numSpotMaps;
+      hash3.numLightProbes = numLightProbes;
       state.version = nextVersion++;
     }
   }
@@ -41883,6 +41883,57 @@ var WebGLRenderer = class {
   }
 };
 
+// src/domain/splat-scene.ts
+var SPLAT_SCENE_SCHEMA = "elsemesh.splat-scene/1";
+var SPLAT_SCENE_CAPABILITY = "splat-scene/1";
+var MAX_SPLAT_SCENE_BYTES = 16 * 1024 * 1024;
+var MAX_SPLAT_PHYSICS_BYTES = 8 * 1024 * 1024;
+var MAX_SPLAT_COUNT = 1e6;
+var hash = (v) => typeof v === "string" && /^[a-f0-9]{64}$/.test(v);
+var record = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+var keys = (v, allowed) => Object.keys(v).length === allowed.length && Object.keys(v).every((k) => allowed.includes(k)) && allowed.every((k) => Object.hasOwn(v, k));
+var number = (v, min, max) => typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
+var integer = (v, min, max) => number(v, min, max) && Number.isSafeInteger(v);
+var vec = (v, max) => Array.isArray(v) && v.length === 3 && v.every((n) => number(n, -max, max));
+var isSplatSceneResourcePath = (path) => typeof path === "string" && /^splat-scenes\/[a-f0-9]{64}\.(sog|json)$/.test(path);
+function reference(v, extension, maximum, asset = false) {
+  return record(v) && keys(v, asset ? ["path", "sha256", "bytes", "count"] : ["path", "sha256", "bytes"]) && hash(v.sha256) && v.path === `splat-scenes/${v.sha256}.${extension}` && integer(v.bytes, 1, maximum) && (!asset || integer(v.count, 1, MAX_SPLAT_COUNT));
+}
+function validateSplatScene(value) {
+  if (value === void 0) return [];
+  if (!record(value) || !keys(value, ["schema", "asset", "physics", "transform", "scaleStatus", "provenance"]) || value.schema !== SPLAT_SCENE_SCHEMA) return ["Invalid splat scene schema or fields."];
+  if (!reference(value.asset, "sog", MAX_SPLAT_SCENE_BYTES, true) || !reference(value.physics, "json", MAX_SPLAT_PHYSICS_BYTES)) return ["Invalid splat scene resource path, hash, byte size or count."];
+  const t = value.transform;
+  if (!record(t) || !keys(t, ["position", "rotation", "scale"]) || !vec(t.position, 2e3) || !vec(t.rotation, Math.PI * 2) || !number(t.scale, 1e-6, 1e3) || value.scaleStatus !== "assumed-gameplay") return ["Invalid bounded splat scene transform or scale status."];
+  const p = value.provenance;
+  if (!record(p) || !keys(p, ["videoSha256", "plySha256", "reviewSha256", "qualificationSha256"]) || !Object.values(p).every(hash)) return ["Invalid splat scene provenance hashes."];
+  return [];
+}
+async function digest(bytes) {
+  const value = await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes));
+  return Array.from(new Uint8Array(value), (n) => n.toString(16).padStart(2, "0")).join("");
+}
+function createSplatSceneResourceReader(project, sourceRead) {
+  const errors = validateSplatScene(project.splatScene);
+  if (errors.length || !project.splatScene) throw Error(errors[0] ?? "World has no splat scene.");
+  const scene = structuredClone(project.splatScene), refs = new Map([scene.asset, scene.physics].map((r) => [r.path, r]));
+  const read = async (path, maxBytes) => {
+    const ref = refs.get(path);
+    if (!ref || !isSplatSceneResourcePath(path)) throw Error("Splat scene resource path is not admitted.");
+    if (!Number.isSafeInteger(maxBytes) || maxBytes < ref.bytes) throw Error("Splat scene resource exceeds caller byte limit.");
+    if (!sourceRead) throw Error("Private splat scene source unavailable. Reopen its authorized world repository.");
+    const supplied = await sourceRead(ref.path, ref.bytes);
+    if (!(supplied instanceof Uint8Array) || supplied.byteLength !== ref.bytes) throw Error("Splat scene resource hash or size mismatch.");
+    const bytes = Uint8Array.from(supplied);
+    if (await digest(bytes) !== ref.sha256) throw Error("Splat scene resource hash or size mismatch.");
+    return bytes;
+  };
+  return { read, readSog: () => read(scene.asset.path, scene.asset.bytes), readPhysicsBytes: () => read(scene.physics.path, scene.physics.bytes) };
+}
+function assertSplatSceneStandaloneExport(project) {
+  if (project.splatScene) throw Error("Splat scene resources require Save repository snapshot or Save repository copy with its authorized resource reader.");
+}
+
 // src/domain/media-screen.ts
 var MEDIA_SCREEN_SCHEMA = "elsemesh.media-screen/1";
 var YOUTUBE_VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
@@ -41927,36 +41978,36 @@ function validateSurfaceExclusions(value) {
 var NATIVE_ISLAND_SCHEMA = "elsemesh.native-island/1";
 var MAX_NATIVE_ISLAND_BYTES = 256 * 1024 * 1024;
 var NATIVE_ISLAND_SPECIES = ["palms", "trees", "bananas", "shrubs", "youngPalms", "ferns", "monsteras", "elephantEars", "heliconias", "strelitzias"];
-var record = (v) => !!v && typeof v === "object" && !Array.isArray(v);
-var keys = (v, allowed) => Object.keys(v).every((k) => allowed.includes(k)) && allowed.every((k) => Object.hasOwn(v, k));
-var number = (v, min = -1e7, max = 1e7) => typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
-var integer = (v, min, max) => number(v, min, max) && Number.isInteger(v);
-var pair = (v) => Array.isArray(v) && v.length === 2 && v.every((n) => number(n));
+var record2 = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+var keys2 = (v, allowed) => Object.keys(v).every((k) => allowed.includes(k)) && allowed.every((k) => Object.hasOwn(v, k));
+var number2 = (v, min = -1e7, max = 1e7) => typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
+var integer2 = (v, min, max) => number2(v, min, max) && Number.isInteger(v);
+var pair = (v) => Array.isArray(v) && v.length === 2 && v.every((n) => number2(n));
 var safeId = (v) => typeof v === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/.test(v);
 var channels = ["height", "normal", "splat", "rock", "sand", "path", "gully", "seagrass", "rubble", "scarp", "grass", "shore", "vegetation"];
 function spectrum(v) {
-  return record(v) && keys(v, ["scale", "windSpeed", "windDirection", "fetch", "spreadBlend", "swell", "peakEnhancement", "shortWavesFade"]) && Object.values(v).every((n) => number(n)) && number(v.scale, 0) && number(v.windSpeed, 0) && number(v.fetch, Number.EPSILON) && number(v.spreadBlend, 0, 1) && number(v.swell, 0, 1) && number(v.peakEnhancement, Number.EPSILON) && number(v.shortWavesFade, 0);
+  return record2(v) && keys2(v, ["scale", "windSpeed", "windDirection", "fetch", "spreadBlend", "swell", "peakEnhancement", "shortWavesFade"]) && Object.values(v).every((n) => number2(n)) && number2(v.scale, 0) && number2(v.windSpeed, 0) && number2(v.fetch, Number.EPSILON) && number2(v.spreadBlend, 0, 1) && number2(v.swell, 0, 1) && number2(v.peakEnhancement, Number.EPSILON) && number2(v.shortWavesFade, 0);
 }
 function validSea(v) {
-  if (!record(v)) return false;
+  if (!record2(v)) return false;
   const admitted = { ...v };
   delete admitted.surfaceExclusions;
-  if (!keys(admitted, ["level", "fft", "shore", "sim", "surface", "appearance"]) || !number(v.level, -2e3, 2e3) || Object.hasOwn(v, "surfaceExclusions") && validateSurfaceExclusions(v.surfaceExclusions).length) return false;
+  if (!keys2(admitted, ["level", "fft", "shore", "sim", "surface", "appearance"]) || !number2(v.level, -2e3, 2e3) || Object.hasOwn(v, "surfaceExclusions") && validateSurfaceExclusions(v.surfaceExclusions).length) return false;
   const { fft, shore, sim, surface, appearance } = v;
-  return record(fft) && keys(fft, ["cascades", "sizes", "depth", "local", "swell", "choppiness", "foamBias", "foamGain", "foamDecay", "foamAdd", "seed", "timeScale"]) && integer(fft.cascades, 1, 4) && Array.isArray(fft.sizes) && fft.sizes.length === fft.cascades && fft.sizes.every((n) => number(n, 1, 1e5)) && number(fft.depth, Number.EPSILON, 1e5) && spectrum(fft.local) && spectrum(fft.swell) && ["choppiness", "foamBias", "foamGain", "foamDecay", "foamAdd", "seed", "timeScale"].every((k) => number(fft[k])) && record(shore) && keys(shore, ["period", "amplitude", "variation", "gamma", "breakSpan", "curl", "runup", "enabled", "turbidity"]) && number(shore.enabled, 0, 1) && Object.entries(shore).every(([k, n]) => k === "enabled" || number(n)) && number(shore.period, Number.EPSILON) && number(shore.amplitude, 0) && number(shore.variation, 0, 1) && number(shore.gamma, Number.EPSILON) && number(shore.breakSpan, Number.EPSILON) && ["curl", "runup", "turbidity"].every((k) => number(shore[k], 0)) && record(sim) && keys(sim, ["center", "size", "res", "dryTime", "foamLife", "surfFoamLife", "residueLife", "foamGen", "depositGain"]) && pair(sim.center) && number(sim.size, 1, 1e5) && integer(sim.res, 8, 1024) && ["dryTime", "foamLife", "surfFoamLife", "residueLife", "foamGen", "depositGain"].every((k) => number(sim[k], 0, 1e5)) && record(surface) && keys(surface, ["amplitude", "slopeScale", "foamCoverage", "foamSharpness", "foamScale", "foamWeights"]) && ["amplitude", "slopeScale", "foamCoverage", "foamSharpness", "foamScale"].every((k) => number(surface[k], 0, 1e5)) && Array.isArray(surface.foamWeights) && surface.foamWeights.length === fft.cascades && surface.foamWeights.every((n) => number(n, 0, 2)) && record(appearance) && keys(appearance, ["swellDir", "reef"]) && record(appearance.swellDir) && keys(appearance.swellDir, ["x", "y"]) && Object.values(appearance.swellDir).every((n) => number(n, -1, 1)) && record(appearance.reef) && keys(appearance.reef, ["center", "radius"]) && record(appearance.reef.center) && keys(appearance.reef.center, ["x", "z"]) && Object.values(appearance.reef.center).every((n) => number(n)) && number(appearance.reef.radius, Number.EPSILON, 1e5);
+  return record2(fft) && keys2(fft, ["cascades", "sizes", "depth", "local", "swell", "choppiness", "foamBias", "foamGain", "foamDecay", "foamAdd", "seed", "timeScale"]) && integer2(fft.cascades, 1, 4) && Array.isArray(fft.sizes) && fft.sizes.length === fft.cascades && fft.sizes.every((n) => number2(n, 1, 1e5)) && number2(fft.depth, Number.EPSILON, 1e5) && spectrum(fft.local) && spectrum(fft.swell) && ["choppiness", "foamBias", "foamGain", "foamDecay", "foamAdd", "seed", "timeScale"].every((k) => number2(fft[k])) && record2(shore) && keys2(shore, ["period", "amplitude", "variation", "gamma", "breakSpan", "curl", "runup", "enabled", "turbidity"]) && number2(shore.enabled, 0, 1) && Object.entries(shore).every(([k, n]) => k === "enabled" || number2(n)) && number2(shore.period, Number.EPSILON) && number2(shore.amplitude, 0) && number2(shore.variation, 0, 1) && number2(shore.gamma, Number.EPSILON) && number2(shore.breakSpan, Number.EPSILON) && ["curl", "runup", "turbidity"].every((k) => number2(shore[k], 0)) && record2(sim) && keys2(sim, ["center", "size", "res", "dryTime", "foamLife", "surfFoamLife", "residueLife", "foamGen", "depositGain"]) && pair(sim.center) && number2(sim.size, 1, 1e5) && integer2(sim.res, 8, 1024) && ["dryTime", "foamLife", "surfFoamLife", "residueLife", "foamGen", "depositGain"].every((k) => number2(sim[k], 0, 1e5)) && record2(surface) && keys2(surface, ["amplitude", "slopeScale", "foamCoverage", "foamSharpness", "foamScale", "foamWeights"]) && ["amplitude", "slopeScale", "foamCoverage", "foamSharpness", "foamScale"].every((k) => number2(surface[k], 0, 1e5)) && Array.isArray(surface.foamWeights) && surface.foamWeights.length === fft.cascades && surface.foamWeights.every((n) => number2(n, 0, 2)) && record2(appearance) && keys2(appearance, ["swellDir", "reef"]) && record2(appearance.swellDir) && keys2(appearance.swellDir, ["x", "y"]) && Object.values(appearance.swellDir).every((n) => number2(n, -1, 1)) && record2(appearance.reef) && keys2(appearance.reef, ["center", "radius"]) && record2(appearance.reef.center) && keys2(appearance.reef.center, ["x", "z"]) && Object.values(appearance.reef.center).every((n) => number2(n)) && number2(appearance.reef.radius, Number.EPSILON, 1e5);
 }
 function validateNativeIsland(value) {
   if (value === void 0) return [];
-  if (!record(value) || !keys(value, ["schema", "source", "grid", "resources", "assets", "arrival", "species", "vegetationRecipe", "vegetationTextures", "sea"]) || value.schema !== NATIVE_ISLAND_SCHEMA) return ["Invalid native island schema or fields."];
-  if (!record(value.source) || !keys(value.source, ["id", "version"]) || !safeId(value.source.id) || !safeId(value.source.version)) return ["Invalid native island source identity."];
+  if (!record2(value) || !keys2(value, ["schema", "source", "grid", "resources", "assets", "arrival", "species", "vegetationRecipe", "vegetationTextures", "sea"]) || value.schema !== NATIVE_ISLAND_SCHEMA) return ["Invalid native island schema or fields."];
+  if (!record2(value.source) || !keys2(value.source, ["id", "version"]) || !safeId(value.source.id) || !safeId(value.source.version)) return ["Invalid native island source identity."];
   const g = value.grid;
-  if (!record(g) || !keys(g, ["resolution", "size", "origin", "sampleConvention", "tileSize", "halo"]) || g.resolution !== 2048 || g.size !== 2048 || !Array.isArray(g.origin) || g.origin.length !== 2 || g.origin[0] !== -1024 || g.origin[1] !== -1024 || g.sampleConvention !== "cell-centred" || g.tileSize !== 128 || g.halo !== 0) return ["Unsupported native island grid."];
+  if (!record2(g) || !keys2(g, ["resolution", "size", "origin", "sampleConvention", "tileSize", "halo"]) || g.resolution !== 2048 || g.size !== 2048 || !Array.isArray(g.origin) || g.origin.length !== 2 || g.origin[0] !== -1024 || g.origin[1] !== -1024 || g.sampleConvention !== "cell-centred" || g.tileSize !== 128 || g.halo !== 0) return ["Unsupported native island grid."];
   if (!validSea(value.sea) || !Array.isArray(value.species) || value.species.length !== NATIVE_ISLAND_SPECIES.length || new Set(value.species).size !== value.species.length || !NATIVE_ISLAND_SPECIES.every((s) => value.species.includes(s))) return ["Invalid original native ocean or species parameters."];
   if (!Array.isArray(value.resources) || !value.resources.length || value.resources.length > 8192) return ["Native island resource count exceeds bounds."];
   let total = 0;
   const ids = /* @__PURE__ */ new Set(), cells = /* @__PURE__ */ new Set(), paths = /* @__PURE__ */ new Map();
   for (const raw of value.resources) {
-    if (!record(raw) || !keys(raw, ["id", "channel", "level", "x", "z", "width", "height", "format", "channels", "path", "sha256", "bytes", "min", "max"]) || !safeId(raw.id) || ids.has(raw.id) || !channels.includes(raw.channel) || !integer(raw.level, 0, 7) || !integer(raw.x, 0, 2047) || !integer(raw.z, 0, 2047) || !integer(raw.width, 1, raw.channel === "vegetation" ? 2e5 : 128) || !integer(raw.height, 1, 128) || !integer(raw.channels, 1, 4) || !number(raw.min) || !number(raw.max) || raw.min > raw.max || typeof raw.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(raw.sha256) || raw.path !== "native-island/" + raw.sha256 + ".bin" || !integer(raw.bytes, 1, 16 * 1024 * 1024)) return ["Invalid native island resource reference."];
+    if (!record2(raw) || !keys2(raw, ["id", "channel", "level", "x", "z", "width", "height", "format", "channels", "path", "sha256", "bytes", "min", "max"]) || !safeId(raw.id) || ids.has(raw.id) || !channels.includes(raw.channel) || !integer2(raw.level, 0, 7) || !integer2(raw.x, 0, 2047) || !integer2(raw.z, 0, 2047) || !integer2(raw.width, 1, raw.channel === "vegetation" ? 2e5 : 128) || !integer2(raw.height, 1, 128) || !integer2(raw.channels, 1, 4) || !number2(raw.min) || !number2(raw.max) || raw.min > raw.max || typeof raw.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(raw.sha256) || raw.path !== "native-island/" + raw.sha256 + ".bin" || !integer2(raw.bytes, 1, 16 * 1024 * 1024)) return ["Invalid native island resource reference."];
     const r = raw;
     ids.add(r.id);
     const cell = [r.channel, r.level, r.x, r.z].join(":");
@@ -41975,18 +42026,18 @@ function validateNativeIsland(value) {
   }
   if (!Array.isArray(value.assets) || value.assets.length > 16) return ["Invalid native island assets."];
   for (const asset of value.assets) {
-    if (!record(asset) || !keys(asset, ["id", "path", "sha256", "bytes", "mediaType", "license", "width", "height"]) || !safeId(asset.id) || ids.has(asset.id) || typeof asset.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(asset.sha256) || asset.path !== "native-island/" + asset.sha256 + ".bin" || !integer(asset.bytes, 1, 8 * 1024 * 1024) || typeof asset.license !== "string" || !asset.license.trim() || asset.license.length > 2e3) return ["Invalid native island asset reference."];
-    if (asset.mediaType === "image/jpeg" ? !integer(asset.width, 1, 2048) || !integer(asset.height, 1, 2048) : asset.mediaType !== "text/plain" || asset.width !== 0 || asset.height !== 0 || asset.bytes > 65536) return ["Unsupported native island asset media or dimensions."];
+    if (!record2(asset) || !keys2(asset, ["id", "path", "sha256", "bytes", "mediaType", "license", "width", "height"]) || !safeId(asset.id) || ids.has(asset.id) || typeof asset.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(asset.sha256) || asset.path !== "native-island/" + asset.sha256 + ".bin" || !integer2(asset.bytes, 1, 8 * 1024 * 1024) || typeof asset.license !== "string" || !asset.license.trim() || asset.license.length > 2e3) return ["Invalid native island asset reference."];
+    if (asset.mediaType === "image/jpeg" ? !integer2(asset.width, 1, 2048) || !integer2(asset.height, 1, 2048) : asset.mediaType !== "text/plain" || asset.width !== 0 || asset.height !== 0 || asset.bytes > 65536) return ["Unsupported native island asset media or dimensions."];
     ids.add(asset.id);
     total += asset.bytes;
   }
   if (total > MAX_NATIVE_ISLAND_BYTES) return ["Native island full resource closure exceeds 256 MiB."];
   const bindings = value.vegetationTextures;
-  if (value.vegetationRecipe !== "elsemesh.native-vegetation/1" || !record(bindings) || !keys(bindings, ["palm", "tree"])) return ["Unsupported original vegetation recipe or texture bindings."];
+  if (value.vegetationRecipe !== "elsemesh.native-vegetation/1" || !record2(bindings) || !keys2(bindings, ["palm", "tree"])) return ["Unsupported original vegetation recipe or texture bindings."];
   const textureIds = [];
   for (const kind of ["palm", "tree"]) {
     const b = bindings[kind];
-    if (!record(b) || !keys(b, ["albedo", "normal", "orm"])) return ["Invalid vegetation texture bindings."];
+    if (!record2(b) || !keys2(b, ["albedo", "normal", "orm"])) return ["Invalid vegetation texture bindings."];
     for (const id3 of Object.values(b)) {
       if (typeof id3 !== "string" || !value.assets.some((a2) => a2.id === id3 && a2.mediaType === "image/jpeg")) return ["Vegetation texture references an absent image."];
       textureIds.push(id3);
@@ -42000,20 +42051,20 @@ function validateNativeIsland(value) {
   };
   if (!["height", "normal", "splat", "rock", "sand", "path", "gully", "seagrass", "rubble", "scarp"].every((c) => complete(c, 0)) || !complete("grass", 1) || !complete("shore", 2) || !["height", "normal", "splat"].every((c) => complete(c, 4)) || resources.filter((r) => r.channel === "vegetation").length !== 1) return ["Native island source lacks complete original fields or its coarse pyramid."];
   const a = value.arrival;
-  if (!record(a) || !keys(a, ["level", "cells"]) || !integer(a.level, 0, 7) || !Array.isArray(a.cells) || !a.cells.length || a.cells.length > 128 || new Set(a.cells).size !== a.cells.length || a.cells.some((id3) => typeof id3 !== "string" || !ids.has(id3) || !value.resources.some((r) => r.id === id3 && r.level === a.level))) return ["Invalid native island arrival cell index."];
+  if (!record2(a) || !keys2(a, ["level", "cells"]) || !integer2(a.level, 0, 7) || !Array.isArray(a.cells) || !a.cells.length || a.cells.length > 128 || new Set(a.cells).size !== a.cells.length || a.cells.some((id3) => typeof id3 !== "string" || !ids.has(id3) || !value.resources.some((r) => r.id === id3 && r.level === a.level))) return ["Invalid native island arrival cell index."];
   return [];
 }
 function vegetation(value, count) {
-  if (!record(value) || !number(value.villagePalms, 0, 2e5) || !keys(value, ["records", "lod", "seeds", "villagePalms"]) || !record(value.records) || !keys(value.records, [...NATIVE_ISLAND_SPECIES]) || !record(value.lod) || !keys(value.lod, ["palmNear", "treeNear", "shrubNear", "underFade", "fernFade", "broadFade", "bananaFade", "canopyFar", "band"]) || !Object.values(value.lod).every((v) => Array.isArray(v) ? pair(v) : number(v, 0, 1e5)) || !record(value.seeds) || !keys(value.seeds, ["terrain", "site", "scatter"]) || !Object.values(value.seeds).every((n) => integer(n, 0, 4294967295))) return false;
+  if (!record2(value) || !number2(value.villagePalms, 0, 2e5) || !keys2(value, ["records", "lod", "seeds", "villagePalms"]) || !record2(value.records) || !keys2(value.records, [...NATIVE_ISLAND_SPECIES]) || !record2(value.lod) || !keys2(value.lod, ["palmNear", "treeNear", "shrubNear", "underFade", "fernFade", "broadFade", "bananaFade", "canopyFar", "band"]) || !Object.values(value.lod).every((v) => Array.isArray(v) ? pair(v) : number2(v, 0, 1e5)) || !record2(value.seeds) || !keys2(value.seeds, ["terrain", "site", "scatter"]) || !Object.values(value.seeds).every((n) => integer2(n, 0, 4294967295))) return false;
   let actual = 0;
   for (const records of Object.values(value.records)) {
     if (!Array.isArray(records)) return false;
     actual += records.length;
-    for (const r of records) if (!record(r) || Object.keys(r).some((k) => !["x", "y", "z", "s", "sy", "yaw", "la", "l", "H", "seed"].includes(k)) || !["x", "y", "z", "s", "yaw", "seed"].every((k) => Object.hasOwn(r, k)) || !Object.values(r).every((n) => number(n)) || !number(r.x, -1024, 1024) || !number(r.z, -1024, 1024) || !number(r.y, -2e3, 2e3) || !number(r.seed, 0, 1) || !number(r.s, 0, 1e3)) return false;
+    for (const r of records) if (!record2(r) || Object.keys(r).some((k) => !["x", "y", "z", "s", "sy", "yaw", "la", "l", "H", "seed"].includes(k)) || !["x", "y", "z", "s", "yaw", "seed"].every((k) => Object.hasOwn(r, k)) || !Object.values(r).every((n) => number2(n)) || !number2(r.x, -1024, 1024) || !number2(r.z, -1024, 1024) || !number2(r.y, -2e3, 2e3) || !number2(r.seed, 0, 1) || !number2(r.s, 0, 1e3)) return false;
   }
   return actual === count;
 }
-async function digest(bytes) {
+async function digest2(bytes) {
   const value = await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes));
   return Array.from(new Uint8Array(value), (n) => n.toString(16).padStart(2, "0")).join("");
 }
@@ -42041,7 +42092,7 @@ function createNativeIslandResourceReader(project, read = nativeIslandRepository
     if (!ref) throw Error("Unknown native island resource.");
     if (!read) throw Error("Native island source unavailable. Reopen its world repository before preview or saving.");
     const bytes = await read(ref.path, ref.bytes);
-    if (bytes.byteLength !== ref.bytes || await digest(bytes) !== ref.sha256) throw Error("Native island resource hash or size mismatch.");
+    if (bytes.byteLength !== ref.bytes || await digest2(bytes) !== ref.sha256) throw Error("Native island resource hash or size mismatch.");
     if ("mediaType" in ref) {
       if (ref.mediaType === "text/plain") new TextDecoder("utf-8", { fatal: true }).decode(bytes);
       else if (!jpegDimensions(bytes, ref.width, ref.height)) throw Error("Native JPEG dimensions do not match its bounded descriptor.");
@@ -42111,11 +42162,11 @@ function effectiveObjectAccess(project) {
 function validateObjectAccess(project) {
   if (!Object.prototype.hasOwnProperty.call(project, "objectAccess")) return [];
   const value = project.objectAccess;
-  const record5 = (v) => !!v && typeof v === "object" && !Array.isArray(v);
-  if (!record5(value) || Object.keys(value).some((k) => !["schema", "rules"].includes(k)) || value.schema !== OBJECT_ACCESS_SCHEMA || !Array.isArray(value.rules) || value.rules.length > 2e3) return ["Invalid object access policy."];
+  const record6 = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+  if (!record6(value) || Object.keys(value).some((k) => !["schema", "rules"].includes(k)) || value.schema !== OBJECT_ACCESS_SCHEMA || !Array.isArray(value.rules) || value.rules.length > 2e3) return ["Invalid object access policy."];
   const seen = /* @__PURE__ */ new Set();
   for (const rule of value.rules) {
-    if (!record5(rule) || Object.keys(rule).some((k) => !["objectId", "actions"].includes(k)) || typeof rule.objectId !== "string" || !rule.objectId.trim() || rule.objectId.length > 200 || seen.has(rule.objectId) || !Array.isArray(rule.actions) || rule.actions.length > 3 || new Set(rule.actions).size !== rule.actions.length) return ["Invalid or duplicate object access rule."];
+    if (!record6(rule) || Object.keys(rule).some((k) => !["objectId", "actions"].includes(k)) || typeof rule.objectId !== "string" || !rule.objectId.trim() || rule.objectId.length > 200 || seen.has(rule.objectId) || !Array.isArray(rule.actions) || rule.actions.length > 3 || new Set(rule.actions).size !== rule.actions.length) return ["Invalid or duplicate object access rule."];
     seen.add(rule.objectId);
     const objects = Array.isArray(project.objects) ? project.objects : [], supported = supportedObjectAccessActions({ objects, terminals: Array.isArray(project.terminals) ? project.terminals : [] }, rule.objectId);
     if (!objects.some((o) => o && o.id === rule.objectId) || !supported.length || rule.actions.some((a) => !supported.includes(a))) return ["Object access rule references an unsupported object or action."];
@@ -42131,27 +42182,27 @@ function setObjectAccessActions(project, objectId, actions) {
 }
 
 // src/domain/road-traffic.ts
-var record2 = (v) => !!v && typeof v === "object" && !Array.isArray(v);
-var keys2 = (v, allowed) => Object.keys(v).every((k) => allowed.includes(k));
+var record3 = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+var keys3 = (v, allowed) => Object.keys(v).every((k) => allowed.includes(k));
 var bounded = (v, min, max) => typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
 var id = (v) => typeof v === "string" && /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,119}$/.test(v);
 function validateRoadTraffic(value, assets = []) {
   if (value === void 0) return [];
   const fail2 = ["Invalid port-traffic/1 configuration."];
-  if (!record2(value) || !keys2(value, ["schema", "seed", "count", "roadY", "graph", "vehicleAssetIds"]) || value.schema !== "port-traffic/1" || !bounded(value.seed, 0, 4294967295) || !Number.isInteger(value.seed) || !bounded(value.count, 0, 12) || !Number.isInteger(value.count) || !bounded(value.roadY, -2e3, 2e3)) return fail2;
+  if (!record3(value) || !keys3(value, ["schema", "seed", "count", "roadY", "graph", "vehicleAssetIds"]) || value.schema !== "port-traffic/1" || !bounded(value.seed, 0, 4294967295) || !Number.isInteger(value.seed) || !bounded(value.count, 0, 12) || !Number.isInteger(value.count) || !bounded(value.roadY, -2e3, 2e3)) return fail2;
   const graph = value.graph, refs = value.vehicleAssetIds;
-  if (!record2(graph) || !keys2(graph, ["nodes", "edges", "classes"]) || !Array.isArray(graph.nodes) || graph.nodes.length < 3 || graph.nodes.length > 64 || !Array.isArray(graph.edges) || graph.edges.length < 3 || graph.edges.length > 128 || !record2(graph.classes) || Object.keys(graph.classes).length < 1 || Object.keys(graph.classes).length > 8) return fail2;
-  for (const [name, c] of Object.entries(graph.classes)) if (!id(name) || !record2(c) || !keys2(c, ["width", "speed"]) || !bounded(c.width, 4, 20) || !bounded(c.speed, 1, 15)) return fail2;
+  if (!record3(graph) || !keys3(graph, ["nodes", "edges", "classes"]) || !Array.isArray(graph.nodes) || graph.nodes.length < 3 || graph.nodes.length > 64 || !Array.isArray(graph.edges) || graph.edges.length < 3 || graph.edges.length > 128 || !record3(graph.classes) || Object.keys(graph.classes).length < 1 || Object.keys(graph.classes).length > 8) return fail2;
+  for (const [name, c] of Object.entries(graph.classes)) if (!id(name) || !record3(c) || !keys3(c, ["width", "speed"]) || !bounded(c.width, 4, 20) || !bounded(c.speed, 1, 15)) return fail2;
   const nodes = /* @__PURE__ */ new Map(), degree = /* @__PURE__ */ new Map(), links = /* @__PURE__ */ new Map(), edges = /* @__PURE__ */ new Set();
   for (const n of graph.nodes) {
-    if (!record2(n) || !keys2(n, ["id", "x", "z"]) || !id(n.id) || nodes.has(n.id) || !bounded(n.x, -2e3, 2e3) || !bounded(n.z, -2e3, 2e3)) return fail2;
+    if (!record3(n) || !keys3(n, ["id", "x", "z"]) || !id(n.id) || nodes.has(n.id) || !bounded(n.x, -2e3, 2e3) || !bounded(n.z, -2e3, 2e3)) return fail2;
     nodes.set(n.id, { x: n.x, z: n.z });
     degree.set(n.id, 0);
     links.set(n.id, []);
   }
   const pairs = /* @__PURE__ */ new Set();
   for (const e of graph.edges) {
-    if (!record2(e) || !keys2(e, ["id", "from", "to", "roadClass"]) || !id(e.id) || edges.has(e.id) || !id(e.from) || !id(e.to) || e.from === e.to || !nodes.has(e.from) || !nodes.has(e.to) || !id(e.roadClass) || !Object.hasOwn(graph.classes, e.roadClass)) return fail2;
+    if (!record3(e) || !keys3(e, ["id", "from", "to", "roadClass"]) || !id(e.id) || edges.has(e.id) || !id(e.from) || !id(e.to) || e.from === e.to || !nodes.has(e.from) || !nodes.has(e.to) || !id(e.roadClass) || !Object.hasOwn(graph.classes, e.roadClass)) return fail2;
     const a = nodes.get(e.from), b = nodes.get(e.to), pair2 = [e.from, e.to].sort().join("|");
     if (pairs.has(pair2) || Math.hypot(a.x - b.x, a.z - b.z) < 30) return fail2;
     pairs.add(pair2);
@@ -42170,7 +42221,7 @@ function validateRoadTraffic(value, assets = []) {
     queue.push(...links.get(n));
   }
   if (seen.size !== nodes.size) return ["Traffic graph must be connected."];
-  if (!record2(refs) || !keys2(refs, ["car", "van", "utility"]) || !["car", "van", "utility"].every((k) => typeof refs[k] === "string" && assets.some((a) => a?.id === refs[k]))) return ["Traffic vehicle assets must reference admitted world assets."];
+  if (!record3(refs) || !keys3(refs, ["car", "van", "utility"]) || !["car", "van", "utility"].every((k) => typeof refs[k] === "string" && assets.some((a) => a?.id === refs[k]))) return ["Traffic vehicle assets must reference admitted world assets."];
   return [];
 }
 
@@ -42185,9 +42236,9 @@ function parseAsciiGrid(input) {
   if (input.length > 64 * 1024 * 1024) fail("ASCII grid exceeds the 64 MiB text limit.");
   const tokens = input.trim().split(/\s+/);
   const header = /* @__PURE__ */ new Map();
-  const keys5 = /* @__PURE__ */ new Set(["ncols", "nrows", "xllcorner", "yllcorner", "xllcenter", "yllcenter", "cellsize", "nodata_value"]);
+  const keys6 = /* @__PURE__ */ new Set(["ncols", "nrows", "xllcorner", "yllcorner", "xllcenter", "yllcenter", "cellsize", "nodata_value"]);
   let cursor = 0;
-  while (cursor < tokens.length && keys5.has(tokens[cursor].toLowerCase())) {
+  while (cursor < tokens.length && keys6.has(tokens[cursor].toLowerCase())) {
     const key = tokens[cursor++].toLowerCase();
     if (header.has(key)) fail(`Duplicate ASCII grid header ${key}.`);
     const raw = tokens[cursor++];
@@ -42951,7 +43002,7 @@ function neonGeometryCacheStats() {
 var MAX_ASSET_BYTES = 15 * 1024 * 1024;
 var MAX_ASSET_VERTICES = 5e5;
 var MAX_ASSET_TRIANGLES = 5e5;
-var integer2 = (value, minimum = 0) => typeof value === "number" && Number.isSafeInteger(value) && value >= minimum;
+var integer3 = (value, minimum = 0) => typeof value === "number" && Number.isSafeInteger(value) && value >= minimum;
 var requireValue = (condition, message) => {
   if (!condition) throw new Error(message);
 };
@@ -42982,8 +43033,8 @@ function inspectGlbJson(buffer) {
   requireValue(!json2.skins?.length && !json2.animations?.length, "Use static GLB meshes without skinning or animation.");
   for (const field of ["buffers", "bufferViews", "accessors", "meshes", "nodes", "scenes"]) requireValue(list(json2[field]) && json2[field].length > 0 && json2[field].length <= 1e5, `GLB ${field} must be a bounded nonempty array.`);
   requireValue(json2.scenes.length === 1 && json2.nodes.length <= 4096, "Use a single scene with at most 4096 nodes.");
-  requireValue(json2.buffers.length === 1 && json2.buffers[0] && json2.buffers[0].uri === void 0 && integer2(json2.buffers[0].byteLength, 1) && json2.buffers[0].byteLength <= binary.byteLength && binary.byteLength - json2.buffers[0].byteLength <= 3, "GLB must contain one complete embedded buffer.");
-  for (const item of json2.bufferViews) requireValue(item && item.buffer === 0 && integer2(item.byteOffset ?? 0) && integer2(item.byteLength, 1) && (item.byteOffset ?? 0) + item.byteLength <= json2.buffers[0].byteLength && !item.extensions && (item.byteStride === void 0 || integer2(item.byteStride, 4) && item.byteStride <= 252 && item.byteStride % 4 === 0), "GLB buffer view exceeds its embedded buffer or uses unsupported encoding.");
+  requireValue(json2.buffers.length === 1 && json2.buffers[0] && json2.buffers[0].uri === void 0 && integer3(json2.buffers[0].byteLength, 1) && json2.buffers[0].byteLength <= binary.byteLength && binary.byteLength - json2.buffers[0].byteLength <= 3, "GLB must contain one complete embedded buffer.");
+  for (const item of json2.bufferViews) requireValue(item && item.buffer === 0 && integer3(item.byteOffset ?? 0) && integer3(item.byteLength, 1) && (item.byteOffset ?? 0) + item.byteLength <= json2.buffers[0].byteLength && !item.extensions && (item.byteStride === void 0 || integer3(item.byteStride, 4) && item.byteStride <= 252 && item.byteStride % 4 === 0), "GLB buffer view exceeds its embedded buffer or uses unsupported encoding.");
   const widths = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
   const bytesPerComponent = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 };
   const data = new DataView(binary.buffer, binary.byteOffset, binary.byteLength);
@@ -43008,7 +43059,7 @@ function inspectGlbJson(buffer) {
     }
   };
   for (const accessor of json2.accessors) {
-    requireValue(accessor && !accessor.sparse && integer2(accessor.bufferView) && !!json2.bufferViews[accessor.bufferView] && integer2(accessor.count, 1) && accessor.count <= MAX_ASSET_VERTICES * 3 && integer2(accessor.byteOffset ?? 0) && !!widths[accessor.type] && !!bytesPerComponent[accessor.componentType], "GLB accessor has an invalid range or unsupported sparse format.");
+    requireValue(accessor && !accessor.sparse && integer3(accessor.bufferView) && !!json2.bufferViews[accessor.bufferView] && integer3(accessor.count, 1) && accessor.count <= MAX_ASSET_VERTICES * 3 && integer3(accessor.byteOffset ?? 0) && !!widths[accessor.type] && !!bytesPerComponent[accessor.componentType], "GLB accessor has an invalid range or unsupported sparse format.");
     const bv = json2.bufferViews[accessor.bufferView], size = widths[accessor.type] * bytesPerComponent[accessor.componentType];
     requireValue((accessor.byteOffset ?? 0) % bytesPerComponent[accessor.componentType] === 0 && (bv.byteStride ?? size) >= size && (accessor.byteOffset ?? 0) + (accessor.count - 1) * (bv.byteStride ?? size) + size <= bv.byteLength, "GLB accessor extends beyond its buffer view.");
     decodedComponents += accessor.count * widths[accessor.type];
@@ -43024,15 +43075,15 @@ function inspectGlbJson(buffer) {
       requireValue(primitive && !primitive.targets && !primitive.extensions && (primitive.mode ?? 4) === 4 && primitive.attributes && typeof primitive.attributes === "object", "Only static triangle mesh primitives are supported.");
       const position = json2.accessors[primitive.attributes.POSITION];
       requireValue(position && position.type === "VEC3" && position.componentType === 5126 && !position.normalized && position.count >= 3, "GLB mesh needs float32 POSITION vertices.");
-      requireValue(primitive.material === void 0 || integer2(primitive.material) && primitive.material < materialCount, "GLB references a missing material.");
+      requireValue(primitive.material === void 0 || integer3(primitive.material) && primitive.material < materialCount, "GLB references a missing material.");
       for (const [semantic, index] of Object.entries(primitive.attributes)) {
         const attr = json2.accessors[index];
-        requireValue(integer2(index) && attr && attr.count === position.count && !/^JOINTS_|^WEIGHTS_/.test(semantic), "GLB attribute counts or skinning attributes are unsupported.");
+        requireValue(integer3(index) && attr && attr.count === position.count && !/^JOINTS_|^WEIGHTS_/.test(semantic), "GLB attribute counts or skinning attributes are unsupported.");
       }
       let count = position.count;
       if (primitive.indices !== void 0) {
         const index = json2.accessors[primitive.indices];
-        requireValue(integer2(primitive.indices) && index && index.type === "SCALAR" && !index.normalized && [5121, 5123, 5125].includes(index.componentType), "GLB indices must use unsigned integer scalars.");
+        requireValue(integer3(primitive.indices) && index && index.type === "SCALAR" && !index.normalized && [5121, 5123, 5125].includes(index.componentType), "GLB indices must use unsigned integer scalars.");
         count = index.count;
         for (let i = 0; i < count; i++) requireValue(valueAt(index, i, 0) < position.count, "GLB index exceeds the vertex range.");
       }
@@ -43054,18 +43105,18 @@ function inspectGlbJson(buffer) {
   }
   requireValue(vertexCount <= MAX_ASSET_VERTICES && triangleCount > 0 && triangleCount <= MAX_ASSET_TRIANGLES, "GLB decoded geometry budget exceeded.");
   for (const node of json2.nodes) {
-    requireValue(node && typeof node === "object" && node.skin === void 0 && (node.mesh === void 0 || integer2(node.mesh) && !!json2.meshes[node.mesh]), "GLB node uses a missing mesh or skinning.");
+    requireValue(node && typeof node === "object" && node.skin === void 0 && (node.mesh === void 0 || integer3(node.mesh) && !!json2.meshes[node.mesh]), "GLB node uses a missing mesh or skinning.");
     for (const [field, count] of [["matrix", 16], ["translation", 3], ["rotation", 4], ["scale", 3]]) if (node[field] !== void 0) requireValue(list(node[field]) && node[field].length === count && node[field].every((n) => Number.isFinite(n) && Math.abs(n) <= 1e6), "GLB node transform is invalid.");
-    requireValue(node.children === void 0 || list(node.children) && node.children.every((i) => integer2(i) && !!json2.nodes[i]), "GLB node references a missing child.");
+    requireValue(node.children === void 0 || list(node.children) && node.children.every((i) => integer3(i) && !!json2.nodes[i]), "GLB node references a missing child.");
   }
   const selected = json2.scene ?? 0;
-  requireValue(integer2(selected) && json2.scenes[selected] && list(json2.scenes[selected].nodes), "GLB default scene is invalid.");
+  requireValue(integer3(selected) && json2.scenes[selected] && list(json2.scenes[selected].nodes), "GLB default scene is invalid.");
   const visited = /* @__PURE__ */ new Set(), active = /* @__PURE__ */ new Set();
   let instances = 0;
   const bounds = new Box3(), point = new Vector3();
   const walk = (index, parent = new Matrix4(), depth = 0) => {
     requireValue(depth < 128, "GLB hierarchy is too deep.");
-    requireValue(integer2(index) && json2.nodes[index] && !active.has(index) && !visited.has(index), "GLB scene graph contains a cycle or shared node.");
+    requireValue(integer3(index) && json2.nodes[index] && !active.has(index) && !visited.has(index), "GLB scene graph contains a cycle or shared node.");
     visited.add(index);
     active.add(index);
     const node = json2.nodes[index];
@@ -43093,7 +43144,7 @@ function inspectGlbJson(buffer) {
   requireValue(json2.images === void 0 || list(json2.images) && json2.images.length <= 64, "GLB image table is invalid.");
   let imagePixels = 0;
   for (const image of json2.images ?? []) {
-    requireValue(image && image.uri === void 0 && integer2(image.bufferView) && json2.bufferViews[image.bufferView] && ["image/png", "image/jpeg"].includes(image.mimeType), "GLB textures must be embedded PNG or JPEG images.");
+    requireValue(image && image.uri === void 0 && integer3(image.bufferView) && json2.bufferViews[image.bufferView] && ["image/png", "image/jpeg"].includes(image.mimeType), "GLB textures must be embedded PNG or JPEG images.");
     const bv = json2.bufferViews[image.bufferView];
     const bytes = binary.subarray(bv.byteOffset ?? 0, (bv.byteOffset ?? 0) + bv.byteLength);
     const dimensions = imageDimensions2(bytes, image.mimeType);
@@ -43102,13 +43153,13 @@ function inspectGlbJson(buffer) {
     requireValue(imagePixels <= 32e6, "GLB decoded image budget exceeded.");
   }
   requireValue(json2.textures === void 0 || list(json2.textures) && json2.textures.length <= 64, "GLB texture table is invalid.");
-  for (const texture of json2.textures ?? []) requireValue(texture && !texture.extensions && integer2(texture.source) && json2.images?.[texture.source], "GLB texture references an unsupported image.");
+  for (const texture of json2.textures ?? []) requireValue(texture && !texture.extensions && integer3(texture.source) && json2.images?.[texture.source], "GLB texture references an unsupported image.");
   const inspectMaterial = (value, depth = 0) => {
     requireValue(depth < 24, "GLB material metadata is too deep.");
     if (typeof value === "number") requireValue(Number.isFinite(value), "GLB material contains a nonfinite value.");
     if (!value || typeof value !== "object") return;
     for (const [key, item] of Object.entries(value)) {
-      if (/Texture$/.test(key)) requireValue(item && typeof item === "object" && integer2(item.index) && json2.textures?.[item.index], "GLB material references a missing texture.");
+      if (/Texture$/.test(key)) requireValue(item && typeof item === "object" && integer3(item.index) && json2.textures?.[item.index], "GLB material references a missing texture.");
       if (["roughnessFactor", "metallicFactor", "alphaCutoff"].includes(key)) requireValue(typeof item === "number" && Number.isFinite(item) && item >= 0 && item <= 1, "GLB material factor must be between zero and one.");
       if (["baseColorFactor", "emissiveFactor"].includes(key)) requireValue(Array.isArray(item) && item.length === (key === "baseColorFactor" ? 4 : 3) && item.every((n) => typeof n === "number" && Number.isFinite(n) && n >= 0 && n <= 1), "GLB material color factor is invalid.");
       inspectMaterial(item, depth + 1);
@@ -43293,7 +43344,7 @@ function treeWindOffset(x, y, z, time, seed = 7319, species = "broadleaf") {
 var MAX_HIERARCHY_DEPTH = 32;
 var MAX_WORLD_TRANSFORM_COMPONENT = 1e7;
 var MAX_WORLD_BOUND_COMPONENT = 1e9;
-var vec = (v) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
+var vec2 = (v) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
 function validateHierarchy(objects) {
   const errors = [], map = /* @__PURE__ */ new Map();
   for (const o of objects) {
@@ -43302,7 +43353,7 @@ function validateHierarchy(objects) {
       continue;
     }
     map.set(o.id, o);
-    if (!vec(o.position) || !vec(o.rotation) || !vec(o.scale) || o.scale.some((n) => n <= 0 || n > 1e3)) errors.push("Hierarchy transforms must be finite positive local TRS.");
+    if (!vec2(o.position) || !vec2(o.rotation) || !vec2(o.scale) || o.scale.some((n) => n <= 0 || n > 1e3)) errors.push("Hierarchy transforms must be finite positive local TRS.");
     if (o.parentId !== void 0 && (typeof o.parentId !== "string" || !o.parentId)) errors.push("Invalid parent ID.");
     if (o.locked !== void 0 && typeof o.locked !== "boolean") errors.push("Invalid object lock.");
     if (o.description !== void 0 && (typeof o.description !== "string" || o.description.length > 2e3)) errors.push("Description exceeds 2000 characters.");
@@ -43522,7 +43573,7 @@ function getGroupBounds(project, id3) {
 function resizeGroup(project, id3, dimensions, uniform = false) {
   editable(project.objects, [id3]);
   const group = project.objects.find((o) => o.id === id3);
-  if (group?.kind !== "group" || !vec(dimensions) || dimensions.some((n) => n <= 0)) throw new Error("Dimensions must be finite and positive.");
+  if (group?.kind !== "group" || !vec2(dimensions) || dimensions.some((n) => n <= 0)) throw new Error("Dimensions must be finite and positive.");
   const size = getGroupBounds(project, id3).dimensions;
   if (size.some((n) => n < 1e-8)) throw new Error("Cannot resize a group with a zero extent.");
   const scales = dimensions.map((n, i) => n / size[i]);
@@ -43561,17 +43612,17 @@ var check = (ok, message) => {
   if (!ok) throw Error(message);
 };
 var object = (v) => !!v && typeof v === "object" && !Array.isArray(v);
-var keys3 = (v, allowed) => object(v) && Object.keys(v).every((k) => allowed.includes(k));
-var number2 = (v, min, max) => typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
-var integer3 = (v, min, max) => number2(v, min, max) && Number.isInteger(v);
+var keys4 = (v, allowed) => object(v) && Object.keys(v).every((k) => allowed.includes(k));
+var number3 = (v, min, max) => typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
+var integer4 = (v, min, max) => number3(v, min, max) && Number.isInteger(v);
 var color = (v) => typeof v === "string" && /^#[0-9a-f]{6}$/.test(v);
 var id2 = (v) => typeof v === "string" && /^[A-Za-z0-9:_-]{1,120}$/.test(v);
 var text2 = (v, max = 120) => typeof v === "string" && v.trim().length > 0 && v.length <= max;
-var vector = (v) => Array.isArray(v) && v.length === 3 && v.every((n) => number2(n, -4e3, 4e3));
+var vector = (v) => Array.isArray(v) && v.length === 3 && v.every((n) => number3(n, -4e3, 4e3));
 var presets = [["grass", "Grass", "#527b3c", 0.9], ["soil", "Soil", "#71513b", 0.95], ["rock", "Rock", "#777a77", 0.85], ["gravel", "Gravel", "#999388", 0.96], ["sand", "Sand", "#c4ad79", 0.94]];
 var LANDSCAPE_MATERIAL_PRESETS = presets.map(([preset, name, color2, roughness]) => ({ id: "landscape-material:" + preset, name, preset, color: color2, roughness, tiling: 4 }));
 var DEFAULT_LANDSCAPE_CONSTRAINTS = Object.freeze({ minElevation: -2e3, maxElevation: 2e3, maxSlope: 60, excludePaths: true, excludeBuildings: true, excludeWater: true, clearance: 0.5 });
-var hash = (seed, x, z, salt = 0) => {
+var hash2 = (seed, x, z, salt = 0) => {
   let h = (seed ^ Math.imul(x, 374761393) ^ Math.imul(z, 668265263) ^ Math.imul(salt + 1, 1274126177)) >>> 0;
   h = Math.imul(h ^ h >>> 13, 1274126177);
   return ((h ^ h >>> 16) >>> 0) / 4294967296;
@@ -43624,12 +43675,12 @@ function validateLandscape(project) {
   if (project.landscape === void 0) return [];
   try {
     const l = project.landscape;
-    check(keys3(l, ["version", "materials", "images", "layers", "tombstones"]) && l.version === 1, "Invalid landscape version or fields");
+    check(keys4(l, ["version", "materials", "images", "layers", "tombstones"]) && l.version === 1, "Invalid landscape version or fields");
     check(Array.isArray(l.materials) && l.materials.length > 0 && l.materials.length <= 16 && Array.isArray(l.layers) && l.layers.length <= 16 && Array.isArray(l.images) && l.images.length <= 16, "Landscape material/layer/image limit exceeded");
     const imageIds = /* @__PURE__ */ new Set();
     let imageBytes = 0;
     for (const image of l.images) {
-      check(keys3(image, ["id", "name", "mediaType", "dataUrl", "bytes", "width", "height"]) && /^sha256:[a-f0-9]{64}$/.test(image.id) && !imageIds.has(image.id) && text2(image.name) && ["image/png", "image/jpeg"].includes(image.mediaType), "Invalid landscape image metadata");
+      check(keys4(image, ["id", "name", "mediaType", "dataUrl", "bytes", "width", "height"]) && /^sha256:[a-f0-9]{64}$/.test(image.id) && !imageIds.has(image.id) && text2(image.name) && ["image/png", "image/jpeg"].includes(image.mediaType), "Invalid landscape image metadata");
       check(typeof image.dataUrl === "string" && image.dataUrl.length < LANDSCAPE_LIMITS.imageBytes * 4 / 3 + 64, "Landscape image encoded limit");
       const bytes = landscapeImageBytes(image.dataUrl);
       check(bytes.length === image.bytes && image.id === "sha256:" + landscapeImageDigest(bytes), "Landscape image hash/byte mismatch");
@@ -43641,19 +43692,19 @@ function validateLandscape(project) {
     check(imageBytes <= LANDSCAPE_LIMITS.totalImageBytes, "Landscape image aggregate limit exceeded");
     const materialIds = /* @__PURE__ */ new Set();
     for (const m of l.materials) {
-      check(keys3(m, ["id", "name", "preset", "color", "roughness", "tiling", "imageRef"]) && id2(m.id) && !materialIds.has(m.id) && text2(m.name) && ["grass", "soil", "rock", "gravel", "sand", "custom"].includes(m.preset) && color(m.color) && number2(m.roughness, 0, 1) && number2(m.tiling, 0.1, 100) && (m.imageRef === void 0 || imageIds.has(m.imageRef)), "Invalid landscape material");
+      check(keys4(m, ["id", "name", "preset", "color", "roughness", "tiling", "imageRef"]) && id2(m.id) && !materialIds.has(m.id) && text2(m.name) && ["grass", "soil", "rock", "gravel", "sand", "custom"].includes(m.preset) && color(m.color) && number3(m.roughness, 0, 1) && number3(m.tiling, 0.1, 100) && (m.imageRef === void 0 || imageIds.has(m.imageRef)), "Invalid landscape material");
       materialIds.add(m.id);
     }
     const layerIds = /* @__PURE__ */ new Set();
     let maskBytes = 0, tiles = 0;
     for (const layer of l.layers) {
-      check(keys3(layer, ["id", "name", "kind", "visible", "locked", "mask", "materialId", "scatter", "water", "boundary"]) && id2(layer.id) && !layerIds.has(layer.id) && text2(layer.name) && ["ground", "vegetation", "water"].includes(layer.kind) && typeof layer.visible === "boolean" && typeof layer.locked === "boolean", "Invalid landscape layer");
+      check(keys4(layer, ["id", "name", "kind", "visible", "locked", "mask", "materialId", "scatter", "water", "boundary"]) && id2(layer.id) && !layerIds.has(layer.id) && text2(layer.name) && ["ground", "vegetation", "water"].includes(layer.kind) && typeof layer.visible === "boolean" && typeof layer.locked === "boolean", "Invalid landscape layer");
       layerIds.add(layer.id);
-      check(keys3(layer.mask, ["cellSize", "tiles"]) && layer.mask.cellSize === 1 && object(layer.mask.tiles), "Invalid sparse landscape mask");
+      check(keys4(layer.mask, ["cellSize", "tiles"]) && layer.mask.cellSize === 1 && object(layer.mask.tiles), "Invalid sparse landscape mask");
       for (const [key, values] of Object.entries(layer.mask.tiles)) {
         check(/^(0|[1-9][0-9]*):(0|[1-9][0-9]*)$/.test(key), "Invalid landscape tile key");
         const [x, z] = key.split(":").map(Number);
-        check(x < Math.ceil(project.terrain.width / 16) && z < Math.ceil(project.terrain.depth / 16) && Array.isArray(values) && values.length === 256 && values.every((v) => integer3(v, 0, 255)) && values.some((v) => v !== 0), "Invalid landscape mask tile");
+        check(x < Math.ceil(project.terrain.width / 16) && z < Math.ceil(project.terrain.depth / 16) && Array.isArray(values) && values.length === 256 && values.every((v) => integer4(v, 0, 255)) && values.some((v) => v !== 0), "Invalid landscape mask tile");
         for (let i = 0; i < 256; i++) if (values[i] !== 0) check(x * 16 + i % 16 < project.terrain.width && z * 16 + Math.floor(i / 16) < project.terrain.depth, "Landscape mask outside terrain");
         tiles++;
         maskBytes += 256;
@@ -43663,20 +43714,20 @@ function validateLandscape(project) {
       if (layer.kind === "vegetation") {
         check(layer.materialId === void 0 && layer.water === void 0, "Invalid vegetation layer fields");
         const s = layer.scatter;
-        check(keys3(s, ["kind", "seed", "spacing", "density", "scaleMin", "scaleMax", "variation", "treeSpecies", "assetRef", "constraints"]) && s && ["tree", "shrub", "grass", "flower", "rock"].includes(s.kind) && integer3(s.seed, 0, 4294967295) && number2(s.spacing, 0.5, 64) && number2(s.density, 0, 1) && number2(s.scaleMin, 0.05, 20) && number2(s.scaleMax, s.scaleMin, 20) && number2(s.variation, 0, 1) && ["broadleaf", "pine", "palm"].includes(s.treeSpecies) && (s.assetRef === void 0 || project.assets.some((a) => a.id === s.assetRef)), "Invalid landscape scatter rule");
+        check(keys4(s, ["kind", "seed", "spacing", "density", "scaleMin", "scaleMax", "variation", "treeSpecies", "assetRef", "constraints"]) && s && ["tree", "shrub", "grass", "flower", "rock"].includes(s.kind) && integer4(s.seed, 0, 4294967295) && number3(s.spacing, 0.5, 64) && number3(s.density, 0, 1) && number3(s.scaleMin, 0.05, 20) && number3(s.scaleMax, s.scaleMin, 20) && number3(s.variation, 0, 1) && ["broadleaf", "pine", "palm"].includes(s.treeSpecies) && (s.assetRef === void 0 || project.assets.some((a) => a.id === s.assetRef)), "Invalid landscape scatter rule");
         const c = s.constraints;
-        check(keys3(c, ["minElevation", "maxElevation", "maxSlope", "excludePaths", "excludeBuildings", "excludeWater", "clearance"]) && number2(c.minElevation, -2e3, 2e3) && number2(c.maxElevation, c.minElevation, 2e3) && number2(c.maxSlope, 0, 90) && number2(c.clearance, 0, 20) && [c.excludePaths, c.excludeBuildings, c.excludeWater].every((v) => typeof v === "boolean"), "Invalid landscape constraints");
+        check(keys4(c, ["minElevation", "maxElevation", "maxSlope", "excludePaths", "excludeBuildings", "excludeWater", "clearance"]) && number3(c.minElevation, -2e3, 2e3) && number3(c.maxElevation, c.minElevation, 2e3) && number3(c.maxSlope, 0, 90) && number3(c.clearance, 0, 20) && [c.excludePaths, c.excludeBuildings, c.excludeWater].every((v) => typeof v === "boolean"), "Invalid landscape constraints");
       }
       if (layer.kind === "water") {
         check(layer.scatter === void 0 && layer.materialId === void 0, "Invalid water layer fields");
         const w = layer.water;
-        check(keys3(w, ["level", "waveAmplitude", "waveSpeed", "shoreFade"]) && w && number2(w.level, -2e3, 2e3) && number2(w.waveAmplitude, 0, 5) && number2(w.waveSpeed, 0, 10) && number2(w.shoreFade, 0.1, 20), "Invalid bounded landscape water");
+        check(keys4(w, ["level", "waveAmplitude", "waveSpeed", "shoreFade"]) && w && number3(w.level, -2e3, 2e3) && number3(w.waveAmplitude, 0, 5) && number3(w.waveSpeed, 0, 10) && number3(w.shoreFade, 0.1, 20), "Invalid bounded landscape water");
       }
     }
     check(tiles <= 256 && maskBytes <= 65536, "Landscape mask allocation limit exceeded");
     check(Array.isArray(l.tombstones) && l.tombstones.length <= 2e4 && new Set(l.tombstones).size === l.tombstones.length && l.tombstones.every((v) => typeof v === "string" && /^landscape-instance:[A-Za-z0-9:_-]+@-?[0-9]+,-?[0-9]+,0$/.test(v) && v.length <= 200), "Invalid generated instance tombstones");
     for (const o of project.objects) if (o.landscapeOrigin !== void 0) {
-      check(keys3(o.landscapeOrigin, ["layerId", "generatedId"]) && id2(o.landscapeOrigin.layerId) && typeof o.landscapeOrigin.generatedId === "string" && o.landscapeOrigin.generatedId.startsWith("landscape-instance:" + o.landscapeOrigin.layerId + "@") && l.tombstones.includes(o.landscapeOrigin.generatedId) && (o.kind === "tree" || o.kind === "glb"), "Promoted object must preserve landscape origin and tombstone");
+      check(keys4(o.landscapeOrigin, ["layerId", "generatedId"]) && id2(o.landscapeOrigin.layerId) && typeof o.landscapeOrigin.generatedId === "string" && o.landscapeOrigin.generatedId.startsWith("landscape-instance:" + o.landscapeOrigin.layerId + "@") && l.tombstones.includes(o.landscapeOrigin.generatedId) && (o.kind === "tree" || o.kind === "glb"), "Promoted object must preserve landscape origin and tombstone");
     }
     assertLandscapeDerivedBudget(project);
     return [];
@@ -43740,9 +43791,9 @@ function editMask(project, layerId, mode, weight, bounds, boundary, workPerCell 
         total += Object.keys(current.mask.tiles).length;
         continue;
       }
-      const keys5 = new Set(replaceWater ? [] : Object.keys(current.mask.tiles));
-      if (tileCount) for (let tz = tz0; tz <= tz1; tz++) for (let tx = tx0; tx <= tx1; tx++) keys5.add(tx + ":" + tz);
-      total += keys5.size;
+      const keys6 = new Set(replaceWater ? [] : Object.keys(current.mask.tiles));
+      if (tileCount) for (let tz = tz0; tz <= tz1; tz++) for (let tx = tx0; tx <= tx1; tx++) keys6.add(tx + ":" + tz);
+      total += keys6.size;
     }
     check(total <= LANDSCAPE_LIMITS.maskTiles, "Landscape operation exceeds the shared 256 mask tile budget; erase coverage or use a smaller area.");
   }
@@ -43768,7 +43819,7 @@ function pointSegmentDistance(x, z, a, b) {
   return Math.hypot(x - a[0] - t * dx, z - a[2] - t * dz);
 }
 function applyLandscapeBrush(project, c) {
-  check(Array.isArray(c.points) && c.points.length > 0 && c.points.length <= 2048 && c.points.every(vector) && number2(c.radius, 0.25, 100) && number2(c.strength, 0, 1) && number2(c.falloff, 0, 1), "Invalid landscape brush command");
+  check(Array.isArray(c.points) && c.points.length > 0 && c.points.length <= 2048 && c.points.every(vector) && number3(c.radius, 0.25, 100) && number3(c.strength, 0, 1) && number3(c.falloff, 0, 1), "Invalid landscape brush command");
   const xs = c.points.map((p) => p[0]), zs = c.points.map((p) => p[2]);
   return editMask(project, c.layerId, c.mode, (x, z) => {
     let d = Infinity;
@@ -43787,7 +43838,7 @@ function pointInLandscapeBoundary(x, z, points) {
   return inside;
 }
 function createLandscapePondBoundary(center, radius, irregularity = 0.35) {
-  check(vector(center) && number2(radius, 0.25, 100) && number2(irregularity, 0, 1), "Invalid pond centre, radius or irregularity");
+  check(vector(center) && number3(radius, 0.25, 100) && number3(irregularity, 0, 1), "Invalid pond centre, radius or irregularity");
   const count = Math.min(64, Math.max(16, Math.ceil(Math.PI * Math.sqrt(radius * (1 + 3 * irregularity) / (0.12 * 2)))));
   const boundary = Array.from({ length: count }, (_, i) => {
     const angle = i * Math.PI * 2 / count, r = radius * (1 + irregularity * (0.12 * Math.cos(2 * angle) + 0.08 * Math.sin(3 * angle) + 0.05 * Math.cos(5 * angle)));
@@ -43835,7 +43886,7 @@ function landscapeWaterHasCompleteCoverage(project, layer) {
 }
 function applyLandscapeArea(project, c) {
   validateBoundary(c.boundary, project);
-  check(c.strength === void 0 || number2(c.strength, 0, 1), "Invalid landscape area strength");
+  check(c.strength === void 0 || number3(c.strength, 0, 1), "Invalid landscape area strength");
   const bounds = boundaryBounds(c.boundary), water = c.mode !== "erase" && project.landscape?.layers.find((l) => l.id === c.layerId)?.kind === "water";
   return editMask(project, c.layerId, c.mode, (x, z) => (water ? cellIntersectsBoundary(x - 0.5, z - 0.5, c.boundary) : pointInLandscapeBoundary(x, z, c.boundary)) ? c.strength ?? 1 : 0, bounds, c.boundary, c.boundary.length * (water ? 6 : 1));
 }
@@ -43843,15 +43894,15 @@ function applyLandscapePond(project, c) {
   const layer = project.landscape?.layers.find((l) => l.id === c.layerId);
   check(layer?.kind === "water" && layer.water, "Choose a water layer for a graded pond");
   check(!layer.locked, "Landscape layer is locked");
-  check(["paint", "replace", "erase"].includes(c.mode) && (c.strength === void 0 || number2(c.strength, 0, 1)), "Invalid pond operation or strength");
+  check(["paint", "replace", "erase"].includes(c.mode) && (c.strength === void 0 || number3(c.strength, 0, 1)), "Invalid pond operation or strength");
   const boundary = createLandscapePondBoundary(c.center, c.radius, c.irregularity);
   validateBoundary(boundary, project);
   const area2 = { layerId: c.layerId, boundary, strength: c.strength, mode: c.mode };
   if (c.mode === "erase") return applyLandscapeArea(project, area2);
-  check(number2(c.bankWidth, 0.25, 100) && number2(c.bedDepth, 0.1, 100), "Pond bank width and bed depth are outside supported bounds");
+  check(number3(c.bankWidth, 0.25, 100) && number3(c.bedDepth, 0.1, 100), "Pond bank width and bed depth are outside supported bounds");
   const terrain = project.terrain, stepX = terrain.width / (terrain.resolution - 1), stepZ = terrain.depth / (terrain.resolution - 1), minimumRun = 2 * Math.max(stepX, stepZ), minRadius = Math.min(...boundary.map((p) => Math.hypot(p[0] - c.center[0], p[2] - c.center[2]))), innerRun = Math.min(c.bankWidth, minRadius * 0.75), level = layer.water.level, freeboard = level + 0.25, bed = level - c.bedDepth;
   check(c.bankWidth >= minimumRun && innerRun >= minimumRun, "Terrain resolution is too coarse for this pond and bank width. Increase the pond radius and bank width or use a finer terrain grid.");
-  check(number2(freeboard, -2e3, 2e3) && number2(bed, -2e3, 2e3), "Pond bank or bed exceeds terrain height limits");
+  check(number3(freeboard, -2e3, 2e3) && number3(bed, -2e3, 2e3), "Pond bank or bed exceeds terrain height limits");
   const b = boundaryBounds(boundary), affected = [b[0] - c.bankWidth, b[1] + c.bankWidth, b[2] - c.bankWidth, b[3] + c.bankWidth];
   check(affected[0] >= -terrain.width / 2 && affected[1] <= terrain.width / 2 && affected[2] >= -terrain.depth / 2 && affected[3] <= terrain.depth / 2, "Pond and its bank extend beyond the terrain. Use a smaller radius or start farther from the edge.");
   const support = [affected[0] - stepX, affected[1] + stepX, affected[2] - stepZ, affected[3] + stepZ];
@@ -43995,13 +44046,13 @@ function exclusionIndex(project) {
   return { path: (x, z, c) => (pathCells.get(Math.floor(x / size) + ":" + Math.floor(z / size)) ?? []).some((test) => test(x, z, c)), building: (x, z, c) => (cells.get(Math.floor(x / size) + ":" + Math.floor(z / size)) ?? []).some((test) => test(x, z, c)) };
 }
 function candidatePoint(seed, x, z, spacing) {
-  return [(x + 0.5 + (hash(seed, x, z, 1) - 0.5) * 0.3) * spacing, (z + 0.5 + (hash(seed, x, z, 2) - 0.5) * 0.3) * spacing];
+  return [(x + 0.5 + (hash2(seed, x, z, 1) - 0.5) * 0.3) * spacing, (z + 0.5 + (hash2(seed, x, z, 2) - 0.5) * 0.3) * spacing];
 }
 function spacingWinner(seed, cx, cz, spacing) {
-  const [x, z] = candidatePoint(seed, cx, cz, spacing), rank = hash(seed, cx, cz, 99);
+  const [x, z] = candidatePoint(seed, cx, cz, spacing), rank = hash2(seed, cx, cz, 99);
   for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
     if (!dx && !dz) continue;
-    const nx = cx + dx, nz = cz + dz, other = hash(seed, nx, nz, 99);
+    const nx = cx + dx, nz = cz + dz, other = hash2(seed, nx, nz, 99);
     if (other > rank || other === rank && (nz > cz || nz === cz && nx > cx)) continue;
     const [xx, zz] = candidatePoint(seed, nx, nz, spacing);
     if (Math.hypot(x - xx, z - zz) < spacing) return false;
@@ -44031,15 +44082,15 @@ function generateLandscapeInstances(project) {
       const [cx, cz] = key.split(":").map(Number), [x, z] = candidatePoint(s.seed, cx, cz, s.spacing);
       if (Math.abs(x) >= project.terrain.width / 2 || Math.abs(z) >= project.terrain.depth / 2) continue;
       const weight = landscapeMaskAt(project, layer.mask, x, z) / 255;
-      if (hash(s.seed, cx, cz, 3) >= s.density * weight || !spacingWinner(s.seed, cx, cz, s.spacing)) continue;
+      if (hash2(s.seed, cx, cz, 3) >= s.density * weight || !spacingWinner(s.seed, cx, cz, s.spacing)) continue;
       const instanceId = "landscape-instance:" + layer.id + "@" + cx + "," + cz + ",0";
       if (removed.has(instanceId)) continue;
       const y = sampleTerrain(project.terrain, x, z), dx = sampleTerrain(project.terrain, x + 0.5, z) - sampleTerrain(project.terrain, x - 0.5, z), dz = sampleTerrain(project.terrain, x, z + 0.5) - sampleTerrain(project.terrain, x, z - 0.5), slope = Math.atan(Math.hypot(dx, dz)) * 180 / Math.PI;
       if (y < c.minElevation || y > c.maxElevation || slope > c.maxSlope || c.excludePaths && exclusions.path(x, z, c.clearance) || c.excludeBuildings && exclusions.building(x, z, c.clearance)) continue;
       const water = sampleLandscapeWater(project, x, z, 0), legacyWater = project.water && Math.abs(x) < project.water.extent / 2 && Math.abs(z) < project.water.extent / 2 && y < project.water.level, lake = (project.features ?? []).some((f) => f.kind === "lake" && y < (f.elevation ?? 0) && pointInLandscapeBoundary(x, z, f.points));
       if (c.excludeWater && (water || legacyWater || lake)) continue;
-      const scale = s.scaleMin + (s.scaleMax - s.scaleMin) * hash(s.seed, cx, cz, 4), tint = hash(s.seed, cx, cz, 5) * s.variation, base = { tree: "#497b39", shrub: "#57813f", grass: "#6b9345", flower: "#b78dcb", rock: "#82877e" }[s.kind], rgb = [1, 3, 5].map((i) => Math.max(0, Math.min(255, Math.round(parseInt(base.slice(i, i + 2), 16) * (1 - s.variation * 0.25 + tint * 0.5))))), color2 = "#" + rgb.map((v) => v.toString(16).padStart(2, "0")).join("");
-      result.push({ id: instanceId, layerId: layer.id, kind: s.kind, position: [x, y, z], rotation: [0, hash(s.seed, cx, cz, 6) * Math.PI * 2, 0], scale: [scale, scale, scale], color: color2, cell: [cx, cz], ordinal: 0, seed: Math.floor(hash(s.seed, cx, cz, 7) * 4294967295), treeSpecies: s.treeSpecies, ...s.assetRef ? { assetRef: s.assetRef } : {} });
+      const scale = s.scaleMin + (s.scaleMax - s.scaleMin) * hash2(s.seed, cx, cz, 4), tint = hash2(s.seed, cx, cz, 5) * s.variation, base = { tree: "#497b39", shrub: "#57813f", grass: "#6b9345", flower: "#b78dcb", rock: "#82877e" }[s.kind], rgb = [1, 3, 5].map((i) => Math.max(0, Math.min(255, Math.round(parseInt(base.slice(i, i + 2), 16) * (1 - s.variation * 0.25 + tint * 0.5))))), color2 = "#" + rgb.map((v) => v.toString(16).padStart(2, "0")).join("");
+      result.push({ id: instanceId, layerId: layer.id, kind: s.kind, position: [x, y, z], rotation: [0, hash2(s.seed, cx, cz, 6) * Math.PI * 2, 0], scale: [scale, scale, scale], color: color2, cell: [cx, cz], ordinal: 0, seed: Math.floor(hash2(s.seed, cx, cz, 7) * 4294967295), treeSpecies: s.treeSpecies, ...s.assetRef ? { assetRef: s.assetRef } : {} });
       check(result.length <= LANDSCAPE_LIMITS.instances, "Landscape generated instance limit exceeded");
     }
   }
@@ -44065,7 +44116,7 @@ function updateLandscapeLayer(project, layerId, patch) {
   check(project.landscape, "No landscape");
   const layer = project.landscape.layers.find((l) => l.id === layerId);
   check(layer, "Unknown landscape layer");
-  check(keys3(patch, ["name", "visible", "locked", "materialId", "scatter", "water", "boundary"]), "Unsupported layer edit");
+  check(keys4(patch, ["name", "visible", "locked", "materialId", "scatter", "water", "boundary"]), "Unsupported layer edit");
   check(!layer.locked || Object.keys(patch).length === 1 && patch.locked === false, "Landscape layer is locked");
   const result = { ...project, landscape: { ...project.landscape, layers: project.landscape.layers.map((l) => l.id === layerId ? { ...l, ...structuredClone(patch) } : l) } };
   assertLandscape(result);
@@ -44080,7 +44131,7 @@ function addLandscapeMaterial(project, material) {
 }
 function updateLandscapeMaterial(project, materialId, patch) {
   check(project.landscape && project.landscape.materials.some((m) => m.id === materialId), "Unknown landscape material");
-  check(keys3(patch, ["name", "preset", "color", "roughness", "tiling", "imageRef"]), "Unsupported material edit");
+  check(keys4(patch, ["name", "preset", "color", "roughness", "tiling", "imageRef"]), "Unsupported material edit");
   const result = { ...project, landscape: { ...project.landscape, materials: project.landscape.materials.map((m) => m.id === materialId ? { ...m, ...patch } : m) } };
   assertLandscape(result);
   return result;
@@ -44199,43 +44250,43 @@ function renderedLandscapeTreeSeed(instance) {
 var MAX_PORTALS = 16;
 var PORTAL_PLAYER_RADIUS = 0.28;
 var PORTAL_PLAYER_HEIGHT = 1.75;
-var record3 = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+var record4 = (v) => !!v && typeof v === "object" && !Array.isArray(v);
 var bounded2 = (v, min, max) => typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
-var vec2 = (v) => Array.isArray(v) && v.length === 3 && v.every((n) => bounded2(n, -2e3, 2e3));
+var vec3 = (v) => Array.isArray(v) && v.length === 3 && v.every((n) => bounded2(n, -2e3, 2e3));
 var identity = (v, prefix) => typeof v === "string" && new RegExp("^" + prefix + "[A-Za-z0-9][A-Za-z0-9._-]{0,159}$").test(v);
-var keys4 = (v, allowed) => Object.keys(v).every((k) => allowed.includes(k));
+var keys5 = (v, allowed) => Object.keys(v).every((k) => allowed.includes(k));
 function validateWorldConnections(project) {
   const errors = [], ids = /* @__PURE__ */ new Set();
   if (project.portals !== void 0) {
     if (!Array.isArray(project.portals) || project.portals.length > MAX_PORTALS) errors.push("Worlds may contain at most 16 portals.");
     for (const p of Array.isArray(project.portals) ? project.portals : []) {
-      if (!record3(p) || !keys4(p, ["id", "name", "position", "yaw", "width", "height", "destination", "enabled", "view", "traversal", "policyRef", "visual"])) {
+      if (!record4(p) || !keys5(p, ["id", "name", "position", "yaw", "width", "height", "destination", "enabled", "view", "traversal", "policyRef", "visual"])) {
         errors.push("Invalid portal fields.");
         continue;
       }
       if (!identity(p.id, "elsemesh-portal:") || ids.has(p.id)) errors.push("Portal has an invalid or duplicate identity.");
       ids.add(p.id);
-      if (typeof p.name !== "string" || !p.name.trim() || p.name.length > 120 || !vec2(p.position) || !bounded2(p.yaw, -Math.PI * 2, Math.PI * 2) || !bounded2(p.width, Math.round((PORTAL_PLAYER_RADIUS * 2 + 0.04) * 100) / 100, 20) || !bounded2(p.height, PORTAL_PLAYER_HEIGHT + 0.04, 20)) errors.push("Portal geometry must be an upright rectangle large enough for the player capsule.");
-      if (typeof p.enabled !== "boolean" || !record3(p.view) || !keys4(p.view, ["enabled", "maxDistance"]) || typeof p.view.enabled !== "boolean" || !bounded2(p.view.maxDistance, 0.5, 200) || !record3(p.traversal) || !keys4(p.traversal, ["enabled"]) || typeof p.traversal.enabled !== "boolean") errors.push("Portal view or traversal settings are invalid.");
-      if (!record3(p.destination) || !keys4(p.destination, ["worldId", "regionId", "portalId"]) || !identity(p.destination.worldId, "elsemesh[.]world:") || !identity(p.destination.regionId, "elsemesh[.]region:") || !identity(p.destination.portalId, "elsemesh-portal:")) errors.push("Portal destination must contain world, region and portal identities.");
+      if (typeof p.name !== "string" || !p.name.trim() || p.name.length > 120 || !vec3(p.position) || !bounded2(p.yaw, -Math.PI * 2, Math.PI * 2) || !bounded2(p.width, Math.round((PORTAL_PLAYER_RADIUS * 2 + 0.04) * 100) / 100, 20) || !bounded2(p.height, PORTAL_PLAYER_HEIGHT + 0.04, 20)) errors.push("Portal geometry must be an upright rectangle large enough for the player capsule.");
+      if (typeof p.enabled !== "boolean" || !record4(p.view) || !keys5(p.view, ["enabled", "maxDistance"]) || typeof p.view.enabled !== "boolean" || !bounded2(p.view.maxDistance, 0.5, 200) || !record4(p.traversal) || !keys5(p.traversal, ["enabled"]) || typeof p.traversal.enabled !== "boolean") errors.push("Portal view or traversal settings are invalid.");
+      if (!record4(p.destination) || !keys5(p.destination, ["worldId", "regionId", "portalId"]) || !identity(p.destination.worldId, "elsemesh[.]world:") || !identity(p.destination.regionId, "elsemesh[.]region:") || !identity(p.destination.portalId, "elsemesh-portal:")) errors.push("Portal destination must contain world, region and portal identities.");
       if (typeof p.policyRef !== "string" || !/^[A-Za-z0-9][A-Za-z0-9:._-]{0,159}$/.test(p.policyRef)) errors.push("Portal policy reference must be a bounded identity, never a URL or credential.");
-      if (!record3(p.visual) || !keys4(p.visual, ["frameColor", "unavailableColor"]) || ![p.visual.frameColor, p.visual.unavailableColor].every((c) => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c))) errors.push("Portal colors must be hexadecimal RGB.");
+      if (!record4(p.visual) || !keys5(p.visual, ["frameColor", "unavailableColor"]) || ![p.visual.frameColor, p.visual.unavailableColor].every((c) => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c))) errors.push("Portal colors must be hexadecimal RGB.");
     }
     for (const p of Array.isArray(project.portals) ? project.portals : []) {
-      if (!record3(p) || !record3(p.destination)) continue;
+      if (!record4(p) || !record4(p.destination)) continue;
       if (p.destination.worldId === project.metadata?.worldId && (p.destination.regionId !== project.metadata?.regionId || !ids.has(p.destination.portalId))) errors.push("Portal references a missing local region or portal.");
     }
   }
   if (project.water !== void 0) {
     const w = project.water;
-    if (!record3(w) || !keys4(w, ["level", "waveAmplitude", "waveSpeed", "extent"]) || !bounded2(w.level, -2e3, 2e3) || !bounded2(w.waveAmplitude, 0, 3) || !bounded2(w.waveSpeed, 0, 10) || !bounded2(w.extent, 16, 4096)) errors.push("Water settings are outside supported bounds.");
+    if (!record4(w) || !keys5(w, ["level", "waveAmplitude", "waveSpeed", "extent"]) || !bounded2(w.level, -2e3, 2e3) || !bounded2(w.waveAmplitude, 0, 3) || !bounded2(w.waveSpeed, 0, 10) || !bounded2(w.extent, 16, 4096)) errors.push("Water settings are outside supported bounds.");
   }
   if (project.terminals !== void 0) {
     const terminalIds = /* @__PURE__ */ new Set(), objects = new Set((Array.isArray(project.objects) ? project.objects : []).map((o) => o?.id));
     if (!Array.isArray(project.terminals) || project.terminals.length > 32) errors.push("Worlds may contain at most 32 retro terminals.");
     for (const t of Array.isArray(project.terminals) ? project.terminals : []) {
-      if (!record3(t) || !keys4(t, ["id", "objectId", "kind", "screenObjectId", "screenObjectIds", "position", "interactionRadius"]) || typeof t.id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9:._-]{0,159}$/.test(t.id) || terminalIds.has(t.id) || !["c64", "bbc", "sun"].includes(t.kind) || !objects.has(t.objectId) || t.screenObjectId !== void 0 && !objects.has(t.screenObjectId) || t.screenObjectIds !== void 0 && (!Array.isArray(t.screenObjectIds) || t.screenObjectIds.length > 8 || new Set(t.screenObjectIds).size !== t.screenObjectIds.length || t.screenObjectIds.some((id3) => !objects.has(id3))) || !vec2(t.position) || !bounded2(t.interactionRadius, 0.5, 5)) errors.push("Retro terminal has invalid settings, duplicate identity or missing object references.");
-      if (record3(t) && typeof t.id === "string") terminalIds.add(t.id);
+      if (!record4(t) || !keys5(t, ["id", "objectId", "kind", "screenObjectId", "screenObjectIds", "position", "interactionRadius"]) || typeof t.id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9:._-]{0,159}$/.test(t.id) || terminalIds.has(t.id) || !["c64", "bbc", "sun"].includes(t.kind) || !objects.has(t.objectId) || t.screenObjectId !== void 0 && !objects.has(t.screenObjectId) || t.screenObjectIds !== void 0 && (!Array.isArray(t.screenObjectIds) || t.screenObjectIds.length > 8 || new Set(t.screenObjectIds).size !== t.screenObjectIds.length || t.screenObjectIds.some((id3) => !objects.has(id3))) || !vec3(t.position) || !bounded2(t.interactionRadius, 0.5, 5)) errors.push("Retro terminal has invalid settings, duplicate identity or missing object references.");
+      if (record4(t) && typeof t.id === "string") terminalIds.add(t.id);
     }
   }
   return errors;
@@ -44392,6 +44443,8 @@ function validateWorld(value) {
   errors.push(...validateWorldConnections(p));
   if (Object.prototype.hasOwnProperty.call(p, "nativeIsland") && p.nativeIsland === void 0) errors.push("Invalid native island field.");
   errors.push(...validateNativeIsland(p.nativeIsland));
+  if (Object.hasOwn(p, "splatScene") && p.splatScene === void 0) errors.push("Invalid splat scene field.");
+  errors.push(...validateSplatScene(p.splatScene));
   errors.push(...validateObjectAccess(p));
   if (Object.prototype.hasOwnProperty.call(p, "welcome")) {
     const greeting = p.welcome;
@@ -44585,6 +44638,7 @@ function validatePlayerWorldPackage(value) {
   if (p.schema !== PLAYER_WORLD_SCHEMA && p.schema !== LANDSCAPE_PLAYER_WORLD_SCHEMA) return invalid("Unsupported player world package schema.");
   const result = validateWorld(p.project);
   if (!result.valid || !result.project) return result;
+  if (result.project.splatScene) return invalid("Splat scene resources require an authorized repository source.");
   if (p.schema === LANDSCAPE_PLAYER_WORLD_SCHEMA !== !!result.project.landscape) return invalid("Landscape requires player-world/3 capabilities.");
   const required = playerWorldCapabilities(result.project).filter((c) => c !== "object-access/1" || result.project.objectAccess !== void 0 || Array.isArray(p.capabilities) && p.capabilities.includes(c));
   if (required.length) {
@@ -44601,6 +44655,7 @@ function createPlayerWorldPackage(value) {
   const result = admitLandscapeProject(value);
   if (!result.valid || !result.project) throw new Error(result.errors[0] ?? "Project is invalid.");
   assertNativeIslandStandaloneExport(result.project);
+  assertSplatSceneStandaloneExport(result.project);
   const packageFile = {
     schema: result.project.landscape ? LANDSCAPE_PLAYER_WORLD_SCHEMA : PLAYER_WORLD_SCHEMA,
     ...playerWorldCapabilities(result.project).length ? { capabilities: playerWorldCapabilities(result.project) } : {},
@@ -44675,7 +44730,7 @@ var PREVIOUS_WORLD_REPOSITORY_SCHEMA = "elsemesh.world-repository/2";
 var CONNECTION_WORLD_REPOSITORY_SCHEMA = "elsemesh.world-repository/3";
 var WORLD_REPOSITORY_SCHEMA = "elsemesh.world-repository/4";
 var WORLD_ENGINE_CONTRACT = "elsemesh.worlds.runtime/1";
-var WORLD_CAPABILITIES = ["water-exclusion/1", "media-screen/1", "native-island/1", "welcome/1", "object-access/1", "project/2", "project/3", "landscape/1", "terrain", "objects", "hierarchy", "features", "neon-sign", "computer", "geography", "terrain-imagery", "weather", "portal/1", "water/1", "retro-terminal/1", "port-traffic/1", "collision-volumes/1"];
+var WORLD_CAPABILITIES = ["splat-scene/1", "water-exclusion/1", "media-screen/1", "native-island/1", "welcome/1", "object-access/1", "project/2", "project/3", "landscape/1", "terrain", "objects", "hierarchy", "features", "neon-sign", "computer", "geography", "terrain-imagery", "weather", "portal/1", "water/1", "retro-terminal/1", "port-traffic/1", "collision-volumes/1"];
 var WORLD_REPOSITORY_MANIFEST = "world.json";
 var WORLD_REPOSITORY_MANIFEST_LIMIT = 64 * 1024;
 var ENGINE_REFERENCE = "95719848d5ffa4428b57c75c272483e1c2113a72";
@@ -44688,15 +44743,15 @@ var hashPattern = /^[a-f0-9]{64}$/;
 var object2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var json = (value) => encoder.encode(JSON.stringify(value, null, 2) + "\n");
 async function repositoryDigest(bytes) {
-  const digest2 = await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes));
-  return Array.from(new Uint8Array(digest2), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const digest3 = await crypto.subtle.digest("SHA-256", Uint8Array.from(bytes));
+  return Array.from(new Uint8Array(digest3), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 function parse(bytes) {
   const text3 = decoder.decode(bytes);
   if (text3.startsWith("version https://git-lfs.github.com/spec/v1")) throw new Error("Git LFS pointer found: download the actual content before opening this world.");
   return JSON.parse(text3);
 }
-function reference(value, expectedPath) {
+function reference2(value, expectedPath) {
   if (!object2(value) || typeof value.path !== "string" || typeof value.sha256 !== "string" || !hashPattern.test(value.sha256) || !Number.isSafeInteger(value.bytes) || value.bytes < 1 || value.bytes > MAX_PROJECT_BYTES) throw new Error("Invalid repository file reference.");
   if (expectedPath !== void 0 ? value.path !== expectedPath : !new RegExp(`^(assets/[a-f0-9]{64}\\.glb|landscape-images/[a-f0-9]{64}\\.(png|jpg)|imagery/[a-f0-9]{64}\\.(png|jpg))$`).test(value.path)) throw new Error("Repository file path is not allowed.");
   if (expectedPath === void 0 && !value.path.includes(value.sha256)) throw new Error("Binary filename does not match its content hash.");
@@ -44748,9 +44803,9 @@ async function packWorldRepository(project, options = {}) {
     const { dataUrl, ...metadata } = image;
     return { ...metadata, file: await binary(dataUrl, "landscape-images", image.mediaType === "image/png" ? "png" : "jpg") };
   })) } : void 0;
-  const extended = project.portals !== void 0 || project.water !== void 0 || project.terminals !== void 0 || project.traffic !== void 0 || project.objectAccess !== void 0 || project.welcome !== void 0 || project.nativeIsland !== void 0;
+  const extended = project.portals !== void 0 || project.water !== void 0 || project.terminals !== void 0 || project.traffic !== void 0 || project.objectAccess !== void 0 || project.welcome !== void 0 || project.nativeIsland !== void 0 || project.splatScene !== void 0;
   const activeRoles = landscape ? roles : extended ? connectionRoles : legacyRoles;
-  const values = { landscape, metadata: project.metadata, terrain: project.terrain, objects: project.objects, features: project.features ?? [], environment: project.environment, spawn: project.spawn, geography, assets, connections: { ...project.nativeIsland !== void 0 ? { nativeIsland: project.nativeIsland } : {}, ...project.welcome !== void 0 ? { welcome: project.welcome } : {}, ...project.objectAccess !== void 0 ? { objectAccess: project.objectAccess } : {}, ...project.traffic !== void 0 ? { traffic: project.traffic } : {}, ...project.portals !== void 0 ? { portals: project.portals } : {}, ...project.water !== void 0 ? { water: project.water } : {}, ...project.terminals !== void 0 ? { terminals: project.terminals } : {} } };
+  const values = { landscape, metadata: project.metadata, terrain: project.terrain, objects: project.objects, features: project.features ?? [], environment: project.environment, spawn: project.spawn, geography, assets, connections: { ...project.splatScene !== void 0 ? { splatScene: project.splatScene } : {}, ...project.nativeIsland !== void 0 ? { nativeIsland: project.nativeIsland } : {}, ...project.welcome !== void 0 ? { welcome: project.welcome } : {}, ...project.objectAccess !== void 0 ? { objectAccess: project.objectAccess } : {}, ...project.traffic !== void 0 ? { traffic: project.traffic } : {}, ...project.portals !== void 0 ? { portals: project.portals } : {}, ...project.water !== void 0 ? { water: project.water } : {}, ...project.terminals !== void 0 ? { terminals: project.terminals } : {} } };
   const components = {};
   const contents = /* @__PURE__ */ new Map();
   for (const role of activeRoles) {
@@ -44784,7 +44839,12 @@ async function packWorldRepository(project, options = {}) {
       if (!files.has(ref.path)) files.set(ref.path, verifiedBytes);
     }
   }
-  if ([...files.entries()].filter(([path]) => !path.startsWith("native-island/")).reduce((sum, [, bytes]) => sum + bytes.byteLength, 0) > MAX_PROJECT_BYTES) throw new Error("Formatted repository exceeds the 25 MiB content budget.");
+  if (project.splatScene) {
+    const reader = createSplatSceneResourceReader(project, options.splatSceneRead);
+    files.set(project.splatScene.asset.path, await reader.readSog());
+    files.set(project.splatScene.physics.path, await reader.readPhysicsBytes());
+  }
+  if ([...files.entries()].filter(([path]) => !path.startsWith("native-island/") && !path.startsWith("splat-scenes/")).reduce((sum, [, bytes]) => sum + bytes.byteLength, 0) > MAX_PROJECT_BYTES) throw new Error("Formatted repository exceeds the 25 MiB content budget.");
   return files;
 }
 async function unpackWorldRepository(read) {
@@ -44795,7 +44855,7 @@ async function unpackWorldRepository(read) {
   const manifest = raw;
   const components = {};
   const activeRoles = manifest.version === 4 ? roles : manifest.version === 3 ? connectionRoles : legacyRoles;
-  for (const role of activeRoles) components[role] = reference(manifest.components[role], `snapshots/${manifest.snapshot}/${role}.json`);
+  for (const role of activeRoles) components[role] = reference2(manifest.components[role], `snapshots/${manifest.snapshot}/${role}.json`);
   if (await snapshotDigest(components) !== manifest.snapshot) throw new Error("Snapshot identifier does not match its components.");
   let total = manifestBytes.byteLength;
   const cache2 = /* @__PURE__ */ new Map();
@@ -44821,7 +44881,7 @@ async function unpackWorldRepository(read) {
   let glbBytes = 0;
   for (const asset of values.assets) {
     if (!object2(asset) || "dataUrl" in asset) throw new Error("Invalid external asset descriptor.");
-    const { file, ...metadata } = asset, ref = reference(file);
+    const { file, ...metadata } = asset, ref = reference2(file);
     if (!ref.path.startsWith("assets/")) throw new Error("GLB asset must use an assets path.");
     if (metadata.bytes !== ref.bytes) throw new Error("Asset byte metadata does not match its binary reference.");
     glbBytes += ref.bytes;
@@ -44832,12 +44892,12 @@ async function unpackWorldRepository(read) {
   let imageryPlan;
   if (geo.terrainImagery !== null) {
     if (!object2(geo.terrainImagery) || "dataUrl" in geo.terrainImagery) throw new Error("Invalid external terrain imagery descriptor.");
-    const { file, ...metadata } = geo.terrainImagery, ref = reference(file);
+    const { file, ...metadata } = geo.terrainImagery, ref = reference2(file);
     if (!ref.path.startsWith("imagery/")) throw new Error("Terrain imagery must use an imagery path.");
     imageryPlan = { metadata, ref, mediaType: ref.path.endsWith(".png") ? "image/png" : "image/jpeg" };
   }
   const connections = manifest.version >= 3 ? values.connections : {};
-  if (!object2(connections) || Object.keys(connections).some((key) => !["portals", "water", "terminals", "traffic", "objectAccess", "welcome", "nativeIsland"].includes(key))) throw new Error("Invalid repository connections component.");
+  if (!object2(connections) || Object.keys(connections).some((key) => !["portals", "water", "terminals", "traffic", "objectAccess", "welcome", "nativeIsland", "splatScene"].includes(key))) throw new Error("Invalid repository connections component.");
   const rawLandscape = manifest.version === 4 ? values.landscape : void 0;
   const imagePlans = [];
   if (rawLandscape !== void 0) {
@@ -44845,7 +44905,7 @@ async function unpackWorldRepository(read) {
     let bytes = 0;
     for (const image of rawLandscape.images) {
       if (!object2(image) || "dataUrl" in image) throw Error("Invalid external landscape image");
-      const { file, ...metadata } = image, ref = reference(file);
+      const { file, ...metadata } = image, ref = reference2(file);
       if (!ref.path.startsWith("landscape-images/") || metadata.id !== "sha256:" + ref.sha256 || metadata.bytes !== ref.bytes) throw Error("Landscape image reference/hash mismatch");
       const mediaType = ref.path.endsWith(".png") ? "image/png" : "image/jpeg";
       if (metadata.mediaType !== mediaType) throw Error("Landscape image media mismatch");
@@ -44905,6 +44965,7 @@ function requiredWorldCapabilities(project) {
   if (project.objects.some((o) => o.kind === "media-screen")) capabilities.add("media-screen/1");
   if (project.nativeIsland?.sea.surfaceExclusions !== void 0) capabilities.add("water-exclusion/1");
   if (project.nativeIsland) capabilities.add("native-island/1");
+  if (project.splatScene) capabilities.add(SPLAT_SCENE_CAPABILITY);
   if (project.objects.some((o) => o.kind === "group" || o.parentId)) capabilities.add("hierarchy");
   for (const kind of ["neon-sign", "computer"]) if (project.objects.some((o) => o.kind === kind)) capabilities.add(kind);
   if (project.portals?.length) capabilities.add("portal/1");
@@ -45026,7 +45087,7 @@ function sameOriginWorldSource(input, options = {}) {
   if (!["http:", "https:"].includes(base.protocol) || base.origin !== origin || base.username || base.password || base.search || base.hash || base.pathname.split("/").some((segment) => segment && !/^[A-Za-z0-9._-]+$/.test(segment))) throw new Error("Repository URLs must use this editor origin without credentials, query or fragment.");
   if (!base.pathname.endsWith("/")) base.pathname += "/";
   return { kind: "local", label: "HTTP " + base.href, read: (path, limit) => {
-    if (path !== WORLD_REPOSITORY_MANIFEST && !/^(snapshots\/[a-f0-9]{64}\/(metadata|terrain|objects|features|environment|spawn|geography|assets|connections|landscape)\.json|assets\/[a-f0-9]{64}\.glb|landscape-images\/[a-f0-9]{64}\.(png|jpg)|native-island\/[a-f0-9]{64}\.bin|imagery\/[a-f0-9]{64}\.(png|jpg))$/.test(path)) throw new Error("World content path is not allowed.");
+    if (path !== WORLD_REPOSITORY_MANIFEST && !/^(snapshots\/[a-f0-9]{64}\/(metadata|terrain|objects|features|environment|spawn|geography|assets|connections|landscape)\.json|assets\/[a-f0-9]{64}\.glb|landscape-images\/[a-f0-9]{64}\.(png|jpg)|splat-scenes\/[a-f0-9]{64}\.(sog|json)|native-island\/[a-f0-9]{64}\.bin|imagery\/[a-f0-9]{64}\.(png|jpg))$/.test(path)) throw new Error("World content path is not allowed.");
     return boundedFetch(base.href + path, limit, options, "application/octet-stream");
   } };
 }
@@ -45056,7 +45117,7 @@ async function loadWorldSource(source, options = {}) {
     if (!commitPattern.test(source.commit)) throw new Error("World content must be pinned to a full Git commit.");
     const prefix = `https://raw.githubusercontent.com/${validated.owner}/${validated.repository}/${source.commit}/${validated.path ? validated.path + "/" : ""}`;
     read = (path, limit) => {
-      if (path !== WORLD_REPOSITORY_MANIFEST && !/^(snapshots\/[a-f0-9]{64}\/(metadata|terrain|objects|features|environment|spawn|geography|assets|connections|landscape)\.json|assets\/[a-f0-9]{64}\.glb|landscape-images\/[a-f0-9]{64}\.(png|jpg)|native-island\/[a-f0-9]{64}\.bin|imagery\/[a-f0-9]{64}\.(png|jpg))$/.test(path)) throw new Error("World content path is not allowed.");
+      if (path !== WORLD_REPOSITORY_MANIFEST && !/^(snapshots\/[a-f0-9]{64}\/(metadata|terrain|objects|features|environment|spawn|geography|assets|connections|landscape)\.json|assets\/[a-f0-9]{64}\.glb|landscape-images\/[a-f0-9]{64}\.(png|jpg)|splat-scenes\/[a-f0-9]{64}\.(sog|json)|native-island\/[a-f0-9]{64}\.bin|imagery\/[a-f0-9]{64}\.(png|jpg))$/.test(path)) throw new Error("World content path is not allowed.");
       return boundedFetch(prefix + path, limit, options, "application/octet-stream");
     };
     location2 = githubWorldSourceLocation(source);
@@ -45064,7 +45125,7 @@ async function loadWorldSource(source, options = {}) {
   }
   const loaded = await inspectWorldRepository(read);
   registerNativeIslandResourceReader(loaded.project, read);
-  return { ...loaded, source, ...loaded.project.nativeIsland ? { nativeIslandRead: read } : {}, identity: { worldId: loaded.project.metadata.worldId, location: location2, ...resolvedCommit ? { resolvedCommit } : {}, contentDigest: loaded.contentDigest, sessionId: crypto.randomUUID() } };
+  return { ...loaded, source, ...loaded.project.splatScene ? { splatSceneRead: createSplatSceneResourceReader(loaded.project, read).read } : {}, ...loaded.project.nativeIsland ? { nativeIslandRead: read } : {}, identity: { worldId: loaded.project.metadata.worldId, location: location2, ...resolvedCommit ? { resolvedCommit } : {}, contentDigest: loaded.contentDigest, sessionId: crypto.randomUUID() } };
 }
 async function checkWorldSourceUpdate(current, options = {}) {
   if (current.source.kind !== "github") throw new Error("Only GitHub sources have remote updates.");
@@ -45079,7 +45140,7 @@ function forkWorldSource(loaded, name = `${loaded.project.metadata.name} (fork)`
   project.metadata = { ...project.metadata, name, worldId: `elsemesh.world:${crypto.randomUUID()}`, regionId: `elsemesh.region:${crypto.randomUUID()}` };
   const validation = validateWorld(project);
   if (!validation.valid) throw new Error(validation.errors.join(" "));
-  const packOptions = { attribution: structuredClone(loaded.manifest.attribution ?? { authors: [] }), provenance: { sourceWorldId: loaded.identity.worldId, sourceLocation: loaded.identity.location, ...loaded.identity.resolvedCommit ? { sourceCommit: loaded.identity.resolvedCommit } : {}, sourceDigest: loaded.identity.contentDigest } };
+  const packOptions = { ...loaded.splatSceneRead ? { splatSceneRead: loaded.splatSceneRead } : {}, attribution: structuredClone(loaded.manifest.attribution ?? { authors: [] }), provenance: { sourceWorldId: loaded.identity.worldId, sourceLocation: loaded.identity.location, ...loaded.identity.resolvedCommit ? { sourceCommit: loaded.identity.resolvedCommit } : {}, sourceDigest: loaded.identity.contentDigest } };
   return { project, packOptions };
 }
 
@@ -45115,9 +45176,9 @@ function describeRuntimeWorld(input) {
 }
 
 // src/domain/runtime-admission.ts
-var record4 = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+var record5 = (v) => !!v && typeof v === "object" && !Array.isArray(v);
 function admitFederatedRuntimeWorld(project, contentDigest, binding, regionProof, verifiers) {
-  if (!/^[a-f0-9]{64}$/.test(contentDigest) || !record4(binding) || !verifiers.verifyBinding(binding)) throw new Error("World content admission signature is not trusted.");
+  if (!/^[a-f0-9]{64}$/.test(contentDigest) || !record5(binding) || !verifiers.verifyBinding(binding)) throw new Error("World content admission signature is not trusted.");
   const region = verifiers.verifyRegion(regionProof);
   if (binding.kind !== "elsemesh.world-content-admission/1" || binding.authoredWorldId !== project.metadata.worldId || binding.authoredRegionId !== project.metadata.regionId || binding.contentDigest !== contentDigest || binding.federationWorldId !== region.worldId || binding.federationRegionId !== region.regionId || binding.authorityNodeId !== region.authority.nodeId || binding.authorityEpoch !== region.authority.epoch || binding.signer !== region.ownerNodeId) throw new Error("World content admission does not match this content, region or authority.");
   return { runtime: describeRuntimeWorld(project), region, contentDigest };
@@ -45349,12 +45410,12 @@ async function privateNeonIdentity() {
       r.onerror = () => reject(r.error);
     });
     if (existing) return existing;
-    const keys5 = await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]);
-    const der = new Uint8Array(await crypto.subtle.exportKey("spki", keys5.publicKey));
-    const digest2 = new Uint8Array(await crypto.subtle.digest("SHA-256", der));
-    const nodeId = "elsemesh-node:" + Array.from(digest2, (x) => x.toString(16).padStart(2, "0")).join("");
+    const keys6 = await crypto.subtle.generateKey({ name: "Ed25519" }, false, ["sign", "verify"]);
+    const der = new Uint8Array(await crypto.subtle.exportKey("spki", keys6.publicKey));
+    const digest3 = new Uint8Array(await crypto.subtle.digest("SHA-256", der));
+    const nodeId = "elsemesh-node:" + Array.from(digest3, (x) => x.toString(16).padStart(2, "0")).join("");
     const encoded = base64(der);
-    const identity2 = { nodeId, publicKey: "-----BEGIN PUBLIC KEY-----\n" + encoded.match(/.{1,64}/g).join("\n") + "\n-----END PUBLIC KEY-----\n", privateKey: keys5.privateKey };
+    const identity2 = { nodeId, publicKey: "-----BEGIN PUBLIC KEY-----\n" + encoded.match(/.{1,64}/g).join("\n") + "\n-----END PUBLIC KEY-----\n", privateKey: keys6.privateKey };
     try {
       await new Promise((resolve, reject) => {
         const tx = db.transaction("keys", "readwrite");
@@ -46745,9 +46806,9 @@ function createPrimitiveKey(primitiveDef) {
 }
 function createAttributesKey(attributes) {
   let attributesKey = "";
-  const keys5 = Object.keys(attributes).sort();
-  for (let i = 0, il = keys5.length; i < il; i++) {
-    attributesKey += keys5[i] + ":" + attributes[keys5[i]] + ";";
+  const keys6 = Object.keys(attributes).sort();
+  for (let i = 0, il = keys6.length; i < il; i++) {
+    attributesKey += keys6[i] + ":" + attributes[keys6[i]] + ";";
   }
   return attributesKey;
 }
@@ -48137,9 +48198,9 @@ var HASH_SIZE = 4096;
 var mod = (a, n) => (a % n + n) % n;
 async function bakeLandscapeAtlas(p) {
   const layers = p.landscape?.layers.filter((l) => l.visible && l.kind === "ground") ?? [];
-  const keys5 = [...new Set(layers.flatMap((l) => Object.keys(l.mask.tiles)))].sort();
-  if (!keys5.length) return null;
-  const side = Math.ceil(Math.sqrt(keys5.length)), size = side * STRIDE, data = new Uint8Array(size * size * 4), rough = new Uint8Array(size * size * 4), index = new Float32Array(HASH_SIZE * 4);
+  const keys6 = [...new Set(layers.flatMap((l) => Object.keys(l.mask.tiles)))].sort();
+  if (!keys6.length) return null;
+  const side = Math.ceil(Math.sqrt(keys6.length)), size = side * STRIDE, data = new Uint8Array(size * size * 4), rough = new Uint8Array(size * size * 4), index = new Float32Array(HASH_SIZE * 4);
   const sampler = createLandscapeSampler(p), images = /* @__PURE__ */ new Map();
   for (const image of p.landscape?.images ?? []) {
     const bitmap = await createImageBitmap(await (await fetch(image.dataUrl)).blob());
@@ -48158,7 +48219,7 @@ async function bakeLandscapeAtlas(p) {
       bitmap.close();
     }
   }
-  keys5.forEach((key, i) => {
+  keys6.forEach((key, i) => {
     const [tx, tz] = key.split(":").map(Number);
     let h = mod(tx * 17 + tz * 31, HASH_SIZE);
     while (index[h * 4 + 2]) h = (h + 1) % HASH_SIZE;
@@ -48195,7 +48256,7 @@ async function bakeLandscapeAtlas(p) {
         rough.set([rs / (a || 1) * 255, 0, 0, a * 255], o);
       }
   });
-  return { data, rough, index, size, side, tiles: keys5.length };
+  return { data, rough, index, size, side, tiles: keys6.length };
 }
 function threeAtlas(atlas) {
   const color2 = new DataTexture(atlas.data, atlas.size, atlas.size);
@@ -48462,6 +48523,9 @@ export {
   MAX_NEON_TRIANGLES,
   MAX_PORTALS,
   MAX_PROJECT_BYTES,
+  MAX_SPLAT_COUNT,
+  MAX_SPLAT_PHYSICS_BYTES,
+  MAX_SPLAT_SCENE_BYTES,
   MAX_TERRAIN_RESOLUTION,
   MAX_WORLD_BOUND_COMPONENT,
   MAX_WORLD_NEON_TRIANGLES,
@@ -48483,6 +48547,8 @@ export {
   PROJECT_SCHEMA,
   PrivateNeonClient,
   RAIN_PARTICLES,
+  SPLAT_SCENE_CAPABILITY,
+  SPLAT_SCENE_SCHEMA,
   three_module_exports as T,
   TREE_SPECIES,
   three_module_exports as Three,
@@ -48505,6 +48571,7 @@ export {
   applyLandscapePond,
   assertLandscapeDerivedBudget,
   assertNativeIslandStandaloneExport,
+  assertSplatSceneStandaloneExport,
   assetPrimitiveGroups,
   bakeLandscapeAtlas,
   buildComputerGeometry,
@@ -48524,6 +48591,7 @@ export {
   createNativeIslandResourceReader,
   createNeonPrefab,
   createPlayerWorldPackage,
+  createSplatSceneResourceReader,
   createTerrain,
   createTreeGeometry,
   createWorld,
@@ -48553,6 +48621,7 @@ export {
   inspectWorldRepository,
   installLandscapeShader,
   isSimpleOutline,
+  isSplatSceneResourcePath,
   landscapeChunks,
   landscapeImageBytes,
   landscapeImageDigest,
@@ -48629,6 +48698,7 @@ export {
   validateObjectAccess,
   validatePlayerWorldPackage,
   validateRoadTraffic,
+  validateSplatScene,
   validateSurfaceExclusions,
   validateTerrainImagery,
   validateWorld,
