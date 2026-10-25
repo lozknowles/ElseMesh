@@ -42,3 +42,10 @@ test('published local duck has exact admitted model bytes, separate notices and 
  const credits=await fs.readFile(path.join(root,'credits.html'),'utf8');assert.match(credits,/CC BY-NC-SA 4.0/);assert.match(credits,/Pollen Robotics/);assert.match(credits,/browser session/);
  for(const name of expected.filter(n=>!n.endsWith('.glb')))assert.doesNotMatch(await fs.readFile(path.join(dir,name),'utf8'),/\/fast\/|\/home\/|[A-Z]:\\(?:Users|Downloads)/);
 });
+
+test('publication retains the current editor and Original Island pins plus explicit downstream contract provenance',async()=>{
+ const publication=JSON.parse(await fs.readFile(path.join(root,'publication.json'),'utf8'));
+ assert.match(publication.engineCommit,/^[a-f0-9]{40}$/);assert.equal(publication.editorCommit,'47a8a3ab7a5d950c499039f316fe19c2bc528f88');
+ const original=publication.optionalWorldRepositories.find(row=>row.worldId==='elsemesh.world:470d2706-d459-4cb6-92d8-d4074289bea5');assert.ok(original);assert.equal(original.commit,'21a8a59117d8e83ee7a7aa42f426486b05ad9ecc');assert.equal(original.contentDigest,'c64b45e75fe4b421dfb6b0e487c5c41eac7c6583e129029987ecad173abef214');assert.equal(original.bundledWithOpening,false);
+ const provenance=JSON.parse(await fs.readFile(new URL('../src/world-runtime/vendor/world-engine-contract.provenance.json',import.meta.url),'utf8'));assert.equal(sha(await fs.readFile(new URL('../src/world-runtime/vendor/world-engine-contract.js',import.meta.url))),provenance.bundleSha256);assert.equal(publication.worldContract.bundleSha256,provenance.bundleSha256);assert.equal(provenance.baseBundleSha256,'d04ead00ab70158ca2d467c52fd5e035c2c5a958063815bcf9e7cd5e9e826fd4');assert.equal(provenance.downstreamPatches[0].commit,'2f3b90b0f04efe979013b2bd949b0be765ec2953');
+});

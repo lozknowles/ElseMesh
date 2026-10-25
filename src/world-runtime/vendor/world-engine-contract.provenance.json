@@ -2,9 +2,9 @@
   "schema": "elsemesh.world-software-provenance/1",
   "repository": "https://github.com/lozknowles/elsemesh-worlds.git",
   "commit": "c24c8b40304681e08254adad77b9bb4142dd67fe",
-  "sourceState": "clean",
+  "sourceState": "downstream-patched",
   "command": "node scripts/build-world-engine-contract.mjs --target=<engine>/src/world-runtime/vendor",
-  "bundleSha256": "d04ead00ab70158ca2d467c52fd5e035c2c5a958063815bcf9e7cd5e9e826fd4",
+  "bundleSha256": "8db4c2e26853fc032f78cf9c3d414a0966eab6b7b5707482245553b07947c3f6",
   "dependencies": {
     "three": "0.180.0",
     "esbuild": "0.28.2"
@@ -49,5 +49,17 @@
     "THREE-LICENSE.txt",
     "FONT-LICENSE.txt",
     "ESBUILD-LICENSE.txt"
+  ],
+  "baseSourceState": "clean",
+  "baseBundleSha256": "d04ead00ab70158ca2d467c52fd5e035c2c5a958063815bcf9e7cd5e9e826fd4",
+  "downstreamPatches": [
+    {
+      "repository": "https://github.com/lozknowles/ElseMesh",
+      "commit": "2f3b90b0f04efe979013b2bd949b0be765ec2953",
+      "path": "src/world-runtime/vendor/world-engine-contract.js",
+      "description": "Raise bounded GitHub commit metadata response limit from 256 KiB to 2 MiB for large authored-world commits.",
+      "baseBundleSha256": "d04ead00ab70158ca2d467c52fd5e035c2c5a958063815bcf9e7cd5e9e826fd4",
+      "patchedBundleSha256": "8db4c2e26853fc032f78cf9c3d414a0966eab6b7b5707482245553b07947c3f6"
+    }
   ]
 }
