@@ -38,3 +38,14 @@ The owner adapter now compiles the exact pinned physics without decoding Gaussia
 The actual-world CPU proof passes 236 route samples, stationary and jump/landing checks, six genuine signed confirmations around a real rounded corner, and rejection of an unconfirmed coalesced chord. All 1,461 independently classified integer-index aperture samples were admitted and passed strict bidirectional sweeps, mapped arrivals and egress; no sample was excluded. An outside-edge regression remains rejected. The earlier floating-step fixture accumulated a one-femtometre outside-edge error; the no-progress review approved integer-index reconstruction without any production tolerance change. Original SOG/physics hashes and authored door geometry are unchanged.
 
 Focused owner-boundary/contact/cache checks pass 30 cases, and the actual pinned-source suite passes both cases. A broader run passed 80 cases; a separate raw-export test could not run because its external original-heights fixture was unavailable. This is not claimed as an implementation failure or a passed raw-export qualification.
+
+
+## Review branch status
+
+The consent implementation is reviewable in the main engine repository, but is not enabled by a main/Pages release. Ordinary-world physical acceptance passed seven checks with two browser clients and a third authenticated excluded client. Pinned owner Sunset physics, protocol, movement confirmation and the prebuilt owner package are qualified separately by CPU tests.
+
+The original Sunset graphical checks remain unqualified. The first two-context run stopped before consent assertions at +772 MiB against a 768 MiB cap. The single approved 400×320 attempt stopped before both clients were ready at +771 MiB; requested CSS sizes are not reported as actual drawing-buffer evidence because the guard closed the pages before that snapshot. Neither attempt is counted as a functional pass. Both restored the baseline after owned cleanup.
+
+The approved desktop alternative was unavailable: sshd explicitly prohibited the private forwarding channels. Its policy was left unchanged, no bypass was attempted, and the temporary test windows and owned forwarder were closed. The test identities were not loaded on the desktop.
+
+The review permits proposing one explicit human-approved capacity experiment, not quietly increasing a guard. Any such experiment must retain at least 2 GiB actually free, a fixed deadline, stable protected processes and owned cleanup, and acknowledge possible compute contention. Until successful Sunset rendering/consent/revoke assertions or a changed approved release scope, main and Pages publication remain on hold.
