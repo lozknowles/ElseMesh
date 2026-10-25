@@ -99,7 +99,7 @@ function correctionUnit(){
  transport.ownerGrantExpiry.set(worldId,Date.now()+600000);transport.sign=async value=>value;
  const state={worldId,generation:3,sequence:9,position:[2,20,1],velocity:[3,0,0],yaw:.2,appearance};
  const receipt=(requestId,patch={},signer=authority)=>{const issuedAt=Date.now();return signObject({protocol:'elsemesh.world-wss/2',type:'pose-corrected',reason:'movement-clearance',requestId,authorityEpoch:7,playerNodeId:player.nodeId,authoredWorldId:worldId,sessionId,generation:3,rejectedSequence:9,acceptedSequence:8,position:[0,20,1],velocity:[0,0,0],yaw:.2,issuedAt,expiresAt:issuedAt+5000,...patch},signer);};
- const context={worldId,generation:3,sessionId,authorityEpoch:7};
+ const context=transport.motionContext();
  return{transport,authority,attacker,player,worldId,sessionId,state,receipt,context,corrections};
 }
 test('current correction validates signed request, context, freshness and consumes exactly once',async()=>{

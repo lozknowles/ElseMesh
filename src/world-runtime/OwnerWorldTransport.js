@@ -6,7 +6,7 @@ const encoder=new TextEncoder(),base64=bytes=>{let out='';for(const byte of byte
 export class OwnerWorldTransport extends PortalTransport {
  constructor(options={}){super(options);this.ownerConfig=options.config;this.ownerRequestSequence=0;this.ownerHandoffCommits=true;this.ownerViews=new Set();this.ownerGrantExpiry=new Map();this.ownerLanes=new Map();this.ownerViewRenewals=new Map();this.ownerViewFresh=new Map();this.ownerWorldEpoch=new Map();this.ownerWorldOnline=new Map();this.events.worldStatus=options.worldStatus??(()=>{});this.events.stateCorrection=options.stateCorrection??(()=>{});this.ownerCorrections=new Set();this.eyeConsents=new Map();this.eyeRevisions=new Map();this.eyeDescriptors=new Map();this.eyeListeners=new Set();if(options.eyeConsent)this.eyeListeners.add(options.eyeConsent);this.eyeClocks=new Map();this.eyeWorldFences=new Map();this.ownerViewSessions=new Map();this.ownerViewSessionRevision=0;this.eyeEpoch=0;this.ownerRequestTimeoutMs=options.ownerRequestTimeoutMs??5000;if(!Number.isSafeInteger(this.ownerRequestTimeoutMs)||this.ownerRequestTimeoutMs<100||this.ownerRequestTimeoutMs>20000)throw Error('Invalid owner request timeout');}
  close(){this.disconnect();}
- motionContext(){return {connection:this.connectionEpoch,worldId:this.worldId,generation:this.generation,sessionId:this.membership?.sessionId,authorityEpoch:this.membership?.world?.epoch,playerNodeId:this.identity?.nodeId,federationWorldId:this.membership?.world?.published?.descriptor?.worldId,federationRegionId:this.membership?.world?.published?.descriptor?.regionId};}
+ motionContext(){return {connection:this.connectionEpoch,worldId:this.worldId,generation:this.generation,sessionId:this.membership?.sessionId,authorityEpoch:this.membership?.world?.epoch,playerNodeId:this.identity?.nodeId,contentDigest:this.membership?.world?.contentDigest,authorityNodeId:this.membership?.world?.published?.descriptor?.authority?.nodeId,federationWorldId:this.membership?.world?.published?.descriptor?.worldId,federationRegionId:this.membership?.world?.published?.descriptor?.regionId};}
  sameMotionContext(context){const current=this.motionContext();return Object.keys(current).every(key=>current[key]===context?.[key]);}
  resetConfirmedMotion(){this.ownerConfirmedMotion=null;this.ownerPosePendingToken=null;this.ownerPosePending=false;}
  rememberConfirmedMotion(pose,context,kind){
@@ -95,7 +95,7 @@ export class OwnerWorldTransport extends PortalTransport {
   const result=lane.tail.then(work,work);lane.tail=result.catch(()=>{});return result.finally(()=>{lane.queued--;if(!lane.queued&&this.ownerLanes.get(laneId)===lane)this.ownerLanes.delete(laneId);});
  }
  async verifyStateCorrection(result,{type,requestId,state,connection,context}){
-  const current=()=>connection===this.connectionEpoch&&this.worldId===context.worldId&&this.generation===context.generation&&this.membership?.sessionId===context.sessionId;
+  const current=()=>connection===this.connectionEpoch&&this.sameMotionContext(context);
   if(!current())return false;
   const prior=this.ownerConfirmedMotion;optionalPitch(result);if(prior&&this.sameMotionContext(prior.context)&&prior.sequence===result.acceptedSequence&&prior.pitch!==result.pitch)throw Error('Invalid authoritative movement correction pitch');
   const contact=this.ownerConfig?.contacts?.find(c=>c.worldId===state.worldId),now=Date.now(),vec=v=>Array.isArray(v)&&v.length===3&&v.every(n=>Number.isFinite(n)&&Math.abs(n)<=1e6);
@@ -103,7 +103,7 @@ export class OwnerWorldTransport extends PortalTransport {
   if(!current())return false;
   if(result.expiresAt<=Date.now()||this.ownerCorrections.has(requestId))throw Error('Expired or replayed authoritative movement correction');
   this.ownerCorrections.add(requestId);if(this.ownerCorrections.size>256)this.ownerCorrections.delete(this.ownerCorrections.values().next().value);
-  this.events.stateCorrection(result);return true;
+  this.rememberConfirmedMotion({...result,sequence:result.acceptedSequence},context,'correction');this.events.stateCorrection(result);return true;
  }
  async request(type,data={}, {nonfatal=false}={}){
   if(nonfatal&&!['world-welcome-read','world-welcome-ack'].includes(type))throw Error('Optional request mode is limited to welcome delivery');

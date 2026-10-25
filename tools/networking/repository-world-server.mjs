@@ -1,3 +1,4 @@
+import {prepareSplatWorldPhysics,splatPlayerClearance} from '../../network/splat-world-physics.mjs';
 import { createServer } from 'node:http';
 import { readFile, stat, realpath } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
@@ -21,13 +22,23 @@ const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=
 export async function pinnedRepository(root,commit){
  root=await realpath(root);check(/^[a-f0-9]{40}$/.test(commit),'Full pinned Git commit required');
  const actual=(await exec('git',['-C',root,'rev-parse',commit+'^{commit}'])).stdout.trim();check(actual===commit,'Commit mismatch');
- let cachePath,cacheBytes;
+ let cachePath,cacheBytes;const sceneCache=new Map(),pending=new Map();let sceneCacheBytes=0,gitShowReads=0;
  const read=async(path,limit)=>{check(isRepositoryContentPath(path),'Content path denied');check(Number.isSafeInteger(limit)&&limit>0&&limit<=MAX_FILE,'Invalid content limit');
-  if(cachePath===path){check(cacheBytes.length<=limit,'Content exceeds limit');return cacheBytes;}
-  const size=Number((await exec('git',['-C',root,'cat-file','-s',commit+':'+path])).stdout.trim());check(Number.isSafeInteger(size)&&size>=0&&size<=limit,'Content exceeds limit');
-  const {stdout}=await exec('git',['-C',root,'show',commit+':'+path],{encoding:'buffer',maxBuffer:limit+1024,timeout:15000});check(stdout.length===size,'Content changed');cachePath=path;cacheBytes=stdout;return stdout;
- };return {kind:'local',label:'pinned:'+commit,read};
+  const scene=/^splat-scenes\/[a-f0-9]{64}\.(sog|json)$/.test(path),cap=scene?(path.endsWith('.sog')?16*1024*1024:8*1024*1024):MAX_FILE,effective=Math.min(limit,cap);
+  if(sceneCache.has(path)){const value=sceneCache.get(path);check(value.length<=effective,'Content exceeds purpose byte cap');sceneCache.delete(path);sceneCache.set(path,value);return value;}
+  if(cachePath===path){check(cacheBytes.length<=effective,'Content exceeds limit');return cacheBytes;}
+  if(pending.has(path)){const value=await pending.get(path);check(value.length<=effective,'Content exceeds limit');return value;}
+  const work=(async()=>{
+   const size=Number((await exec('git',['-C',root,'cat-file','-s',commit+':'+path])).stdout.trim());
+   // Bound the Git object size BEFORE git show allocates its output buffer.
+   check(Number.isSafeInteger(size)&&size>=0&&size<=effective,'Content exceeds purpose byte cap or caller limit');
+   gitShowReads++;const {stdout}=await exec('git',['-C',root,'show',commit+':'+path],{encoding:'buffer',maxBuffer:effective+1024,timeout:15000});check(stdout.length===size,'Content changed');
+   if(scene){while(sceneCache.size>=2||sceneCacheBytes+size>24*1024*1024){const first=sceneCache.keys().next().value;sceneCacheBytes-=sceneCache.get(first).length;sceneCache.delete(first);}sceneCache.set(path,stdout);sceneCacheBytes+=size;}
+   else{cachePath=path;cacheBytes=stdout;}return stdout;
+  })();pending.set(path,work);try{return await work;}finally{if(pending.get(path)===work)pending.delete(path);}
+ };return {kind:'local',label:'pinned:'+commit,read,cacheDiagnostics:()=>({entries:sceneCache.size,bytes:sceneCacheBytes,gitShowReads})};
 }
+
 export async function prepareRepositoryConfig(config,identity){
  const worlds=[];
  for(const configured of config.worlds){
@@ -36,11 +47,12 @@ export async function prepareRepositoryConfig(config,identity){
   check(configured.binding&&Number.isSafeInteger(configured.binding.expiresAt)&&configured.binding.expiresAt>Date.now(),'Expired content admission');
   check(configured.binding&&verifyObject(configured.binding,new Set([configured.ownerNodeId])),'Untrusted content admission');
   admitFederatedRuntimeWorld(project,loaded.identity.contentDigest,configured.binding,configured.published,{verifyBinding:b=>b===configured.binding,verifyRegion:p=>p.descriptor});
-  const physics=await prepareNativeIslandPhysics(project,source.read),heightAt=physics?.heightAt??((x,z)=>sampleTerrain(project.terrain,x,z));
-  const clearance=createRepositoryMotionClearance({colliders:collisionWorldBounds(project),heightAt,width:physics?project.nativeIsland.grid.size:project.terrain.width,depth:physics?project.nativeIsland.grid.size:project.terrain.depth});
+  const splatPhysics=await prepareSplatWorldPhysics(project,source.read);
+  const physics=splatPhysics?null:await prepareNativeIslandPhysics(project,source.read),heightAt=physics?.heightAt??((x,z)=>sampleTerrain(project.terrain,x,z));
+  const clearance=splatPhysics?splatPlayerClearance(splatPhysics):createRepositoryMotionClearance({colliders:collisionWorldBounds(project),heightAt,width:physics?project.nativeIsland.grid.size:project.terrain.width,depth:physics?project.nativeIsland.grid.size:project.terrain.depth});
   check(!configured.portals||canonical(configured.portals.map(({invitation,acceptance,...p})=>p))===canonical(project.portals??[]),'Operator portal data disagrees with pinned content');
   const approvals=new Map((configured.portals??[]).map(p=>[p.id,{invitation:p.invitation,acceptance:p.acceptance}]));
-  worlds.push({...configured,contentDigest:loaded.identity.contentDigest,spawn:project.spawn.position,portals:(project.portals??[]).map(p=>({...p,...approvals.get(p.id)})),clearance,source});
+  const preparedWorld={...configured,contentDigest:loaded.identity.contentDigest,spawn:project.spawn.position,portals:(project.portals??[]).map(p=>({...p,...approvals.get(p.id)})),clearance,source};if(splatPhysics)Object.defineProperty(preparedWorld,'splatPhysics',{value:splatPhysics,enumerable:false});worlds.push(preparedWorld);
  }
  return {...config,worlds};
 }

@@ -43,7 +43,7 @@ import {resolveInstallationMode,installationRenderer,ownerEyePitch} from './Inst
 import {PublicPortalRuntime} from './PublicPortalRuntime.js';
 import {PublicMicroduck} from './PublicMicroduck.js';
 import {repositorySceneOptions} from './RepositorySceneOptions.js';
-import {withSplatMovementBoundary} from './SplatMovementBoundary.js';
+import {withSplatMovementBoundary,confirmedSplatPose} from './SplatMovementBoundary.js';
 import { RepositoryPortalRuntime } from './RepositoryPortalRuntime.js';
 import {OwnerObjectAccessClient,canResumeObjectInteraction} from './OwnerObjectAccessClient.js';
 import {WorldWelcomeController,WorldWelcomeView,LocalWelcomeSpeech,validWorldWelcome} from './WorldWelcome.js';
@@ -75,14 +75,14 @@ async function init(){
  const interactionState=()=>({active:host.active,hostGeneration:host.generation,inputEnabled:input.enabled,transport:portals.transport,connection:portals.transport.connectionEpoch,sessionId:portals.transport.membership?.sessionId,generation:portals.transport.generation});
  const canResume=()=>canResumeObjectInteraction(interactionContext,{active:host.active,hostGeneration:host.generation,pending:portals.pending,authorityOffline:portals.authorityOffline,transport:portals.transport,connected:portals.connected,ownerMode:ownerMode()});
  const retro=new RepositoryRetro(input,{canResume,canExecute:()=>!ownerMode()||!!objectAccess?.valid(activeComputerId),canCommand:async()=>{if(!ownerMode())return true;if(!objectAccess?.valid(activeComputerId)){objectAccess?.invalidate();return false;}try{await objectAccess.use(activeComputerId);return true;}catch(error){report(error.message);return false;}}});
- let publicDuck=null;
+ let publicDuck=null,movementPortals=null;
  let refraction,atmosphere,sky,clouds,environment,shadows,weather,renderer,medium,post,backendHost={},backendPortals={};
  if(isWebGL){
   const {buildWebGLRepositoryScene,disposeWebGLRepositoryScene,buildWebGLNeon}=await import('./WebGLRepositoryScene.js');
   const {WebGLPortalViews}=await import('./WebGLPortalViews.js');
   configureWebGLRepositoryScene(engine.scene);
   engine.repositoryReadinessSignature=webGLRepositoryReadinessSignature;engine.prepareRepositoryResources=root=>prepareWebGLRepositoryResources({renderer:engine.renderer,camera:engine.camera,root,targetScene:engine.scene});
-  const buildGL=async(descriptor,camera,{loaded}={})=>{const candidate=await buildWebGLRepositoryScene(descriptor,camera,repositorySceneOptions(descriptor.project,loaded,{renderer:engine.renderer,backend:'webgl2'}));try{if(candidate.splatScene){candidate.terrain=withSplatMovementBoundary(candidate.splatScene.physics);const warm=camera.clone();warm.position.fromArray(descriptor.project.spawn.position);warm.position.y+=1.62;warm.rotation.set(candidate.splatScene.physics.qualification.spawn.pitch??0,descriptor.project.spawn.yaw,0,'YXZ');warm.updateMatrixWorld(true);await candidate.splatScene.prepareResources(warm);}await publicDuck?.install(candidate);return candidate;}catch(error){disposeWebGLRepositoryScene(candidate);throw error;}};
+  const buildGL=async(descriptor,camera,{loaded}={})=>{const candidate=await buildWebGLRepositoryScene(descriptor,camera,repositorySceneOptions(descriptor.project,loaded,{renderer:engine.renderer,backend:'webgl2'}));try{if(candidate.splatScene){candidate.terrain=withSplatMovementBoundary(candidate.splatScene.physics,{requireOwnerConfirmation:()=>movementPortals?.config?.protocol==='elsemesh.owner-runtime/1',getConfirmedPose:()=>confirmedSplatPose(movementPortals,candidate,{contentDigest:loaded?.identity?.contentDigest})});const warm=camera.clone();warm.position.fromArray(descriptor.project.spawn.position);warm.position.y+=1.62;warm.rotation.set(candidate.splatScene.physics.qualification.spawn.pitch??0,descriptor.project.spawn.yaw,0,'YXZ');warm.updateMatrixWorld(true);await candidate.splatScene.prepareResources(warm);}await publicDuck?.install(candidate);return candidate;}catch(error){disposeWebGLRepositoryScene(candidate);throw error;}};
   const disposeGL=candidate=>{publicDuck?.releaseCandidate(candidate);disposeWebGLRepositoryScene(candidate);};
   backendHost={buildCandidate:buildGL,disposeCandidate:disposeGL,buildNeon:buildWebGLNeon};
   backendPortals={buildScene:buildGL,disposeCandidate:disposeGL,createPeerLayer:(scene,id)=>createWebGLRepositoryPeerLayer(scene,id,engine.prepareRepositoryResources),addPortalFrame:addWebGLPortalFrame,views:new WebGLPortalViews({engine,mainCamera:engine.camera,configureScene:configureWebGLRepositoryScene})};
@@ -115,7 +115,7 @@ async function init(){
  document.querySelector('#terminal-close').onclick=()=>{terminal.close();engine.canvas.focus();};
  let arrivals;
  const portalOptions={onPresence:packet=>arrivals?.receive(packet),onActivated:active=>arrivals?.activated(active),engine,host,input,...backendPortals,getPitch:()=>ownerEyePitch({protocol:portals.config?.protocol,backend:selected.backend,player:host.active?.player}),getAppearance:()=>app.avatarChooser?.value??loadAppearance(),onStatus:s=>{document.querySelector('#portal-status').textContent=s;}};
- const portals=installation.kind==='published'?new PublicPortalRuntime({...portalOptions,catalog:installation.catalog}):new RepositoryPortalRuntime(portalOptions);
+ const portals=installation.kind==='published'?new PublicPortalRuntime({...portalOptions,catalog:installation.catalog}):new RepositoryPortalRuntime(portalOptions);movementPortals=portals;
  if(installation.kind==='published'){publicDuck=new PublicMicroduck({runtime:portals,getActive:()=>host.active});portals.onBeforeDisconnect=()=>publicDuck.stop();}
  objectAccess=new OwnerObjectAccessClient({getContext:()=>{const t=portals.transport,a=host.active;return {transport:t,active:a,connection:t.connectionEpoch,worldId:a?.identity.worldId,contentDigest:a?.identity.contentDigest,sessionId:t.membership?.sessionId,generation:t.generation,authorityEpoch:t.membership?.world?.epoch,ready:ownerMode()&&portals.connected&&!portals.pending&&!portals.authorityOffline&&!t.closed&&!t.frozen&&t.worldId===a?.identity.worldId};},onLost:()=>{media?.exit();if(terminal.open)terminal.close();retro.clear({resume:false});if(canResume())input.resume();interactionContext=null;activeComputerId=null;document.querySelector('#computer-controls').textContent='Access restricted';},onSnapshot:snapshot=>{accessPanel?.render(snapshot);if(snapshot?.overlay)host.setRuntimeOverlay(snapshot.overlay);if(controlsHelp?.open)controlsHelp.render();}});
  accessPanel=new ObjectAccessPanel({client:objectAccess,host,parent:document.querySelector('#panel'),onStatus:report});
