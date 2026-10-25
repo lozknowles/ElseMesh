@@ -10,13 +10,13 @@ const retained=new Set(['S1','S2','S3']);
 const blankObject=(id,name,kind,position=[0,0,0],rotation=[0,0,0],parentId)=>({id,name,kind,position,rotation,scale:[1,1,1],visible:true,collision:'none',color:'#b5b5ad',...(parentId?{parentId}:{})});
 function localPoint(v,s){const x=v[0]-s.x,z=v[2]-s.z,c=Math.cos(s.yaw),n=Math.sin(s.yaw);return [c*x-n*z,v[1]-s.floorY,n*x+c*z];}
 function localNormal(v,s){const c=Math.cos(s.yaw),n=Math.sin(s.yaw);return [c*v[0]-n*v[2],v[1],n*v[0]+c*v[2]];}
-export function hutGlb(batches,s){
+export function hutGlb(batches,s,materialFactors={}){
  const gltf={asset:{version:'2.0',generator:'Lost Island trusted original Village hut capture'},scene:0,scenes:[{nodes:[0]}],nodes:[{name:'Beach hut '+s.name,mesh:0}],meshes:[{primitives:[]}],materials:[],accessors:[],bufferViews:[],buffers:[]},chunks=[];let length=0;
  const add=(array,type,componentType)=>{const raw=Buffer.from(array.buffer,array.byteOffset,array.byteLength),view=gltf.bufferViews.length;gltf.bufferViews.push({buffer:0,byteOffset:length,byteLength:raw.length});chunks.push(raw);length+=raw.length;const pad=(4-length%4)%4;if(pad){chunks.push(Buffer.alloc(pad));length+=pad;}const item={bufferView:view,componentType,count:array.length/({SCALAR:1,VEC2:2,VEC3:3}[type]),type};gltf.accessors.push(item);return gltf.accessors.length-1;};
  for(const [name,b]of Object.entries(batches)){if(!b.idx.length)continue;const p=new Float32Array(b.pos.length),normal=new Float32Array(b.nrm.length);
  for(let i=0;i<p.length;i+=3){p.set(localPoint(b.pos.slice(i,i+3),s),i);normal.set(localNormal(b.nrm.slice(i,i+3),s),i);}
  const position=add(p,'VEC3',5126),a=gltf.accessors[position];a.min=[Infinity,Infinity,Infinity];a.max=[-Infinity,-Infinity,-Infinity];for(let i=0;i<p.length;i++){const k=i%3;a.min[k]=Math.min(a.min[k],p[i]);a.max[k]=Math.max(a.max[k],p[i]);}
- const mi=gltf.materials.length;gltf.materials.push({name,pbrMetallicRoughness:{baseColorFactor:[1,1,1,1],roughnessFactor:name==='glass'?.28:name==='roofMetal'?.65:.88,metallicFactor:name==='roofMetal'?.12:0},doubleSided:true,...name==='glass'?{alphaMode:'BLEND'}:{}});
+ const mi=gltf.materials.length;gltf.materials.push({name,pbrMetallicRoughness:{baseColorFactor:materialFactors[name]??[1,1,1,1],roughnessFactor:name==='glass'?.28:name==='roofMetal'?.65:.88,metallicFactor:name==='roofMetal'?.12:0},doubleSided:true,...name==='glass'?{alphaMode:'BLEND'}:{}});
  gltf.meshes[0].primitives.push({attributes:{POSITION:position,NORMAL:add(normal,'VEC3',5126),TEXCOORD_0:add(new Float32Array(b.uv),'VEC2',5126),COLOR_0:add(new Float32Array(b.tint.map(v=>Math.max(0,Math.min(1,v)))),'VEC3',5126)},indices:add(new Uint32Array(b.idx),'SCALAR',5125),material:mi,mode:4});
  }
  gltf.buffers=[{byteLength:length}];const raw=Buffer.from(JSON.stringify(gltf)),json=Buffer.concat([raw,Buffer.alloc((4-raw.length%4)%4,32)]),bin=Buffer.concat(chunks),out=Buffer.alloc(28+json.length+bin.length);
