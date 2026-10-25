@@ -39,13 +39,13 @@ export function addWebGLPortalFrame(root,portal){
  const group=new T.Group(),material=new T.MeshStandardMaterial({color:portal.visual.frameColor,emissive:portal.visual.frameColor,emissiveIntensity:.65,roughness:.25});group.position.fromArray(portal.position);group.rotation.y=portal.yaw;
  for(const [w,h,x,y]of [[.12,portal.height+.24,-portal.width/2-.06,0],[.12,portal.height+.24,portal.width/2+.06,0],[portal.width,.12,0,portal.height/2+.06],[portal.width,.12,0,-portal.height/2-.06]]){const mesh=new T.Mesh(new T.BoxGeometry(w,h,.15),material);mesh.position.set(x,y,0);group.add(mesh);}root.add(group);
 }
-export function updateWebGLRepositoryEnvironment(engine,active,time){
- const env=active?.project.environment??{},hour=env.timeOfDay??14,day=Math.max(.03,Math.sin((hour-6)*Math.PI/12));
+export function updateWebGLRepositoryEnvironment(engine,active,time,environment){
+ const env=environment??active?.project.environment??{},hour=env.timeOfDay??14,day=Math.max(.03,Math.sin((hour-6)*Math.PI/12));
  const lights=engine.scene.userData.repositoryLights;
  const storm=env.weather==='storm',phase=time%11,flash=storm&&phase>10.1&&phase<10.28?Math.pow(Math.sin((phase-10.1)/.18*Math.PI),2):0;
  if(lights){lights.sky.intensity=.3+day*1.9;lights.sun.intensity=(.1+day*2.4)*(storm?.55:1)+flash*5;lights.sun.position.set(Math.cos(hour*Math.PI/12)*300,Math.max(15,day*300),140);}
  const color=new T.Color().setRGB(.04+day*.46,.06+day*.60,.11+day*.64);engine.scene.background.copy(color);
  const underwater=engine.camera.position.y<repositoryProjectWaterHeight(active?.project,engine.camera.position.x,engine.camera.position.z,time);
  engine.scene.fog.color.copy(underwater?new T.Color('#1b6a77'):color);engine.scene.fog.density=underwater?.045:Math.min(.008,(env.mistDensity??.004)*.08)*(1+.12*Math.sin(time*(env.mistSpeed??2)*.07));
- const shelter=updateWebGLWeatherShelter(engine,active,time,underwater);active?.root.userData.updateWebGL?.(time);return {flash,backend:'webgl2',underwater:!!underwater,...shelter};
+ const shelter=updateWebGLWeatherShelter(engine,active,time,underwater);active?.nativeIsland?.setEnvironment(env);active?.root.userData.updateWebGL?.(time);return {flash,backend:'webgl2',underwater:!!underwater,...shelter};
 }
