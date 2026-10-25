@@ -14,7 +14,7 @@ Each object is evaluated once per frame even when its GLB has several primitives
 Yaw and translation apply to its resolved world matrix, retaining scale, pitch,
 roll, and hierarchy transforms. The saved project is never mutated.
 
-Motion runs in the active world and live portal views. Terrain height, terrain
+Motion runs in the active world and live portal views. Installed candidate terrain height (including native-island heightAt), terrain
 bounds, and the project's global water level (or native-island sea level) constrain the contract evaluator.
 Absent or unsuitable habitat leaves an object at its authored transform. This
 does not model landscape-layer ponds, obstacle avoidance, ecological behaviour,
@@ -30,3 +30,7 @@ Run `node --test test/repository-ambient-behaviour.mjs` for controller and scene
 integration tests on both backends. These exercise CPU-side instance matrix
 updates, batching, habitat and immutable saved transforms; they do not establish
 real-device GPU frame rate or visual acceptance.
+
+Weather isolation tests verify loaded environment values, native weather particle/bolt
+state, and WebGL fog clearing across A-B-A activation. They do not qualify rendered
+WebGL rain, cloud, or thunder parity with the WebGPU weather implementation.

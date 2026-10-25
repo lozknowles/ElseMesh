@@ -125,7 +125,7 @@ export async function buildWebGLRepositoryScene(descriptor,camera,options={}){
    else if(['box','sphere','cylinder','cone'].includes(object.kind))add(item,object.kind==='sphere'?new T.SphereGeometry(.8,24,16):object.kind==='cylinder'?new T.CylinderGeometry(.65,.65,1.6,24):object.kind==='cone'?new T.ConeGeometry(.8,1.6,24):new T.BoxGeometry(1.6,1.6,1.6),object.color);
    else throw Error('Unsupported WebGL repository object '+object.kind);
   }
-  const ambient=createRepositoryAmbientBehaviour(project);candidate.ambient=ambient;
+  const ambient=createRepositoryAmbientBehaviour(project,{terrain:candidate.terrain});candidate.ambient=ambient;
   const groups=new Map(),cache=new Map(),screensByObject=new Map((project.terminals??[]).filter(t=>t.screenObjectId).map(t=>[t.screenObjectId,t.kind]));
   for(const object of allObjects.filter(o=>o.kind==='glb'&&effectiveObjectState(allObjects,o.id).visible)){const kind=screensByObject.get(object.id),key=object.assetId+JSON.stringify(object.materialOverrides??[])+(kind??'')+(object.landscapeChunk??'');if(!groups.has(key))groups.set(key,{objects:[],kind});groups.get(key).objects.push(object);}
   for(const {objects,kind}of groups.values()){

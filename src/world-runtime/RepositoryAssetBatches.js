@@ -4,8 +4,8 @@ import { inspectAndLoadAsset,disposeAssetScene } from './vendor/world-engine-con
 import { buildNativeAsset } from './NativeAssets.js';
 import { repositoryRetroScreen } from './RepositoryRetro.js';
 /** Share admitted geometry/materials per asset and override, preserving every authored transform and ID. */
-export async function buildRepositoryAssetBatches(project,objects,matrices,convertGeometry){
- const root=new N.Group(),diagnostics=[],loadedAssets=new Map(),groups=new Map(),ambient=createRepositoryAmbientBehaviour(project);
+export async function buildRepositoryAssetBatches(project,objects,matrices,convertGeometry,options={}){
+ const root=new N.Group(),diagnostics=[],loadedAssets=new Map(),groups=new Map(),ambient=createRepositoryAmbientBehaviour(project,options);
  const screens=new Map((project.terminals??[]).filter(t=>t.screenObjectId).map(t=>[t.screenObjectId,t.kind]));
  for(const object of objects){const kind=screens.get(object.id);const key=object.assetId+JSON.stringify(object.materialOverrides??[])+(kind??'')+(object.landscapeChunk??'');let group=groups.get(key);if(!group){group={objects:[],kind};groups.set(key,group);}group.objects.push(object);}
  try{

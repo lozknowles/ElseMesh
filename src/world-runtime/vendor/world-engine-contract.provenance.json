@@ -1,15 +1,16 @@
 {
   "schema": "elsemesh.world-software-provenance/1",
   "repository": "https://github.com/lozknowles/elsemesh-worlds.git",
-  "commit": "c24c8b40304681e08254adad77b9bb4142dd67fe",
-  "sourceState": "downstream-patched",
+  "commit": "6c4d4a7e0781974dcc167ff1ce669e4e5909f603",
+  "sourceState": "clean",
   "command": "node scripts/build-world-engine-contract.mjs --target=<engine>/src/world-runtime/vendor",
-  "bundleSha256": "8db4c2e26853fc032f78cf9c3d414a0966eab6b7b5707482245553b07947c3f6",
+  "bundleSha256": "98bcd32c879ccdd4ba4ad0e04039c98aa9958ad4b4e0a741a5562ea915a12a5f",
   "dependencies": {
     "three": "0.180.0",
     "esbuild": "0.28.2"
   },
   "inputs": {
+    "src/domain/ambient-behaviour.ts": "83e0035c5d0a71c11aa5b60b2eb1107667a20bc9eede2382889931aaf0bdf580",
     "src/domain/asset-glb.ts": "8025b4a318e752b073e6586502faa34dd50777896c032b55b9f19318cfacfcfe",
     "src/domain/authored-runtime.ts": "a6602a2367c54dc5730184944993c394099da4ace6de6daa6082a89626510ecc",
     "src/domain/computer.ts": "45a0eb28b396789da140a6ca7f165138a2b9635e2fac4ebc8c97993bbbf877b8",
@@ -34,10 +35,10 @@
     "src/domain/surface-exclusions.ts": "f4773ebe337da0482ad9c37cc749acde201b9e955c6b63db17bb62fa2ce26b27",
     "src/domain/trees.ts": "d07d0d8ba05f257319b3501fcfb7419c33617bc4f3440ebec628f1230308581b",
     "src/domain/weather.ts": "2b62e9c576ee81dfa4894028012c40167e6a7a8243aad2d756aeff84b19e4a8b",
-    "src/domain/world-repository.ts": "83deba3b392939aa72fd229044e281b327f157a68f7af21fe477bf2b4d452b04",
-    "src/domain/world-source.ts": "c908c49152a4d7fb838feda529d264f459cf16da6335af825eb306bdf7cdfe79",
-    "src/domain/world.ts": "5b6fa8250dee8411a7fd234b12644d1666126474044f5d074bbe85e4478feb6d",
-    "src/runtime/world-engine-contract.ts": "20b7f0d16cb601f0fb297084533aca0f2b8a2f72e5ebf5fc9f4c8f547af49127",
+    "src/domain/world-repository.ts": "c4bf8e2e5db4117014d343d33df680a8695d16833efdf7e6df8c20d0a89c8d85",
+    "src/domain/world-source.ts": "161f8d0b8634710cde07bfd905019c940fb025814f81470c035be5eb565a4765",
+    "src/domain/world.ts": "9370ec73a962f21b36a67b33cb782a42c050d034776c58c5c224d6dee43f7463",
+    "src/runtime/world-engine-contract.ts": "869cdf5ca687cac4456baa6fa38fa351065e495898bd8d673cf18bcadb12fd2a",
     "src/ui/asset-admission.ts": "b68db5789f8212c4f8e70326d4a01e4a49034a39d37fc3067f4a6bd15ef73708",
     "src/ui/landscape-render.ts": "2a278eb5668c251513aad51528ff90ce699b6177d0a981a01ae37cebddc7f0f8",
     "scripts/build-world-engine-contract.mjs": "b409d5668bc5b42ed8a0309d9c4be03e6520e358fe9b9ce9991a077c45c2c0ac",
@@ -49,17 +50,5 @@
     "THREE-LICENSE.txt",
     "FONT-LICENSE.txt",
     "ESBUILD-LICENSE.txt"
-  ],
-  "baseSourceState": "clean",
-  "baseBundleSha256": "d04ead00ab70158ca2d467c52fd5e035c2c5a958063815bcf9e7cd5e9e826fd4",
-  "downstreamPatches": [
-    {
-      "repository": "https://github.com/lozknowles/ElseMesh",
-      "commit": "2f3b90b0f04efe979013b2bd949b0be765ec2953",
-      "path": "src/world-runtime/vendor/world-engine-contract.js",
-      "description": "Raise bounded GitHub commit metadata response limit from 256 KiB to 2 MiB for large authored-world commits.",
-      "baseBundleSha256": "d04ead00ab70158ca2d467c52fd5e035c2c5a958063815bcf9e7cd5e9e826fd4",
-      "patchedBundleSha256": "8db4c2e26853fc032f78cf9c3d414a0966eab6b7b5707482245553b07947c3f6"
-    }
   ]
 }

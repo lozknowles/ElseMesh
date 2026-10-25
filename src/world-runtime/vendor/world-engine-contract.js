@@ -41963,6 +41963,49 @@ function disposeMediaScreenGeometry(value) {
   for (const part of value.parts) part.geometry.dispose();
 }
 
+// src/domain/ambient-behaviour.ts
+var AMBIENT_BEHAVIOUR_SCHEMA = "elsemesh.ambient-behaviour/1";
+var kinds = ["bird-flight", "crab-walk", "fish-swim"];
+var finite = (value) => typeof value === "number" && Number.isFinite(value);
+function validateAmbientBehaviour(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return ["Ambient behaviour must be an object."];
+  const b = value;
+  if (Object.keys(b).some((key) => !["schema", "kind", "speed", "radius", "seed"].includes(key))) return ["Ambient behaviour has unsupported fields."];
+  if (b.schema !== AMBIENT_BEHAVIOUR_SCHEMA || !kinds.includes(b.kind)) return ["Ambient behaviour has an unsupported version or kind."];
+  if (!finite(b.speed) || b.speed < 0.05 || b.speed > 12) return ["Ambient speed must be 0.05 to 12 m/s."];
+  if (!finite(b.radius) || b.radius < 0.2 || b.radius > 30) return ["Ambient radius must be 0.2 to 30 m."];
+  if (!Number.isInteger(b.seed) || b.seed < 0 || b.seed > 4294967295) return ["Ambient seed must be an unsigned 32-bit integer."];
+  return [];
+}
+function evaluateAmbientBehaviour(behaviour, anchor, baseYaw, time, habitat = {}) {
+  if (validateAmbientBehaviour(behaviour).length || !anchor.every(Number.isFinite) || !finite(baseYaw) || !finite(time)) return { position: [...anchor], yaw: baseYaw, active: false };
+  const phase = (behaviour.seed >>> 0) / 4294967296 * Math.PI * 2;
+  const frequency = behaviour.speed / Math.max(behaviour.radius / 2, 0.2);
+  const theta = phase + Math.max(0, time) * frequency;
+  const half = behaviour.radius / 2;
+  const x = anchor[0] + half * (Math.cos(theta) - Math.cos(phase));
+  const z = anchor[2] + half * (Math.sin(theta) - Math.sin(phase));
+  const heading = Math.atan2(-Math.sin(theta), Math.cos(theta));
+  const stationary = { position: [...anchor], yaw: baseYaw, active: false };
+  const edge = habitat.bounds;
+  if (edge && (Math.abs(x) > edge.width / 2 - 1 || Math.abs(z) > edge.depth / 2 - 1)) return stationary;
+  const ground = habitat.groundHeight?.(x, z);
+  if (ground !== void 0 && !Number.isFinite(ground)) return stationary;
+  if (behaviour.kind === "crab-walk") {
+    if (ground === void 0 || ground > anchor[1] + 1 || ground < anchor[1] - 1) return stationary;
+    return { position: [x, ground, z], yaw: baseYaw + heading, active: true };
+  }
+  if (behaviour.kind === "fish-swim") {
+    const water = habitat.waterLevel;
+    if (!finite(water) || water - (ground ?? -Infinity) < 0.8) return stationary;
+    const y2 = Math.min(anchor[1] + 0.18 * Math.sin(theta * 1.4), water - 0.35);
+    if (ground !== void 0 && y2 < ground + 0.2) return stationary;
+    return { position: [x, y2, z], yaw: baseYaw + heading, active: true };
+  }
+  const y = Math.max(anchor[1] + 0.3 * Math.sin(theta * 1.7), (ground ?? -Infinity) + 1.2);
+  return { position: [x, y, z], yaw: baseYaw + heading, active: true };
+}
+
 // src/domain/surface-exclusions.ts
 function validateSurfaceExclusions(value) {
   if (!Array.isArray(value) || value.length > 16) return ["Water surface exclusions must contain at most 16 volumes."];
@@ -42230,7 +42273,7 @@ var MAX_IMAGERY_BYTES = 15 * 1024 * 1024;
 function fail(message) {
   throw new Error(message);
 }
-var finite = (n) => typeof n === "number" && Number.isFinite(n);
+var finite2 = (n) => typeof n === "number" && Number.isFinite(n);
 var text = (s, limit = 2e3) => typeof s === "string" && s.trim().length > 0 && s.length <= limit;
 function parseAsciiGrid(input) {
   if (input.length > 64 * 1024 * 1024) fail("ASCII grid exceeds the 64 MiB text limit.");
@@ -42248,13 +42291,13 @@ function parseAsciiGrid(input) {
   }
   const ncols = header.get("ncols"), nrows = header.get("nrows"), cellSize = header.get("cellsize");
   if (![ncols, nrows].every((n) => Number.isInteger(n) && n >= 2) || ncols * nrows > 4194304) fail("ASCII grid must contain 2–4,194,304 bounded sample cells.");
-  if (!finite(cellSize) || cellSize <= 0 || cellSize > 1e4) fail("ASCII cellsize must be a positive spacing in metres.");
+  if (!finite2(cellSize) || cellSize <= 0 || cellSize > 1e4) fail("ASCII cellsize must be a positive spacing in metres.");
   for (const axis of ["x", "y"]) if (Number(header.has(`${axis}llcorner`)) + Number(header.has(`${axis}llcenter`)) !== 1) fail(`Specify exactly one ${axis}llcorner or ${axis}llcenter header.`);
   if (tokens.length - cursor !== ncols * nrows) fail(`ASCII sample count differs from ncols × nrows (${ncols * nrows}).`);
   const values = new Array(ncols * nrows);
   for (let i = 0; i < values.length; i++) {
     const value = Number(tokens[cursor + i]);
-    if (!finite(value)) fail(`ASCII sample ${i + 1} is not finite.`);
+    if (!finite2(value)) fail(`ASCII sample ${i + 1} is not finite.`);
     values[i] = value;
   }
   return { ncols, nrows, cellSize, xOrigin: header.get("xllcenter") ?? header.get("xllcorner") + cellSize / 2, yOrigin: header.get("yllcenter") ?? header.get("yllcorner") + cellSize / 2, nodata: header.get("nodata_value") ?? null, values };
@@ -42262,7 +42305,7 @@ function parseAsciiGrid(input) {
 function sampleGeographicGrid(grid, easting, northing) {
   const x = (easting - grid.xOrigin) / grid.cellSize;
   const y = (northing - grid.yOrigin) / grid.cellSize;
-  if (!finite(x) || !finite(y) || x < -1e-8 || y < -1e-8 || x > grid.ncols - 1 + 1e-8 || y > grid.nrows - 1 + 1e-8) fail("Selected terrain extends outside source sample coverage. Choose a smaller area or another grid.");
+  if (!finite2(x) || !finite2(y) || x < -1e-8 || y < -1e-8 || x > grid.ncols - 1 + 1e-8 || y > grid.nrows - 1 + 1e-8) fail("Selected terrain extends outside source sample coverage. Choose a smaller area or another grid.");
   const sx = Math.max(0, Math.min(grid.ncols - 1, x)), sy = Math.max(0, Math.min(grid.nrows - 1, y));
   const x0 = Math.floor(sx), y0 = Math.floor(sy), x1 = Math.min(grid.ncols - 1, x0 + 1), y1 = Math.min(grid.nrows - 1, y0 + 1);
   const tx = sx - x0, ty = sy - y0;
@@ -42271,14 +42314,14 @@ function sampleGeographicGrid(grid, easting, northing) {
   for (const [col, row, weight] of corners) {
     if (weight <= 1e-12) continue;
     const value = grid.values[(grid.nrows - 1 - row) * grid.ncols + col];
-    if (!finite(value) || grid.nodata !== null && value === grid.nodata) fail("Selected terrain includes NODATA or missing elevations. Choose a fully covered area.");
+    if (!finite2(value) || grid.nodata !== null && value === grid.nodata) fail("Selected terrain includes NODATA or missing elevations. Choose a fully covered area.");
     height += value * weight;
   }
   return height;
 }
 function createGeographicTerrain(grid, selection, metadata) {
   const { easting, northing, radius } = selection;
-  if (![easting, northing].every(finite) || !Number.isInteger(radius) || radius < 8 || radius > 1024) fail("Choose finite British National Grid coordinates and an integer radius from 8 to 1024 metres.");
+  if (![easting, northing].every(finite2) || !Number.isInteger(radius) || radius < 8 || radius > 1024) fail("Choose finite British National Grid coordinates and an integer radius from 8 to 1024 metres.");
   const size = radius * 2;
   const requested = selection.resolution ?? Math.min(257, Math.max(9, Math.ceil(size / grid.cellSize / 2) * 2 + 1));
   if (!Number.isInteger(requested) || requested < 9 || requested > 257 || requested % 2 !== 1) fail("Output resolution must be an odd grid size from 9 to 257.");
@@ -42291,7 +42334,7 @@ function createGeographicTerrain(grid, selection, metadata) {
   if (minCol < 0 || minRow < 0 || maxCol >= grid.ncols || maxRow >= grid.nrows) fail("Selected terrain extends outside source sample coverage.");
   for (let row = minRow; row <= maxRow; row++) for (let col = minCol; col <= maxCol; col++) {
     const value = grid.values[(grid.nrows - 1 - row) * grid.ncols + col];
-    if (!finite(value) || grid.nodata !== null && value === grid.nodata) fail("Selected terrain includes NODATA or missing elevations.");
+    if (!finite2(value) || grid.nodata !== null && value === grid.nodata) fail("Selected terrain includes NODATA or missing elevations.");
   }
   const heights = [];
   for (let z = 0; z < requested; z++) for (let x = 0; x < requested; x++) {
@@ -42304,20 +42347,20 @@ function createGeographicTerrain(grid, selection, metadata) {
 function validateGeographicBounds(value) {
   if (!value || typeof value !== "object") return false;
   const b = value;
-  return [b.west, b.east, b.south, b.north].every(finite) && b.west < b.east && b.south < b.north && b.west >= 0 && b.east <= 7e5 && b.south >= 0 && b.north <= 13e5;
+  return [b.west, b.east, b.south, b.north].every(finite2) && b.west < b.east && b.south < b.north && b.west >= 0 && b.east <= 7e5 && b.south >= 0 && b.north <= 13e5;
 }
 function validateGeography(value, terrain) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return ["Geographic reference must be an object."];
   const geo = value;
   const errors = [];
   if (geo.crs !== "EPSG:27700") errors.push("Only EPSG:27700 British National Grid geography is supported.");
-  if (!validateGeographicBounds(geo.bounds) || !geo.center || !finite(geo.center.easting) || !finite(geo.center.northing)) errors.push("Geographic bounds or centre are invalid.");
+  if (!validateGeographicBounds(geo.bounds) || !geo.center || !finite2(geo.center.easting) || !finite2(geo.center.northing)) errors.push("Geographic bounds or centre are invalid.");
   else {
     const width = geo.bounds.east - geo.bounds.west, depth = geo.bounds.north - geo.bounds.south;
     if (width > 2048 || depth > 2048 || Math.abs(width - depth) > 1e-6 || Math.abs((geo.bounds.west + geo.bounds.east) / 2 - geo.center.easting) > 1e-6 || Math.abs((geo.bounds.south + geo.bounds.north) / 2 - geo.center.northing) > 1e-6) errors.push("Geographic extent must be a centred square no larger than 2048 metres.");
     if (terrain && (Math.abs(width - terrain.width) > 1e-6 || Math.abs(depth - terrain.depth) > 1e-6 || Math.abs(width / (terrain.resolution - 1) - geo.outputSpacing) > 1e-6)) errors.push("Geographic extent or output spacing does not match the terrain.");
   }
-  if (![geo.sourceSpacing, geo.outputSpacing].every((n) => finite(n) && n > 0)) errors.push("Geographic source and output sample spacing must be positive.");
+  if (![geo.sourceSpacing, geo.outputSpacing].every((n) => finite2(n) && n > 0)) errors.push("Geographic source and output sample spacing must be positive.");
   if (!text(geo.sourceName, 240) || !text(geo.license) || !text(geo.attribution) || !text(geo.verticalDatum, 240) || geo.source !== void 0 && !text(geo.source)) errors.push("Geographic source name, licence, attribution and vertical datum are required.");
   return errors;
 }
@@ -44451,7 +44494,10 @@ function validateWorld(value) {
     if (!greeting || typeof greeting !== "object" || Array.isArray(greeting) || Object.keys(greeting).some((k) => !["schema", "text", "audio"].includes(k))) errors.push("Invalid welcome greeting.");
     else {
       const g = greeting;
-      if (g.schema !== "elsemesh.world-welcome/1" || typeof g.text !== "string" || !g.text.trim() || g.text.length > 2e3 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(g.text) || typeof g.audio !== "boolean") errors.push("Welcome greeting must contain 1–2000 plain text characters and a read aloud choice.");
+      if (g.schema !== "elsemesh.world-welcome/1" || typeof g.text !== "string" || !g.text.trim() || g.text.length > 2e3 || g.text.split("").some((character) => {
+        const code = character.charCodeAt(0);
+        return code === 127 || code < 32 && ![9, 10, 13].includes(code);
+      }) || typeof g.audio !== "boolean") errors.push("Welcome greeting must contain 1–2000 plain text characters and a read aloud choice.");
     }
   }
   errors.push(...validateRoadTraffic(p.traffic, Array.isArray(p.assets) ? p.assets : []));
@@ -44490,6 +44536,10 @@ function validateWorld(value) {
     if (object3?.collisionOnly !== void 0 && (typeof object3.collisionOnly !== "boolean" || object3.collisionOnly && (object3.kind !== "box" || object3.collision === "none"))) errors.push(`Object ${index + 1} has invalid collision-only volume settings.`);
     if (object3?.treeSpecies !== void 0 && !["broadleaf", "palm", "pine"].includes(object3.treeSpecies)) errors.push(`Object ${index + 1} has an unsupported tree species.`);
     if (object3?.treeSeed !== void 0 && (!Number.isInteger(object3.treeSeed) || object3.treeSeed < 0 || object3.treeSeed > 4294967295)) errors.push(`Object ${index + 1} has an invalid tree seed.`);
+    if (object3?.ambientBehaviour !== void 0) {
+      if (object3.kind !== "glb" || object3.collision !== "none") errors.push(`Object ${index + 1} ambient behaviour requires a non-colliding GLB.`);
+      errors.push(...validateAmbientBehaviour(object3.ambientBehaviour).map((error) => `Object ${index + 1}: ${error}`));
+    }
     if (object3?.materialOverrides !== void 0) {
       const seen = /* @__PURE__ */ new Set();
       if (!Array.isArray(object3.materialOverrides) || object3.materialOverrides.length > 256 || object3.materialOverrides.some((entry) => {
@@ -44502,6 +44552,7 @@ function validateWorld(value) {
   }
   if (Array.isArray(p.objects)) {
     errors.push(...validateHierarchy(p.objects));
+    if (p.objects.filter((o) => o?.ambientBehaviour).length > 256) errors.push("Worlds may contain at most 256 ambient wildlife objects.");
     if (p.objects.filter((o) => o?.kind === "media-screen").length > 16) errors.push("Worlds may contain at most 16 media screens.");
     for (const o of p.objects) {
       if (o?.kind === "media-screen") {
@@ -44627,7 +44678,8 @@ function playerWorldCapabilities(project) {
     ...project.welcome ? ["welcome/1"] : [],
     ...project.landscape ? ["project/3", "landscape/1"] : [],
     ...project.traffic ? ["port-traffic/1"] : [],
-    ...project.objects.some((o) => o.collisionOnly) ? ["collision-volumes/1"] : []
+    ...project.objects.some((o) => o.collisionOnly) ? ["collision-volumes/1"] : [],
+    ...project.objects.some((o) => o.ambientBehaviour) ? ["ambient-behaviour/1"] : []
   ];
 }
 function validatePlayerWorldPackage(value) {
@@ -44730,7 +44782,7 @@ var PREVIOUS_WORLD_REPOSITORY_SCHEMA = "elsemesh.world-repository/2";
 var CONNECTION_WORLD_REPOSITORY_SCHEMA = "elsemesh.world-repository/3";
 var WORLD_REPOSITORY_SCHEMA = "elsemesh.world-repository/4";
 var WORLD_ENGINE_CONTRACT = "elsemesh.worlds.runtime/1";
-var WORLD_CAPABILITIES = ["splat-scene/1", "water-exclusion/1", "media-screen/1", "native-island/1", "welcome/1", "object-access/1", "project/2", "project/3", "landscape/1", "terrain", "objects", "hierarchy", "features", "neon-sign", "computer", "geography", "terrain-imagery", "weather", "portal/1", "water/1", "retro-terminal/1", "port-traffic/1", "collision-volumes/1"];
+var WORLD_CAPABILITIES = ["splat-scene/1", "water-exclusion/1", "media-screen/1", "native-island/1", "welcome/1", "object-access/1", "project/2", "project/3", "landscape/1", "terrain", "objects", "hierarchy", "features", "neon-sign", "computer", "geography", "terrain-imagery", "weather", "ambient-behaviour/1", "portal/1", "water/1", "retro-terminal/1", "port-traffic/1", "collision-volumes/1"];
 var WORLD_REPOSITORY_MANIFEST = "world.json";
 var WORLD_REPOSITORY_MANIFEST_LIMIT = 64 * 1024;
 var ENGINE_REFERENCE = "95719848d5ffa4428b57c75c272483e1c2113a72";
@@ -44972,6 +45024,7 @@ function requiredWorldCapabilities(project) {
   if (project.water) capabilities.add("water/1");
   if (project.traffic) capabilities.add("port-traffic/1");
   if (project.objects.some((o) => o.collisionOnly)) capabilities.add("collision-volumes/1");
+  if (project.objects.some((o) => o.ambientBehaviour)) capabilities.add("ambient-behaviour/1");
   if (project.terminals?.length) capabilities.add("retro-terminal/1");
   if (project.features?.length) capabilities.add("features");
   if (project.geography) capabilities.add("geography");
@@ -48503,6 +48556,7 @@ function assetPrimitiveGroups(child) {
   });
 }
 export {
+  AMBIENT_BEHAVIOUR_SCHEMA,
   GLTFLoader as BuiltinCharacterGLTFLoader,
   COMPUTER_BOUNDS,
   COMPUTER_SCHEMA,
@@ -48607,6 +48661,7 @@ export {
   effectiveObjectState,
   ensureLandscape,
   eraseGeneratedInstance,
+  evaluateAmbientBehaviour,
   featureFlowWarnings,
   forkWorldSource,
   generateLandscapeInstances,
@@ -48686,6 +48741,7 @@ export {
   updateLandscapeLayer,
   updateLandscapeMaterial,
   updateLandscapeWater,
+  validateAmbientBehaviour,
   validateBoundary,
   validateComputer,
   validateGeographicBounds,

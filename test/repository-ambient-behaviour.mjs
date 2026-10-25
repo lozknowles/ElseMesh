@@ -92,3 +92,28 @@ for(const [backend,E,build,dispose]of [['webgl',T,buildWebGLRepositoryScene,disp
   host.dispose();for(const mesh of weather.group.children){mesh.geometry.dispose();mesh.material.dispose();}
  }
 });
+
+test('loader rejects unknown requirements and object-access downgrade before scene build or activation',async()=>{
+ const project=createWorld('Restricted export');project.objectAccess={schema:'elsemesh.object-access/1',rules:[]};
+ const files=await packWorldRepository(project),asSource=values=>localRepositorySource([...values].map(([path,bytes])=>({webkitRelativePath:'Restricted/'+path,size:bytes.byteLength,arrayBuffer:async()=>bytes.slice().buffer})));
+ const engine={scene:new N.Scene(),camera:new N.PerspectiveCamera()},input={pressed:new Set(),_clearTransientInput(){},consumeLook:()=>({x:0,y:0}),moveAxes:()=>({x:0,y:0,sprint:0}),down:()=>false,hit:()=>false};
+ let builds=0;const host=new RepositoryWorldHost({engine,input,buildCandidate:async(...args)=>{builds++;return buildRepositoryScene(...args);}});
+ try{
+  await host.load(asSource(files));assert.deepEqual(host.active.project.objectAccess,project.objectAccess);const active=host.active,baseline=builds;
+  for(const kind of ['unknown','omitted-access']){
+   const altered=new Map(files),manifest=JSON.parse(new TextDecoder().decode(files.get('world.json')));
+   if(kind==='unknown')manifest.engine.requires.push('unknown-executable-capability/99');
+   else manifest.engine.requires=manifest.engine.requires.filter(c=>c!=='object-access/1');
+   altered.set('world.json',new TextEncoder().encode(JSON.stringify(manifest)));
+   await assert.rejects(host.load(asSource(altered)),/capability|engine contract/i);assert.equal(builds,baseline);assert.equal(host.active,active);assert.equal(active.root.parent,engine.scene);
+  }
+ }finally{host.dispose();}
+});
+
+test('native habitat uses installed exact surface rather than authored coarse proxy',()=>{
+ const p=createWorld('native habitat');p.terrain.heights.fill(50);p.nativeIsland={sea:{level:0}};
+ const objects=[{id:'crab',ambientBehaviour:behaviour('crab-walk')},{id:'fish',ambientBehaviour:behaviour('fish-swim')}],matrices=new Map([['crab',new T.Matrix4().makeTranslation(0,-2,0)],['fish',new T.Matrix4().makeTranslation(5,-1,5)]]);
+ let samples=0;const controller=createRepositoryAmbientBehaviour(p,{terrain:{heightAt(){samples++;return -2;}}}),mesh=new T.InstancedMesh(new T.BoxGeometry(),null,2);
+ controller.register(mesh,objects,matrices);controller.update(4);
+ const matrix=new T.Matrix4();mesh.getMatrixAt(0,matrix);assert.equal(matrix.elements[13],-2);assert.notDeepEqual(matrix.elements.slice(12,15),[0,-2,0]);mesh.getMatrixAt(1,matrix);assert.ok(matrix.elements[13]<0);assert.notDeepEqual(matrix.elements.slice(12,15),[5,-1,5]);assert.equal(samples,2);mesh.geometry.dispose();
+});
