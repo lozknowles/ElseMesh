@@ -1,5 +1,31 @@
 {
   "schema": "elsemesh.publication/1",
+  "editorCommit": "47a8a3ab7a5d950c499039f316fe19c2bc528f88",
+  "optionalWorldRepositories": [
+    {
+      "worldId": "elsemesh.world:470d2706-d459-4cb6-92d8-d4074289bea5",
+      "repository": "https://github.com/lozknowles/elsemesh-world-original-island",
+      "commit": "21a8a59117d8e83ee7a7aa42f426486b05ad9ecc",
+      "contentDigest": "c64b45e75fe4b421dfb6b0e487c5c41eac7c6583e129029987ecad173abef214",
+      "bundledWithOpening": false
+    }
+  ],
+  "engineCommit": "11db1c9cee8ed459e957a55375cb404b8e2a4997",
+  "worldContract": {
+    "commit": "c24c8b40304681e08254adad77b9bb4142dd67fe",
+    "bundleSha256": "8db4c2e26853fc032f78cf9c3d414a0966eab6b7b5707482245553b07947c3f6",
+    "baseBundleSha256": "d04ead00ab70158ca2d467c52fd5e035c2c5a958063815bcf9e7cd5e9e826fd4",
+    "downstreamPatches": [
+      {
+        "repository": "https://github.com/lozknowles/ElseMesh",
+        "commit": "2f3b90b0f04efe979013b2bd949b0be765ec2953",
+        "path": "src/world-runtime/vendor/world-engine-contract.js",
+        "description": "Raise bounded GitHub commit metadata response limit from 256 KiB to 2 MiB for large authored-world commits.",
+        "baseBundleSha256": "d04ead00ab70158ca2d467c52fd5e035c2c5a958063815bcf9e7cd5e9e826fd4",
+        "patchedBundleSha256": "8db4c2e26853fc032f78cf9c3d414a0966eab6b7b5707482245553b07947c3f6"
+      }
+    ]
+  },
   "worldRepositoryCommit": "9a292002611928ef8a867ed939c8aa20c56a5283",
   "openingWorldId": "elsemesh.world:2842c4f2-93a0-4492-b942-e53e524de319",
   "worlds": [
@@ -33,16 +59,5 @@
     "assetSha256": "66334b9bcea5abb6b2a310c44c584fd7fdc8fb999db9c718c785473c41019298",
     "physicsSha256": "eedaeb18bfa8eacbee42c10d105b67d519f9351fb75879f4306645cf1d3a3757"
   },
-  "previousPublicEditorPreserved": false,
-  "engineCommit": "2f3b90b0f04efe979013b2bd949b0be765ec2953",
-  "editorCommit": "47a8a3ab7a5d950c499039f316fe19c2bc528f88",
-  "optionalWorldRepositories": [
-    {
-      "worldId": "elsemesh.world:470d2706-d459-4cb6-92d8-d4074289bea5",
-      "repository": "https://github.com/lozknowles/elsemesh-world-original-island",
-      "commit": "21a8a59117d8e83ee7a7aa42f426486b05ad9ecc",
-      "contentDigest": "c64b45e75fe4b421dfb6b0e487c5c41eac7c6583e129029987ecad173abef214",
-      "bundledWithOpening": false
-    }
-  ]
+  "previousPublicEditorPreserved": true
 }
