@@ -61,6 +61,7 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /editor/
+            /assets/
             /publication.json
       - name: Verify owner Sunset physics against pinned public data
         run: ELSEMESH_PUBLIC_SUNSET_SOURCE_ROOT="$GITHUB_WORKSPACE/pinned-public-world" npm run test:owner-splat:actual

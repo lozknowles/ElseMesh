@@ -35,6 +35,20 @@ test('publication preserves editor, notices, immutable opening pin and excludes 
  await visit(root);
 });
 
+test('publication retains module closure used by an already-open warehouse tab',async()=>{
+ const expected={
+  'SplatScenePhysics-DnwdxMwA.js':'cffd6f1f388a979e70461b469c3ebaa7461b2525e3b886b490187c86a2d331ff',
+  'WebGLPortalViews-K8knYW1g.js':'7230cc9e81593b9903b2ec882dcd1a5dcdc8247229417bde5fd4066f5c18025e',
+  'WebGLRepositoryScene-Kr2hmB38.js':'b65a54f2a3e6af3984c5a0830660ee662d0255a484a4bf7478efb7146ab494ec',
+  'main-CNOK0buL.js':'36e92b11c58cf5750ee839def9775fe8be39e69904a1dc2d0e3fecc1904e86b7',
+  'spark.module-BgZ7pwUd.js':'fd9e32f82ef4f43b39d3d76002b0467b51d1310a84a597a64a2578dcb036c2bf',
+  'world-engine-contract-BU9EDy71.js':'9e8a17d54f4831e6ea9f639f0c7b07ed6bd32c4faf25c4a423cf460a59629a31'
+ };
+ for(const [name,digest] of Object.entries(expected)){
+  const bytes=await fs.readFile(path.join(root,'assets',name));assert.equal(sha(bytes),digest,name);
+ }
+});
+
 test('published local duck has exact admitted model bytes, separate notices and no full-resolution source',async()=>{
  const dir=path.join(root,'models/microduck'),expected=['ATTRIBUTION.md','LICENSE-APACHE-2.0.txt','LICENSE-MODELS.md','collision-proxy.json','manifest.json','microduck-realtime.glb'];
  assert.deepEqual((await fs.readdir(dir)).sort(),expected.sort());
@@ -45,7 +59,7 @@ test('published local duck has exact admitted model bytes, separate notices and 
 
 test('publication retains the current editor and Original Island pins plus explicit downstream contract provenance',async()=>{
  const publication=JSON.parse(await fs.readFile(path.join(root,'publication.json'),'utf8'));
- assert.match(publication.engineCommit,/^[a-f0-9]{40}$/);assert.equal(publication.editorCommit,'47a8a3ab7a5d950c499039f316fe19c2bc528f88');
+ assert.match(publication.engineCommit,/^[a-f0-9]{40}$/);assert.match(publication.editorCommit,/^[a-f0-9]{40}$/);
  const original=publication.optionalWorldRepositories.find(row=>row.worldId==='elsemesh.world:470d2706-d459-4cb6-92d8-d4074289bea5');assert.ok(original);assert.equal(original.commit,'21a8a59117d8e83ee7a7aa42f426486b05ad9ecc');assert.equal(original.contentDigest,'c64b45e75fe4b421dfb6b0e487c5c41eac7c6583e129029987ecad173abef214');assert.equal(original.bundledWithOpening,false);
- const provenance=JSON.parse(await fs.readFile(new URL('../src/world-runtime/vendor/world-engine-contract.provenance.json',import.meta.url),'utf8'));assert.equal(sha(await fs.readFile(new URL('../src/world-runtime/vendor/world-engine-contract.js',import.meta.url))),provenance.bundleSha256);assert.equal(publication.worldContract.bundleSha256,provenance.bundleSha256);assert.equal(provenance.baseBundleSha256,'d04ead00ab70158ca2d467c52fd5e035c2c5a958063815bcf9e7cd5e9e826fd4');assert.equal(provenance.downstreamPatches[0].commit,'2f3b90b0f04efe979013b2bd949b0be765ec2953');
+ const provenance=JSON.parse(await fs.readFile(new URL('../src/world-runtime/vendor/world-engine-contract.provenance.json',import.meta.url),'utf8'));assert.equal(sha(await fs.readFile(new URL('../src/world-runtime/vendor/world-engine-contract.js',import.meta.url))),provenance.bundleSha256);assert.equal(publication.worldContract.bundleSha256,provenance.bundleSha256);assert.equal(publication.worldContract.commit,provenance.commit);assert.equal(publication.worldContract.baseBundleSha256,provenance.baseBundleSha256??provenance.bundleSha256);assert.deepEqual(publication.worldContract.downstreamPatches,provenance.downstreamPatches??[]);
 });

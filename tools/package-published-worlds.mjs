@@ -40,6 +40,20 @@ for(const relative of [...needed].sort()){
  const target=path.join(destination,relative);await fs.mkdir(path.dirname(target),{recursive:true});await fs.copyFile(full,target);
 }
 async function inspect(dir){const info=await fs.lstat(dir);if(info.isSymbolicLink())throw Error('Symlink in public editor');if(info.isDirectory())for(const name of await fs.readdir(dir))await inspect(path.join(dir,name));else if(!info.isFile())throw Error('Invalid editor file');}
+// Keep bounded immutable asset names used by tabs opened before this release.
+const priorAssets=path.join(previous,'assets'),outputAssets=path.join(output,'assets');
+const priorNames=await fs.readdir(priorAssets);if(priorNames.length>96)throw Error('Too many prior application assets');
+let retainedAssetBytes=0,retainedAssetCount=0;
+for(const name of priorNames){
+ if(name.includes('..')||!/^[A-Za-z][A-Za-z0-9_.-]*-[A-Za-z0-9_-]{8}\.(?:js|css)$/.test(name))throw Error('Unexpected prior application asset');
+ const from=path.join(priorAssets,name),info=await fs.lstat(from);
+ if(!info.isFile()||info.isSymbolicLink()||info.size>5*1024*1024)throw Error('Invalid prior application asset');
+ retainedAssetBytes+=info.size;if(retainedAssetBytes>32*1024*1024)throw Error('Prior application asset budget');
+ const target=path.join(outputAssets,name);
+ const existing=await fs.lstat(target).catch(error=>{if(error.code==='ENOENT')return null;throw error;});
+ if(existing){if(!existing.isFile()||existing.isSymbolicLink()||existing.size!==info.size||await repositoryDigest(new Uint8Array(await fs.readFile(target)))!==await repositoryDigest(new Uint8Array(await fs.readFile(from))))throw Error('Application asset name collision');continue;}
+ await fs.copyFile(from,target);retainedAssetCount++;
+}
 await inspect(path.join(previous,'editor'));await fs.cp(path.join(previous,'editor'),path.join(output,'editor'),{recursive:true,errorOnExist:true,force:false});
 await fs.copyFile(path.join(build,'published-worlds.json'),path.join(output,'published-worlds.json'));
 await fs.copyFile(fileURLToPath(new URL('../node_modules/@sparkjsdev/spark/LICENSE',import.meta.url)),path.join(output,'licenses/SPARK-LICENSE.txt'));
