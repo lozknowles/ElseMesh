@@ -141,3 +141,10 @@ a crossing or prepare/commit a transfer. That recovery limitation remains.
 HP protocol/host checks: `node --test test/owner-motion-correction.mjs
  test/owner-motion-application.mjs` (11 cases). Real native collision and travel
 acceptance must be reported separately from these tests.
+
+
+## Minimum participating owner runtime
+
+All participating owner installations must upgrade to the qualified consent-enabled owner package, including its matching prebuilt client. Older owner-runtime/1 installations lack signed VIEW-session and motion receipt fields required by the new guarantees. Mixed old/new owner federation is not supported by this release; an outdated destination is unavailable and reports **Owner runtime upgrade required**. This is not an invitation to relax receipt verification or couple VIEW permission to ENTER.
+
+Use the whole owner application package when upgrading; keep owner keys, world repositories and ledger/configuration in their existing external state locations. Do not run two authorities concurrently with the same identity/state. Existing owners are not automatically restarted or upgraded by the static website release. Ordinary static single-player mode needs no owner connection and remains functional with an empty sharing roster.

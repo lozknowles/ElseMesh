@@ -49,3 +49,21 @@ The original Sunset graphical checks remain unqualified. The first two-context r
 The approved desktop alternative was unavailable: sshd explicitly prohibited the private forwarding channels. Its policy was left unchanged, no bypass was attempted, and the temporary test windows and owned forwarder were closed. The test identities were not loaded on the desktop.
 
 The review permits proposing one explicit human-approved capacity experiment, not quietly increasing a guard. Any such experiment must retain at least 2 GiB actually free, a fixed deadline, stable protected processes and owned cleanup, and acknowledge possible compute contention. Until successful Sunset rendering/consent/revoke assertions or a changed approved release scope, main and Pages publication remain on hold.
+
+
+## Focused original Sunset acceptance
+
+The primary withdrew the proposed memory-cap increase and selected a materially different, lower-resource engine qualification: a visibly labeled synthetic **Vision test room** connected to the original Sunset scene. This did not substitute for a full Warehouse capacity claim. Both owners used the frozen packaged runtime, strict admission and actual signed movement. All nonportal Sunset project fields, its 719,538 Gaussians, original physics, transform and doorway geometry stayed exact; only documented fixture identities and reciprocal links changed.
+
+All nine browser checks passed at actual 400×320 drawing buffers and portal targets, pixel ratio one. Genuine UI sharing excluded the third authenticated client. Observer airborne selection continued to a signed landing with no correction or session/generation change. The target crossed physically, cleared to a signed 1.07 m outward position, jumped and landed on the strict signed Sunset floor. Fresh cross-world sharing rendered the original Sunset statue/landscape and a live return view showing the test-room sign/avatar. Verified revocation synchronously removed selection and retained targets/pixels, with no later eye draws. Sampled GPU use stayed within the original 768 MiB guard and restored after owned cleanup. The full Warehouse/Sunset two-client graphics combination was not qualified by this run.
+
+A separate final static-public smoke passed four checks: default published WebGL startup, original Sunset live preview and local duck, a truthful empty God view roster without identity/socket/consent calls, and actual keyboard movement after closing the popup.
+
+The user subsequently explicitly approved one new 800 MiB / 2 GiB minimum-free / 240-second full Warehouse/Sunset attempt. This is a separate human-authorized scope, not an inferred retry or automatic budget ladder. It runs only after the narrow legacy transition safety fix and exact final build are qualified; any guard or acceptance failure ends that scope without another increase.
+
+
+## Legacy transition safety review
+
+The minimum-version review found that a local known-legacy rejection could occur after the transition had marked a commit outcome uncertain, despite making no request. A synchronous compatibility assertion now runs before that uncertainty boundary using the same frozen request/context passed into prepare. The transport retains its defensive assertion. No VIEW prerequisite is added to ENTER.
+
+Actual owner/encrypted-RPC, real transition and real Input tests confirm known legacy rejection allocates nothing and restores source controls/membership; uncached legacy discovered after reservation waits for real signed cancellation; missing cancellation proof remains conservatively frozen until definitive recovery. Modern ENTER without destination VIEW remains supported. Present malformed or invalidly signed receipts remain authentication failures, not harmless legacy. The final related CPU suite passes 68 cases.

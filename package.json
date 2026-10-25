@@ -26,7 +26,7 @@
     "test:landscape:gpu": "node test/repository-landscape-browser-gpu.mjs",
     "test:published-worlds": "node --test test/published-world-boot.mjs test/published-world-runtime.mjs test/public-sunset-navigation.test.mjs test/splat-initial-preparation.mjs test/splat-readiness-contract.mjs test/splat-scene-source.mjs test/splat-scene-physics.mjs test/splat-scene-renderer.mjs test/splat-player-boundary.mjs test/splat-native-contact.mjs test/collider-ground-seams.mjs",
     "test:public-duck": "node --test test/public-microduck.mjs test/microduck-asset.mjs test/microduck-navigation.mjs",
-    "test:player-eyes": "node --test test/eyes-consent-authority.mjs test/eyes-consent-server.mjs test/player-gaze-owner.mjs test/player-gaze-wire.mjs test/player-gaze-transition.mjs test/player-eye-view.mjs test/player-eye-roster.mjs test/player-eye-controls.mjs test/player-eye-consent-panel.mjs test/player-eyes-runtime-controls.mjs test/authorized-eye-scenes.mjs test/webgl-player-eye-renderer.mjs",
+    "test:player-eyes": "node --test test/eyes-consent-authority.mjs test/eyes-consent-server.mjs test/player-gaze-owner.mjs test/player-gaze-wire.mjs test/player-gaze-transition.mjs test/player-eye-view.mjs test/player-eye-roster.mjs test/player-eye-controls.mjs test/player-eye-consent-panel.mjs test/player-eyes-runtime-controls.mjs test/authorized-eye-scenes.mjs test/webgl-player-eye-renderer.mjs test/owner-runtime-upgrade.mjs",
     "test:owner-splat": "node --test test/owner-splat-pinned.mjs test/owner-splat-confirmed-motion.mjs test/splat-player-boundary.mjs test/splat-native-contact.mjs test/owner-motion-correction.mjs",
     "test:owner-splat:actual": "node --test test/owner-splat-physics.mjs"
   },

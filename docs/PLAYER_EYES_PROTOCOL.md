@@ -30,3 +30,10 @@ Owner subscription additionally returns a signed `viewReceipt` using protocol `e
 Authenticated application denial uses a contextual owner-signed `eyes-denied` response with code `EYE_CONSENT_DENIED`. It clears affected eye data without incorrectly marking an otherwise usable remote world offline. Invalid/unsigned replies, VIEW/authority failures and RPC connection failures retain the normal fail-closed authority handling. An explicit Stop sharing increments the durable revision even when there are no current recipients, fencing an earlier delayed grant request.
 
 The generic coordinator path does not implement this consent protocol and publishes no optional eye pitch or eye-session state. Owner-only gaze publication and three-peer generic presence tests guard that boundary while preserving ordinary avatars, accepted self receipts and portal handoff.
+
+
+## Minimum participating owner runtime
+
+All participating owner installations must upgrade to the qualified consent-enabled owner package, including its matching prebuilt client. Older owner-runtime/1 installations lack signed VIEW-session and motion receipt fields required by the new guarantees. Mixed old/new owner federation is not supported by this release; an outdated destination is unavailable and reports **Owner runtime upgrade required**. This is not an invitation to relax receipt verification or couple VIEW permission to ENTER.
+
+Use the whole owner application package when upgrading; keep owner keys, world repositories and ledger/configuration in their existing external state locations. Do not run two authorities concurrently with the same identity/state. Existing owners are not automatically restarted or upgraded by the static website release. Ordinary static single-player mode needs no owner connection and remains functional with an empty sharing roster.

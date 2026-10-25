@@ -22,12 +22,13 @@ export function createRepositoryPortalTransition({transport,host,portal,sourceAc
   }};
  const sourceClient={ready:Promise.resolve(),requestHandoff:async()=>{if(transport.ownerHandoffCommits)commitAttempted=true;reservation=await transport.handoff(reservation.id);return reservation.handoff;}};
  const runtimeRegistry={prepare:async({signal})=>{
-  try{freeze(true);const p=sourceActive.player,pitch=getPitch();
+  try{freeze(true);const p=sourceActive.player,pitch=getPitch(),prepareRequest=Object.freeze({portalId:portal.id,destinationWorldId:portal.destination.worldId,sourceWorldId:sourceActive.identity?.worldId??transport.worldId,connection:transport.connectionEpoch,sessionId:transport.membership?.sessionId,generation:transport.generation});
   const receipt=await transport.sendAcceptedState({position:p.position.toArray(),velocity:p.velocity.toArray(),yaw:p.yaw,...(pitch!==undefined?{pitch}:{}),appearance:getAppearance()});
   if(!receipt.portalCrossings?.includes(portal.id))throw Error('Authority did not accept this portal crossing');
   if(signal?.aborted)throw Error('World transition cancelled before reservation');
+  transport.assertPrepareCompatible?.(prepareRequest);
   if(transport.ownerHandoffCommits)commitAttempted=true;
-  reservation=await transport.prepare(portal.id);
+  reservation=await transport.prepare(portal.id,prepareRequest);
   if(transport.ownerHandoffCommits)commitAttempted=false;
   if(reservation.state==='cancelled')throw Error(reservation.ownerTombstone?.reason??'Destination rejected entry');
   descriptor=descriptor??await transport.describe(reservation.destinationWorldId);
