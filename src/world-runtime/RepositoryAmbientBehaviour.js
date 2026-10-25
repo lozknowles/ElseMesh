@@ -2,7 +2,7 @@ import {T,evaluateAmbientBehaviour,sampleTerrain} from './vendor/world-engine-co
 
 /** Client-local decorative motion only; authored matrices and collisions stay immutable. */
 export function createRepositoryAmbientBehaviour(project){
- const habitat={groundHeight:(x,z)=>sampleTerrain(project.terrain,x,z),waterLevel:project.water?.level,bounds:project.terrain};
+ const habitat={groundHeight:(x,z)=>sampleTerrain(project.terrain,x,z),waterLevel:project.water?.level??project.nativeIsland?.sea?.level,bounds:project.terrain};
  const entries=new Map(),batches=new Set(),delta=new T.Matrix4(),matrix=new T.Matrix4();
  let lastTime;
  return {

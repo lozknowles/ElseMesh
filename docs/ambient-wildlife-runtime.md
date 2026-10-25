@@ -15,7 +15,7 @@ Yaw and translation apply to its resolved world matrix, retaining scale, pitch,
 roll, and hierarchy transforms. The saved project is never mutated.
 
 Motion runs in the active world and live portal views. Terrain height, terrain
-bounds, and the project's global water level constrain the contract evaluator.
+bounds, and the project's global water level (or native-island sea level) constrain the contract evaluator.
 Absent or unsuitable habitat leaves an object at its authored transform. This
 does not model landscape-layer ponds, obstacle avoidance, ecological behaviour,
 pathfinding, or physical interaction.
