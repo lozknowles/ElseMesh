@@ -10,9 +10,9 @@ The architect approved reuse of the qualified rendering primitives, conditional 
 
 Source or destination world/session changes invalidate sharing. The player must share again after arriving in a new world; grants are not copied through portal handoff. Cross-world observation is allowed only with newly issued target consent and destination VIEW permission. Existing avatar presence does not constitute consent to vision sharing.
 
-## Acceptance
+## Original acceptance criteria (historical hold)
 
-Pending. Three authenticated clients must prove intended-recipient access and excluded-player denial, authenticated share/revoke ownership, replay and reordered-message protection, revoke during preparation and transfer, VIEW loss and authority changes, and safe own-camera recovery. Public empty-roster behavior, own physical body and input, portals and resource lifetime regressions must remain intact. No production or privacy qualification is implied until this section records the final evidence and completion review.
+At the initial review, acceptance was pending. Three authenticated clients must prove intended-recipient access and excluded-player denial, authenticated share/revoke ownership, replay and reordered-message protection, revoke during preparation and transfer, VIEW loss and authority changes, and safe own-camera recovery. Public empty-roster behavior, own physical body and input, portals and resource lifetime regressions must remain intact. No production or privacy qualification is implied until this section records the final evidence and completion review.
 
 
 ## Preliminary completion gate
@@ -40,11 +40,11 @@ The actual-world CPU proof passes 236 route samples, stationary and jump/landing
 Focused owner-boundary/contact/cache checks pass 30 cases, and the actual pinned-source suite passes both cases. A broader run passed 80 cases; a separate raw-export test could not run because its external original-heights fixture was unavailable. This is not claimed as an implementation failure or a passed raw-export qualification.
 
 
-## Review branch status
+## Earlier review-branch status (historical hold)
 
-The consent implementation is reviewable in the main engine repository, but is not enabled by a main/Pages release. Ordinary-world physical acceptance passed seven checks with two browser clients and a third authenticated excluded client. Pinned owner Sunset physics, protocol, movement confirmation and the prebuilt owner package are qualified separately by CPU tests.
+At this earlier checkpoint, the consent implementation was reviewable in the main engine repository but was not enabled by a main/Pages release. Ordinary-world physical acceptance passed seven checks with two browser clients and a third authenticated excluded client. Pinned owner Sunset physics, protocol, movement confirmation and the prebuilt owner package are qualified separately by CPU tests.
 
-The original Sunset graphical checks remain unqualified. The first two-context run stopped before consent assertions at +772 MiB against a 768 MiB cap. The single approved 400×320 attempt stopped before both clients were ready at +771 MiB; requested CSS sizes are not reported as actual drawing-buffer evidence because the guard closed the pages before that snapshot. Neither attempt is counted as a functional pass. Both restored the baseline after owned cleanup.
+At that checkpoint, the original Sunset graphical checks remained unqualified. The first two-context run stopped before consent assertions at +772 MiB against a 768 MiB cap. The single approved 400×320 attempt stopped before both clients were ready at +771 MiB; requested CSS sizes are not reported as actual drawing-buffer evidence because the guard closed the pages before that snapshot. Neither attempt is counted as a functional pass. Both restored the baseline after owned cleanup.
 
 The approved desktop alternative was unavailable: sshd explicitly prohibited the private forwarding channels. Its policy was left unchanged, no bypass was attempted, and the temporary test windows and owned forwarder were closed. The test identities were not loaded on the desktop.
 
@@ -67,3 +67,20 @@ The user subsequently explicitly approved one new 800 MiB / 2 GiB minimum-free /
 The minimum-version review found that a local known-legacy rejection could occur after the transition had marked a commit outcome uncertain, despite making no request. A synchronous compatibility assertion now runs before that uncertainty boundary using the same frozen request/context passed into prepare. The transport retains its defensive assertion. No VIEW prerequisite is added to ENTER.
 
 Actual owner/encrypted-RPC, real transition and real Input tests confirm known legacy rejection allocates nothing and restores source controls/membership; uncached legacy discovered after reservation waits for real signed cancellation; missing cancellation proof remains conservatively frozen until definitive recovery. Modern ENTER without destination VIEW remains supported. Present malformed or invalidly signed receipts remain authentication failures, not harmless legacy. The final related CPU suite passes 68 cases.
+
+
+## Final compatibility source gate
+
+The architect reviewed the frozen 11db1c9 runtime and found no remaining material compatibility blocker. Known old-runtime rejection precedes the uncertain prepare boundary; signed cancellation and ambiguous-outcome freezing remain enforced. The primary accepted the review and retained matching owner/client upgrades as a deployment prerequisite. Final checks passed 70 consent, 101 published-runtime, 150 portal, 32 network, 6 security, 25 world, 30 owner-Splat and 2 actual pinned-Sunset cases. The default suite passed 73 with one pre-existing real-GPU test skipped; that skipped case is not claimed as qualified. A scan of all 48 changed text files found no credential or private-path matches. Final graphical evidence and publication remain separately gated.
+
+
+## Human-approved full Warehouse/Sunset attempt
+
+The single approved 800 MiB experiment used the clean 11db1c9 client and matching 320-file owner package, after seven stable samples over 30 seconds at 13,301 MiB used / 2,966 MiB free. Both real full-scene clients reached ready with 400 by 320 drawing buffers, pixel ratio one, original 719,538-Gaussian Sunset and live portal targets. Default denial with a third authenticated client also passed.
+
+The next sampled GPU allocation jumped from 14,088 MiB used to 14,284 MiB used: 983 MiB above baseline with 1,983 MiB free. The guard terminated the owned browser. Thus the cap and minimum-free targets were briefly exceeded before detection; neither target is described as maintained throughout. Sharing, cross-world eye rendering and revocation in the full Warehouse/Sunset combination did not complete and remain unqualified. This is a guard-aborted attempt, not a functional pass. No retry or larger budget is authorized. The focused original-Sunset and ordinary-world successes do not substitute for this full-scene acceptance.
+
+
+## Limited-release decision
+
+The architect's no-progress and release-scope review found a narrow engine/Pages release defensible after cleanup and exact publication checks. The primary accepted this scope: ordinary-world consent, focused original-Sunset cross-world consent, strict owner physics, and the public single-player empty roster. The full Warehouse/Sunset multiplayer combination remains explicitly unqualified. No persistent owner installation is restarted or upgraded by this release; participating owners must separately install the matching consent-enabled package. The review does not authorize another graphics attempt, a larger resource cap, or a full-scene readiness claim. Allocation profiling or a client with sufficient headroom would be separate future work.
