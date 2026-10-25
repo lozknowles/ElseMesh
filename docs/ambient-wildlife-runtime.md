@@ -34,3 +34,13 @@ real-device GPU frame rate or visual acceptance.
 Weather isolation tests verify loaded environment values, native weather particle/bolt
 state, and WebGL fog clearing across A-B-A activation. They do not qualify rendered
 WebGL rain, cloud, or thunder parity with the WebGPU weather implementation.
+
+## Release verification
+
+The editor's clean source commit 6c4d4a7 produced the vendored world-engine bundle
+(SHA-256 98bcd32c879ccdd4ba4ad0e04039c98aa9958ad4b4e0a741a5562ea915a12a5f).
+The current game source integration was reviewed at ffdf3a5; all 121 named runtime
+imports resolved. The editor passed 245 serial tests, typecheck and production build;
+the game passed 39 focused/access tests, 160 portal tests and production build.
+The architect completion gate found no remaining code blocker. Browser visual
+acceptance, real-device frame rate and rendered WebGL weather parity are still open.
