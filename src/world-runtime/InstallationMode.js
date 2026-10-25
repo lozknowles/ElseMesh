@@ -8,3 +8,8 @@ export async function resolveInstallationMode({fetcher=fetch,baseURL=location.hr
  }
  const catalog=await readPublishedWorldCatalog({fetcher,baseURL});return Object.freeze(catalog?{kind:'published',catalog}:{kind:'legacy'});
 }
+
+/** Owner installations offer shared views by default; explicit native choice stays available. */
+export function installationRenderer(installation,requested){if(installation?.kind==='published')return 'webgl2';if(requested==='webgl2')return 'webgl2';if(requested==='native'||requested==='webgpu')return 'native';return installation?.kind==='network'&&installation.runtimeConfig?.protocol==='elsemesh.owner-runtime/1'?'webgl2':'auto';}
+
+export function ownerEyePitch({protocol,backend,player}={}){return protocol==='elsemesh.owner-runtime/1'&&backend==='webgl2'&&player?.mode==='walk'&&Number.isFinite(player.pitch)&&Math.abs(player.pitch)<=1.5?player.pitch:undefined;}

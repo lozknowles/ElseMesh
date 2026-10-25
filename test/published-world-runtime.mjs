@@ -37,3 +37,21 @@ test('stale transfer never drains or resumes input belonging to a changed Host g
 test('initial published preparation is protected before its first GPU await and fully retires on cancellation',async()=>{
  const f=await fixture(),r=f.runtime,source=f.host.active;r.disconnect();await r.cache.whenDisposed;const oldViews=source.publicViewEntries;assert.equal(oldViews.size,0);let release;f.host.engine.prepareRepositoryResources=async()=>new Promise(resolve=>release=resolve);const work=r.activateOffline(source);while(!release)await new Promise(resolve=>setImmediate(resolve));const cache=r.cache,record=cache.get(source.loaded);assert.ok(record.pin);assert.equal(r.pending,true);r.disconnect();assert.equal(record.disposed,false);assert.equal(source.publicViewEntries.size,1);release();await assert.rejects(work,/superseded/);await cache.whenDisposed;assert.equal(source.publicViewEntries.size,0);assert.equal(f.disposed.includes(source.root),false);assert.equal(source.root.parent,f.host.engine.scene);f.host.dispose();assert.equal(new Set(f.disposed).size,f.disposed.length);
 });
+
+
+test('duck stop preserves real visual resources through delayed cache compilation and active-root retention',async()=>{
+ const {PublicMicroduck}=await import('../src/world-runtime/PublicMicroduck.js'),{RigidCharacterVisual}=await import('../src/npc/RigidCharacterVisual.js'),{parseGLB}=await import('../src/engine/loaders/GLTF.js'),{readFile}=await import('node:fs/promises'),{webGLRepositoryReadinessSignature}=await import('../src/world-runtime/WebGLRepositoryReadiness.js');
+ const bytes=await readFile(new URL('../public/models/microduck/microduck-realtime.glb',import.meta.url)),data=parseGLB(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength));
+ const f=await rewarmFixture(),r=f.runtime,cache=r.cache,source=f.host.active,duck=new PublicMicroduck({runtime:r,getActive:()=>f.host.active,createVisual:()=>new RigidCharacterVisual({load:async()=>data})});
+ const disposals=new Map();for(const record of cache.records.values()){await duck.install(record.candidate);const context=duck.context(record.loaded.identity.worldId);for(const resource of [...context.visual.geometries,...context.visual.materials]){disposals.set(resource,0);resource.addEventListener('dispose',()=>disposals.set(resource,disposals.get(resource)+1));}}
+ const oldDispose=r.disposeCandidate;r.disposeCandidate=c=>{duck.releaseCandidate(c);oldDispose(c);};const oldHostDispose=f.host.disposeCandidate;f.host.disposeCandidate=c=>{duck.releaseCandidate(c);oldHostDispose(c);};r.onBeforeDisconnect=()=>duck.stop();
+ cache.fingerprint=webGLRepositoryReadinessSignature;for(const record of cache.records.values())cache.markReady(record);
+ const material=f.record.candidate.root.children.find(n=>n.name==='Microduck').children[0];material.userData.feature='retained';
+ // Real material structure mutation makes the cached package require preparation.
+ const context=duck.context(f.record.loaded.identity.worldId);context.visual.materials[0].wireframe=true;
+ let finish;f.host.engine.prepareRepositoryResources=async()=>new Promise(resolve=>finish=resolve);const work=f.host.acquireResources(f.record.loaded);while(!finish)await new Promise(resolve=>setImmediate(resolve));
+ assert.ok(f.record.pin);const roots=[...cache.records.values()].map(record=>record.candidate.root),resources=disposals.size;r.disconnect();duck.stop();assert.equal(duck.actor,null);assert.equal(duck.contexts.size,0);assert.equal(duck.retired.size,2);assert.ok([...disposals.values()].every(count=>count===0));assert.ok(roots.every(root=>root.getObjectByName('Microduck')));
+ finish();await assert.rejects(work,/superseded/);await cache.whenDisposed;
+ assert.equal(duck.retired.size,1);assert.ok(source.root.getObjectByName('Microduck'));const retained=[...duck.retired.values()][0];assert.equal(retained.root,source.root);for(const resource of [...retained.visual.geometries,...retained.visual.materials])assert.equal(disposals.get(resource),0);
+ f.host.dispose();assert.equal(duck.retired.size,0);assert.equal(disposals.size,resources);assert.ok([...disposals.values()].every(count=>count===1));for(const root of roots)duck.releaseCandidate({root});duck.dispose();assert.ok([...disposals.values()].every(count=>count===1));
+});

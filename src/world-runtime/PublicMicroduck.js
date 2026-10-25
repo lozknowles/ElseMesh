@@ -10,11 +10,11 @@ const CONFIG=Object.freeze({radius:.1,height:.275,speed:.22,turnRate:1.8,portalC
  * This component never activates a player world or accesses a network identity. */
 export class PublicMicroduck{
  constructor({runtime,getActive,createVisual=()=>new RigidCharacterVisual(),config={}}={}){
-  Object.assign(this,{runtime,getActive,createVisual});this.config={...CONFIG,...config};this.contexts=new Map();this.installing=new Map();this.epoch=0;this.disposed=false;this.actor=null;this.error=null;this.status='waiting';this.loading=null;
+  Object.assign(this,{runtime,getActive,createVisual});this.config={...CONFIG,...config};this.contexts=new Map();this.retired=new Map();this.installing=new Map();this.epoch=0;this.disposed=false;this.actor=null;this.error=null;this.status='waiting';this.loading=null;
  }
  async install(candidate){
   if(this.disposed)return false;const worldId=idOf(candidate),entry=this.runtime.entry(worldId);if(!entry||!candidate?.root||!candidate.terrain||!candidate.colliders)return false;
-  const existing=this.contexts.get(worldId);if(existing?.root===candidate.root)return true;if(existing)this.releaseCandidate(existing.candidate);
+  const existing=this.contexts.get(worldId);if(existing?.root===candidate.root)return true;if(existing){existing.visual.root.visible=false;this.retired.set(existing.root,existing);this.contexts.delete(worldId);if(this.actor){this.actor._epoch++;this.actor.setActive(false);this.actor=null;}}
   if(this.installing.has(candidate.root))return this.installing.get(candidate.root);
   let visual;try{visual=this.createVisual();}catch(error){this.error=error.message;this.status='unavailable';return false;}const epoch=this.epoch,pending=(async()=>{try{
    check(await visual.ready!==false,'Microduck asset preparation failed');check(!this.disposed&&epoch===this.epoch&&!candidate.disposed,'Microduck preparation superseded');
@@ -69,11 +69,14 @@ export class PublicMicroduck{
   const context=this.context(this.actor.worldId);if(!context||!this.bound(context)){this.stop();this.error='Microduck package changed';return;}
   this.actor.update(dt);const snapshot=this.actor.snapshot();for(const c of this.contexts.values()){const visible=c.worldId===snapshot.worldId;c.visual.root.visible=visible;if(visible)c.visual.update(snapshot);}
  }
+ // Simulation ends immediately. GPU disposal belongs to actual package retirement,
+ // after its preparation lease settles, even when a hidden graph is preserved active.
  releaseCandidate(candidate){
-  const context=[...this.contexts.values()].find(c=>c.root===candidate?.root);if(!context)return;
-  this.contexts.delete(context.worldId);context.visual.dispose();if(this.actor){this.actor._epoch++;this.actor.setActive(false);this.actor=null;}this.status='waiting';
+  const root=candidate?.root,context=[...this.contexts.values()].find(c=>c.root===root)??this.retired.get(root);if(!context)return;
+  const current=this.contexts.get(context.worldId)===context;if(current)this.contexts.delete(context.worldId);this.retired.delete(root);context.visual.dispose();
+  if(current&&this.actor){this.actor._epoch++;this.actor.setActive(false);this.actor=null;}if(current)this.status='waiting';
  }
- stop(){this.epoch++;if(this.actor){this.actor._epoch++;this.actor.setActive(false);}this.actor=null;this.loading=null;for(const c of this.contexts.values())c.visual.dispose();this.contexts.clear();this.status='stopped';}
+ stop(){this.epoch++;if(this.actor){this.actor._epoch++;this.actor.setActive(false);}this.actor=null;this.loading=null;for(const c of this.contexts.values()){c.visual.root.visible=false;this.retired.set(c.root,c);}this.contexts.clear();this.status='stopped';}
  dispose(){if(this.disposed)return;this.stop();this.disposed=true;}
  diagnostics(){return {status:this.status,error:this.error,epoch:this.epoch,visualCount:this.contexts.size,worlds:[...this.contexts.values()].map(c=>({worldId:c.worldId,visible:c.visual.root.visible,bound:this.bound(c)})),actor:this.actor?.snapshot()??null};}
 }

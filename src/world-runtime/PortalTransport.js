@@ -3,6 +3,8 @@ import {verifyRuntimeSignature} from './RepositorySession.js';
 import { canonical, privateNeonIdentity } from './vendor/world-engine-contract.js';
 const encoder=new TextEncoder(),MAX_FILE=128*1024*1024;
 const b64=bytes=>{let result='';for(let i=0;i<bytes.length;i+=8192)result+=String.fromCharCode(...bytes.subarray(i,i+8192));return btoa(result);};
+/** Optional radians: unavailable gaze must never become a fabricated zero. */
+export function optionalPitch(pose){if(pose.pitch===undefined)return {};if(!Number.isFinite(pose.pitch)||Math.abs(pose.pitch)>1.5)throw Error('Invalid optional player pitch');return {pitch:pose.pitch};}
 /** Persistent browser identity; same-origin endpoint set by runtime, never authored data. */
 export class PortalTransport {
  constructor({status=()=>{},presence=()=>{},membership=()=>{},error=()=>{}}={}){this.events={status,presence,membership,error};this.socket=null;this.pending=new Map();this.sequence=0;this.generation=0;this.worldId=null;this.lastStateAt=-Infinity;this.requestSequence=0;this.queue=Promise.resolve();this.closed=true;this.connectionEpoch=0;this.frozen=false;}
@@ -54,21 +56,21 @@ export class PortalTransport {
   }catch(error){this.disconnect();throw error;}
  }
 
- async sendAcceptedState({position,velocity=[0,0,0],yaw=0,timestamp=Date.now(),appearance=loadAppearance()}){
-  validateAppearance(appearance);
-  const state={appearance:{...appearance},worldId:this.worldId,generation:this.generation,sequence:this.sequence++,timestamp,position:[...position],velocity:[...velocity],yaw};
+ async sendAcceptedState({position,velocity=[0,0,0],yaw=0,pitch,timestamp=Date.now(),appearance=loadAppearance()}){
+  validateAppearance(appearance);const gaze=optionalPitch({pitch});
+  const state={appearance:{...appearance},worldId:this.worldId,generation:this.generation,sequence:this.sequence++,timestamp,position:[...position],velocity:[...velocity],yaw,...gaze};
   const receipt=await this.request('accepted-state',{state}),authority=this.membership?.world?.published?.descriptor?.authority?.nodeId??this.membership?.authorityNodeId;
-  if(!authority||!await verifyRuntimeSignature(receipt,new Set([authority]))||receipt.protocol!=='elsemesh.world-wss/2'||receipt.type!=='pose-accepted'||receipt.playerNodeId!==this.identity.nodeId||receipt.authoredWorldId!==state.worldId||receipt.sessionId!==this.membership.sessionId||receipt.generation!==state.generation||receipt.sequence!==state.sequence||canonical(receipt.position)!==canonical(state.position)||canonical(receipt.velocity)!==canonical(state.velocity)||receipt.yaw!==state.yaw||canonical(receipt.appearance)!==canonical(state.appearance))throw Error('Invalid authoritative crossing receipt');
+  if(!authority||!await verifyRuntimeSignature(receipt,new Set([authority]))||receipt.protocol!=='elsemesh.world-wss/2'||receipt.type!=='pose-accepted'||receipt.playerNodeId!==this.identity.nodeId||receipt.authoredWorldId!==state.worldId||receipt.sessionId!==this.membership.sessionId||receipt.generation!==state.generation||receipt.sequence!==state.sequence||canonical(receipt.position)!==canonical(state.position)||canonical(receipt.velocity)!==canonical(state.velocity)||receipt.yaw!==state.yaw||receipt.pitch!==state.pitch||canonical(receipt.appearance)!==canonical(state.appearance))throw Error('Invalid authoritative crossing receipt');
   this.lastAcceptedPose=receipt;return receipt;
  }
  handoff(reservationId){return this.request('handoff',{reservationId});}
  prepare(portalId){return this.request('prepare',{portalId});}
  ready(reservationId,contentDigest,epoch){return this.request('ready',{reservationId,contentDigest,epoch});}
- adoptCommit(result){if(result.state==='committed'&&(this.worldId!==result.destinationWorldId||this.generation!==result.generation)){this.worldId=result.destinationWorldId;this.generation=result.generation;this.sequence=0;this.membership={...this.membership,...result,world:this.recoveryContext?.reservation?.id===result.id?this.recoveryContext.destination:this.membership.world,sessionId:result.destinationSessionId};this.events.membership(result);}return result;}
+ adoptCommit(result){if(result.state==='committed'&&(this.worldId!==result.destinationWorldId||this.generation!==result.generation)){this.worldId=result.destinationWorldId;this.generation=result.generation;this.sequence=0;const {pitch:previousPitch,...previousMembership}=this.membership??{};this.membership={...previousMembership,...result,world:this.recoveryContext?.reservation?.id===result.id?this.recoveryContext.destination:this.membership.world,sessionId:result.destinationSessionId};this.events.membership(result);}return result;}
  async commit(reservationId){return this.adoptCommit(await this.request('commit',{reservationId}));}
  async status(reservationId){return this.adoptCommit(await this.request('status',{reservationId}));}
  cancel(reservationId){return this.request('cancel',{reservationId});}
- sendState({position,velocity=[0,0,0],yaw=0,timestamp=Date.now(),appearance=loadAppearance()}){const now=performance.now();if(this.frozen||this.closed||this.socket?.readyState!==1||now-this.lastStateAt<50||this.socket.bufferedAmount>65536)return false;validateAppearance(appearance);this.lastStateAt=now;this.socket.send(JSON.stringify({type:'state',worldId:this.worldId,generation:this.generation,sequence:this.sequence++,timestamp,position,velocity,yaw,appearance:{...appearance}}));return true;}
+ sendState({position,velocity=[0,0,0],yaw=0,pitch,timestamp=Date.now(),appearance=loadAppearance()}){const now=performance.now();if(this.frozen||this.closed||this.socket?.readyState!==1||now-this.lastStateAt<50||this.socket.bufferedAmount>65536)return false;validateAppearance(appearance);const gaze=optionalPitch({pitch});this.lastStateAt=now;this.socket.send(JSON.stringify({type:'state',worldId:this.worldId,generation:this.generation,sequence:this.sequence++,timestamp,position,velocity,yaw,...gaze,appearance:{...appearance}}));return true;}
  disconnect(){this.connectionEpoch++;this.closed=true;const socket=this.socket;this.socket=null;socket?.close();for(const pending of this.pending.values()){clearTimeout(pending.timer);pending.reject(Error('Coordinator disconnected'));}this.pending.clear();this.queue=Promise.resolve();}
  dispose(){this.disconnect();}
 }

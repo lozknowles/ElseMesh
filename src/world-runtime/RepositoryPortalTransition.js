@@ -1,12 +1,12 @@
 import {loadAppearance} from '../player/AvatarAppearance.js';
 import {FederatedWorldTransition} from '../network/FederatedWorldTransition.js';
-const poseOf=r=>({position:[...r.position],velocity:[...r.velocity],yaw:r.yaw});
+const poseOf=r=>({position:[...r.position],velocity:[...r.velocity],yaw:r.yaw,...(r.pitch!==undefined?{pitch:r.pitch}:{})});
 /**
  * Adapter around the recovered client transition and authenticated authority ledgers.
  * load(descriptor) must verify the destination owner/content admission.
  * onFrozen(true) suspends input and the runtime loop; unknown outcomes stay frozen.
  */
-export function createRepositoryPortalTransition({transport,host,portal,sourceActive,load,descriptor,getAppearance=()=>sourceActive?.player?.avatarAppearance??loadAppearance(),onFrozen=()=>{},onStatus=()=>{}}={}){
+export function createRepositoryPortalTransition({transport,host,portal,sourceActive,load,descriptor,getAppearance=()=>sourceActive?.player?.avatarAppearance??loadAppearance(),getPitch=()=>undefined,onFrozen=()=>{},onStatus=()=>{}}={}){
  if(!transport||!host||!portal||!sourceActive||typeof load!=='function')throw Error('Repository portal transition dependencies are incomplete');
  let reservation,prepared,candidate,frozen=false,commitAttempted=false,busy=false;
  const freeze=value=>{frozen=value;transport.setFrozen?.(value);onFrozen(value);};
@@ -22,8 +22,8 @@ export function createRepositoryPortalTransition({transport,host,portal,sourceAc
   }};
  const sourceClient={ready:Promise.resolve(),requestHandoff:async()=>{if(transport.ownerHandoffCommits)commitAttempted=true;reservation=await transport.handoff(reservation.id);return reservation.handoff;}};
  const runtimeRegistry={prepare:async({signal})=>{
-  try{freeze(true);const p=sourceActive.player;
-  const receipt=await transport.sendAcceptedState({position:p.position.toArray(),velocity:p.velocity.toArray(),yaw:p.yaw,appearance:getAppearance()});
+  try{freeze(true);const p=sourceActive.player,pitch=getPitch();
+  const receipt=await transport.sendAcceptedState({position:p.position.toArray(),velocity:p.velocity.toArray(),yaw:p.yaw,...(pitch!==undefined?{pitch}:{}),appearance:getAppearance()});
   if(!receipt.portalCrossings?.includes(portal.id))throw Error('Authority did not accept this portal crossing');
   if(signal?.aborted)throw Error('World transition cancelled before reservation');
   if(transport.ownerHandoffCommits)commitAttempted=true;
@@ -35,12 +35,12 @@ export function createRepositoryPortalTransition({transport,host,portal,sourceAc
   const loaded=await load(descriptor);
   transport.setRecoveryContext?.({reservation,descriptor});
   if(host.active!==sourceActive)throw Error('Source world changed before transfer');
-  prepared=await host.prepare(loaded,{pose:{...poseOf(reservation),pitch:p.pitch}});
+  prepared=await host.prepare(loaded,{pose:poseOf(reservation)});
   if(!prepared)throw Error('Destination preparation was superseded');
   await transport.ready(reservation.id,loaded.identity.contentDigest,descriptor.epoch);
   candidate={loaded,activate:async(spawn)=>{
    if(!reservation||reservation.state!=='committed'||JSON.stringify(poseOf(reservation))!==JSON.stringify(spawn))throw Error('Activation requires authoritative committed pose');
-   if(!prepared)prepared=await host.prepare(loaded,{pose:{...spawn,pitch:p.pitch}});
+   if(!prepared)prepared=await host.prepare(loaded,{pose:spawn});
    if(!prepared||!await host.activatePrepared(prepared))throw Error('Committed destination activation failed; reconcile membership');
    prepared=null;freeze(false);
   },dispose:async()=>{if(commitAttempted)return;if(prepared)host.discardPrepared(prepared);prepared=null;}};
