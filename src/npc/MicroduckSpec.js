@@ -1,0 +1,3 @@
+export const MICRODUCK_ASSET_VERSION='sha256:f8776b98041d44b51286cb13c599e6aaedbc59f15336f51aeb88da41c9878c54';
+export const MICRODUCK_GAIT_VERSION='microduck-velstand-665ae4eb-50hz-v2';
+export const MICRODUCK_BYTES=6929080;

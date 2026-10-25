@@ -41,6 +41,7 @@ import { RepositoryWorldHost } from './RepositoryWorldHost.js';
 import {RefractionPass,REFRACTION_PREPARE_DEFINES} from '../ocean/RefractionPass.js';
 import {resolveInstallationMode} from './InstallationMode.js';
 import {PublicPortalRuntime} from './PublicPortalRuntime.js';
+import {PublicMicroduck} from './PublicMicroduck.js';
 import {repositorySceneOptions} from './RepositorySceneOptions.js';
 import {withSplatMovementBoundary} from './SplatMovementBoundary.js';
 import { RepositoryPortalRuntime } from './RepositoryPortalRuntime.js';
@@ -72,15 +73,17 @@ async function init(){
  const interactionState=()=>({active:host.active,hostGeneration:host.generation,inputEnabled:input.enabled,transport:portals.transport,connection:portals.transport.connectionEpoch,sessionId:portals.transport.membership?.sessionId,generation:portals.transport.generation});
  const canResume=()=>canResumeObjectInteraction(interactionContext,{active:host.active,hostGeneration:host.generation,pending:portals.pending,authorityOffline:portals.authorityOffline,transport:portals.transport,connected:portals.connected,ownerMode:ownerMode()});
  const retro=new RepositoryRetro(input,{canResume,canExecute:()=>!ownerMode()||!!objectAccess?.valid(activeComputerId),canCommand:async()=>{if(!ownerMode())return true;if(!objectAccess?.valid(activeComputerId)){objectAccess?.invalidate();return false;}try{await objectAccess.use(activeComputerId);return true;}catch(error){report(error.message);return false;}}});
+ let publicDuck=null;
  let refraction,atmosphere,sky,clouds,environment,shadows,weather,renderer,medium,post,backendHost={},backendPortals={};
  if(isWebGL){
   const {buildWebGLRepositoryScene,disposeWebGLRepositoryScene,buildWebGLNeon}=await import('./WebGLRepositoryScene.js');
   const {WebGLPortalViews}=await import('./WebGLPortalViews.js');
   configureWebGLRepositoryScene(engine.scene);
   engine.repositoryReadinessSignature=webGLRepositoryReadinessSignature;engine.prepareRepositoryResources=root=>prepareWebGLRepositoryResources({renderer:engine.renderer,camera:engine.camera,root,targetScene:engine.scene});
-  const buildGL=async(descriptor,camera,{loaded}={})=>{const candidate=await buildWebGLRepositoryScene(descriptor,camera,repositorySceneOptions(descriptor.project,loaded,{renderer:engine.renderer,backend:'webgl2'}));try{if(candidate.splatScene){candidate.terrain=withSplatMovementBoundary(candidate.splatScene.physics);const warm=camera.clone();warm.position.fromArray(descriptor.project.spawn.position);warm.position.y+=1.62;warm.rotation.set(candidate.splatScene.physics.qualification.spawn.pitch??0,descriptor.project.spawn.yaw,0,'YXZ');warm.updateMatrixWorld(true);await candidate.splatScene.prepareResources(warm);}return candidate;}catch(error){disposeWebGLRepositoryScene(candidate);throw error;}};
-  backendHost={buildCandidate:buildGL,disposeCandidate:disposeWebGLRepositoryScene,buildNeon:buildWebGLNeon};
-  backendPortals={buildScene:buildGL,disposeCandidate:disposeWebGLRepositoryScene,createPeerLayer:(scene,id)=>createWebGLRepositoryPeerLayer(scene,id,engine.prepareRepositoryResources),addPortalFrame:addWebGLPortalFrame,views:new WebGLPortalViews({engine,mainCamera:engine.camera,configureScene:configureWebGLRepositoryScene})};
+  const buildGL=async(descriptor,camera,{loaded}={})=>{const candidate=await buildWebGLRepositoryScene(descriptor,camera,repositorySceneOptions(descriptor.project,loaded,{renderer:engine.renderer,backend:'webgl2'}));try{if(candidate.splatScene){candidate.terrain=withSplatMovementBoundary(candidate.splatScene.physics);const warm=camera.clone();warm.position.fromArray(descriptor.project.spawn.position);warm.position.y+=1.62;warm.rotation.set(candidate.splatScene.physics.qualification.spawn.pitch??0,descriptor.project.spawn.yaw,0,'YXZ');warm.updateMatrixWorld(true);await candidate.splatScene.prepareResources(warm);}await publicDuck?.install(candidate);return candidate;}catch(error){disposeWebGLRepositoryScene(candidate);throw error;}};
+  const disposeGL=candidate=>{publicDuck?.releaseCandidate(candidate);disposeWebGLRepositoryScene(candidate);};
+  backendHost={buildCandidate:buildGL,disposeCandidate:disposeGL,buildNeon:buildWebGLNeon};
+  backendPortals={buildScene:buildGL,disposeCandidate:disposeGL,createPeerLayer:(scene,id)=>createWebGLRepositoryPeerLayer(scene,id,engine.prepareRepositoryResources),addPortalFrame:addWebGLPortalFrame,views:new WebGLPortalViews({engine,mainCamera:engine.camera,configureScene:configureWebGLRepositoryScene})};
   renderer=engine.renderer;
  }else{
   atmosphere=new Atmosphere(engine);sky=new Sky(atmosphere);clouds=new SkyProClouds(engine,atmosphere);await clouds.ready;sky.clouds=clouds;backendPortals.background=new RepositoryPortalSky({sky});
@@ -111,6 +114,7 @@ async function init(){
  let arrivals;
  const portalOptions={onPresence:packet=>arrivals?.receive(packet),onActivated:active=>arrivals?.activated(active),engine,host,input,...backendPortals,getAppearance:()=>app.avatarChooser?.value??loadAppearance(),onStatus:s=>{document.querySelector('#portal-status').textContent=s;}};
  const portals=installation.kind==='published'?new PublicPortalRuntime({...portalOptions,catalog:installation.catalog}):new RepositoryPortalRuntime(portalOptions);
+ if(installation.kind==='published'){publicDuck=new PublicMicroduck({runtime:portals,getActive:()=>host.active});portals.onBeforeDisconnect=()=>publicDuck.stop();}
  objectAccess=new OwnerObjectAccessClient({getContext:()=>{const t=portals.transport,a=host.active;return {transport:t,active:a,connection:t.connectionEpoch,worldId:a?.identity.worldId,contentDigest:a?.identity.contentDigest,sessionId:t.membership?.sessionId,generation:t.generation,authorityEpoch:t.membership?.world?.epoch,ready:ownerMode()&&portals.connected&&!portals.pending&&!portals.authorityOffline&&!t.closed&&!t.frozen&&t.worldId===a?.identity.worldId};},onLost:()=>{media?.exit();if(terminal.open)terminal.close();retro.clear({resume:false});if(canResume())input.resume();interactionContext=null;activeComputerId=null;document.querySelector('#computer-controls').textContent='Access restricted';},onSnapshot:snapshot=>{accessPanel?.render(snapshot);if(snapshot?.overlay)host.setRuntimeOverlay(snapshot.overlay);if(controlsHelp?.open)controlsHelp.render();}});
  accessPanel=new ObjectAccessPanel({client:objectAccess,host,parent:document.querySelector('#panel'),onStatus:report});
  if(installation.kind==='published'){
@@ -122,6 +126,7 @@ async function init(){
    'In Sunset, keep to the lawn near the doorway. Walk a few steps forward, then turn around and walk through the same doorway to return to the warehouse.',
    'The Dock doorway keeps its existing appearance; this single-player tour connects only the gold Sunset doorway.',
    'Press E near a computer. At the TV, press E, then Play on TV. Return to game keeps it playing; press E again to control or stop it. Using a computer stops the TV.',
+   'Microduck is your local companion for this browser session. It explores the warehouse, visits Sunset through the gold doorway and returns.',
    'This is a public single-player tour. No owner connection or visitor permission setup is needed.',
    'Open world remains available if you want to leave the tour and open another repository.'
   ]){const item=document.createElement('li');item.textContent=tip;list.append(item);}}
@@ -156,7 +161,7 @@ async function init(){
  const avatar=isWebGL?new WebGLRepositoryAvatar(engine.scene,{prepareResources:engine.prepareRepositoryResources}):new ReadiedRepositoryAvatar(engine.scene,{model:{wheelPivot:{position:new N.Vector3()},lines:{deckY:0},group:new N.Group()},getYaw:()=>0},{prepareResources:engine.prepareRepositoryResources});
  arrivals=new PortalArrivalController({runtime:portals,localAvatar:avatar});
  const openingPlayer={avatarAppearance:loadAppearance()};
- const app={media,objectAccess,accessPanel,controlsHelp,engine,input,host,renderer,post,weather,retro,portals,avatar,arrivals,followCamera,camera:engine.camera,freeCam:false,get player(){return host.active?.player??openingPlayer;},fly:{yaw:0,pitch:0,velocity:new N.Vector3(),setPose(position,yaw,pitch){this.yaw=yaw;this.pitch=pitch;engine.camera.position.copy(position);engine.camera.quaternion.setFromEuler(new N.Euler(pitch,yaw,0,'YXZ'));engine.camera.updateMatrixWorld();}},thirdIsland:{active:false},monorail:{state:'off'},setFreeCam(value){this.freeCam=!!value;},gpu:isWebGL?null:GPU,backend:selected.backend,fallbackReason:selected.fallbackReason,session:null,...repositoryWorldActions({host,portals,report})};
+ const app={publicDuck,media,objectAccess,accessPanel,controlsHelp,engine,input,host,renderer,post,weather,retro,portals,avatar,arrivals,followCamera,camera:engine.camera,freeCam:false,get player(){return host.active?.player??openingPlayer;},fly:{yaw:0,pitch:0,velocity:new N.Vector3(),setPose(position,yaw,pitch){this.yaw=yaw;this.pitch=pitch;engine.camera.position.copy(position);engine.camera.quaternion.setFromEuler(new N.Euler(pitch,yaw,0,'YXZ'));engine.camera.updateMatrixWorld();}},thirdIsland:{active:false},monorail:{state:'off'},setFreeCam(value){this.freeCam=!!value;},gpu:isWebGL?null:GPU,backend:selected.backend,fallbackReason:selected.fallbackReason,session:null,...repositoryWorldActions({host,portals,report})};
  let welcomeMuted=false;try{welcomeMuted=localStorage.getItem('elsemesh.world-welcome-muted/1')==='1';}catch{}
  const isWelcomeMuted=()=>welcomeMuted||!!app.audio?.muted||!!app.audioMuted;
  const welcomeSpeech=new LocalWelcomeSpeech({isMuted:isWelcomeMuted});
@@ -210,7 +215,7 @@ async function init(){
     if(canMove){const device=retro.nearest(engine.camera.position),tv=nearestMedia();if(input.hit('KeyE')){if(device){const computer=host.active.project.objects.find(o=>o.id===device.objectId);if(computer)void openComputer(computer,host.active,device);else if(!ownerMode()){interactionContext=interactionState();retro.open(device);}else report('Access restricted');}else if(tv)void openMedia(tv,host.active);}}
    if(host.active&&!app.freeCam)followCamera.update(dt,host.active,{suspended:terminal.open||retro.active||!!media?.controlsOpen||controlsHelp.open||accessPanel.root.open||portals.pending});
    if(host.active)avatar.update(dt,host.active.player,engine.camera,app.freeCam||followCamera.enabled);else avatar.group.visible=false;
-   portals.update(dt,time);arrivals.update();portalEffects.update(dt,time);input.endFrame();
+   portals.update(dt,time);publicDuck?.update(dt);arrivals.update();portalEffects.update(dt,time);input.endFrame();
    const env=host.environment()??{timeOfDay:14,cloudCoverage:.49,windSpeed:6,sunAzimuth:0};let weatherState;const water=host.active?.project.water;
    if(isWebGL){weatherState=updateWebGLRepositoryEnvironment(engine,host.active,time);portals.render({width:engine.width,height:engine.height,time});host.active?.nativeIsland?.bindView(engine.camera);renderer.render(engine.scene,engine.camera);}
    else{const shelters=repositoryWeatherShelters(host.active?.project);setMistShelters(medium.uniforms,shelters);clouds.coverage.value=env.cloudCoverage??.49;G.windSpeed.value=env.windSpeed??6;

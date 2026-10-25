@@ -30,7 +30,15 @@ test('generated publication contains every manifest, native and lazy SOG/physics
 });
 test('publication preserves editor, notices, immutable opening pin and excludes lab/source evidence artifacts',async()=>{
  const config=JSON.parse(await fs.readFile(path.join(root,'opening-world.json'),'utf8')),opening=catalog.worlds.find(w=>w.worldId===catalog.openingWorldId);assert.equal(config.bundlePath,opening.bundlePath);assert.equal(config.contentDigest,opening.contentDigest);await fs.access(path.join(root,'editor/index.html'));await fs.access(path.join(root,'licenses/SPARK-LICENSE.txt'));
- const denied=/\.(?:mp4|ply|sqlite|pem|pyc)$|client-identities|owner-trace|sensor\.jsonl|\.local-evidence|microduck/i;
+ const denied=/\.(?:mp4|ply|sqlite|pem|pyc)$|client-identities|owner-trace|sensor\.jsonl|\.local-evidence/i;
  async function visit(dir){for(const name of await fs.readdir(dir)){assert.ok(!denied.test(name),name);const full=path.join(dir,name),info=await fs.lstat(full);assert.ok(!info.isSymbolicLink());if(info.isDirectory())await visit(full);}}
  await visit(root);
+});
+
+test('published local duck has exact admitted model bytes, separate notices and no full-resolution source',async()=>{
+ const dir=path.join(root,'models/microduck'),expected=['ATTRIBUTION.md','LICENSE-APACHE-2.0.txt','LICENSE-MODELS.md','collision-proxy.json','manifest.json','microduck-realtime.glb'];
+ assert.deepEqual((await fs.readdir(dir)).sort(),expected.sort());
+ const bytes=await fs.readFile(path.join(dir,'microduck-realtime.glb'));assert.equal(bytes.length,6929080);assert.equal(sha(bytes),'f8776b98041d44b51286cb13c599e6aaedbc59f15336f51aeb88da41c9878c54');
+ const credits=await fs.readFile(path.join(root,'credits.html'),'utf8');assert.match(credits,/CC BY-NC-SA 4.0/);assert.match(credits,/Pollen Robotics/);assert.match(credits,/browser session/);
+ for(const name of expected.filter(n=>!n.endsWith('.glb')))assert.doesNotMatch(await fs.readFile(path.join(dir,name),'utf8'),/\/fast\/|\/home\/|[A-Z]:\\(?:Users|Downloads)/);
 });

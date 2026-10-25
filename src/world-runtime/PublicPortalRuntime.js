@@ -6,7 +6,7 @@ import {Vector3} from '../engine/index.js';
 import {loadWorldSource,describeRuntimeWorld,portalLocalPoint,portalWorldPoint,mapPortalPoint,mapPortalDirection,mapPortalYaw,sweepPortalCapsule} from './vendor/world-engine-contract.js';
 const check=(v,m)=>{if(!v)throw Error(m);};
 /** A published single-player journey. It never creates a network identity,
- * membership, owner grant, peer, NPC, or authority receipt. */
+ * membership, owner grant, network peer, or authority receipt. */
 export class PublicPortalRuntime{
  constructor({catalog,engine,host,input,views,buildScene,disposeCandidate,addPortalFrame,portalEffects,onStatus=()=>{},onChange=()=>{},onActivated=()=>{},baseURL=location.href,fetcher=fetch}={}){
   this.catalog=validatePublishedWorldCatalog(catalog,{baseURL});check(engine&&host&&input&&views&&buildScene&&disposeCandidate,'Public runtime dependencies missing');Object.assign(this,{engine,host,input,views,buildScene,disposeCandidate,addPortalFrame,portalEffects,onStatus,onChange,onActivated,baseURL,fetcher});
@@ -91,6 +91,7 @@ export class PublicPortalRuntime{
  getPeerLayer(){return null;}avatarRepresentations(){return [];}recover(){return Promise.reject(Error('Published single-player travel has no network recovery'));}
  diagnostics(){return {mode:'published',activeWorldId:this.host.active?.identity.worldId,pending:this.pending,enabled:this.enabled,crossings:this.crossings,cacheCount:this.cache.records.size,previewCount:[...this.previewRecords.values()].filter(r=>r.record).length,errors:[...this.errors].map(([portalId,error])=>({portalId,error})),portals:[...this.views.entries].map(([id,e])=>({id,state:e.aperture.userData.portalViewState,worldId:this.previewRecords.get(id)?.worldId}))};}
  disconnect(){
+  this.onBeforeDisconnect?.();
   if(this.pending)this.host.generation++;this.epoch++;this.transport.connectionEpoch++;this.enabled=false;this.pending=false;this.config=null;this.restoreHooks();
   if(this.activeRecord){this.activeRecord.viewEntries=this.views.park();this.activeRecord=null;}else this.views.clear();
   const cache=this.cache;for(const prepared of [...this.host.prepared??[]])if(prepared.resourceLease?.record&&cache.records.has(prepared.resourceLease.record.key))this.host.discardPrepared(prepared);
