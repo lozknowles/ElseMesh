@@ -156,6 +156,7 @@ export class PortalViews {
     jitterY:FrameUniforms.fields.jitter.value.y*size.height/2});
    e.block.fields.portalClipPlane.value=portalDestinationPlane(e.destination);
    e.candidate.nativeIsland?.bindView(cam,e.viewWater);
+   e.candidate.root.userData.updateAmbientBehaviour?.(time);
    e.candidate.root.traverse(n=>{n.userData.updateNeon?.(time,14);n.userData.updateTreeLOD?.(time,cam.position);});
    const horizon=FrameUniforms.fields.horizonColor.value;
    if(e.viewRenderer){

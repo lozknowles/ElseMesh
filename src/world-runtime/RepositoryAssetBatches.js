@@ -1,10 +1,11 @@
 import * as N from '../engine/index.js';
+import {createRepositoryAmbientBehaviour} from './RepositoryAmbientBehaviour.js';
 import { inspectAndLoadAsset,disposeAssetScene } from './vendor/world-engine-contract.js';
 import { buildNativeAsset } from './NativeAssets.js';
 import { repositoryRetroScreen } from './RepositoryRetro.js';
 /** Share admitted geometry/materials per asset and override, preserving every authored transform and ID. */
 export async function buildRepositoryAssetBatches(project,objects,matrices,convertGeometry){
- const root=new N.Group(),diagnostics=[],loadedAssets=new Map(),groups=new Map();
+ const root=new N.Group(),diagnostics=[],loadedAssets=new Map(),groups=new Map(),ambient=createRepositoryAmbientBehaviour(project);
  const screens=new Map((project.terminals??[]).filter(t=>t.screenObjectId).map(t=>[t.screenObjectId,t.kind]));
  for(const object of objects){const kind=screens.get(object.id);const key=object.assetId+JSON.stringify(object.materialOverrides??[])+(kind??'')+(object.landscapeChunk??'');let group=groups.get(key);if(!group){group={objects:[],kind};groups.set(key,group);}group.objects.push(object);}
  try{
@@ -18,11 +19,11 @@ export async function buildRepositoryAssetBatches(project,objects,matrices,conve
    converted.group.traverse(part=>{if(!part.isMesh)return;const material=retro??part.material;if(retro)oldMaterials.add(part.material);
     const instance=new N.InstancedMesh(part.geometry,material,items.length);instance.castShadow=!kind;instance.receiveShadow=true;instance.userData.editorObjectIds=items.map(o=>o.id);
     for(let i=0;i<items.length;i++){instance.setMatrixAt(i,new N.Matrix4().fromArray(matrices.get(items[i].id).elements));if(items[i].landscapeTint)instance.setColorAt(i,new N.Color().fromArray(items[i].landscapeTint));}instance.instanceMatrix.needsUpdate=true;if(instance.instanceColor)instance.instanceColor.needsUpdate=true;
-    if(material.transparent)instance.layers.set(2);container.add(instance);
+    ambient.register(instance,items,matrices);if(material.transparent)instance.layers.set(2);container.add(instance);
    });for(const material of oldMaterials)material.dispose();
    for(const object of items)diagnostics.push({objectId:object.id,primitives:converted.diagnostics.primitives,warnings:converted.diagnostics.warnings});
   }
-  root.userData.assetBatchCount=groups.size;return {root,diagnostics};
+  root.userData.assetBatchCount=groups.size;root.userData.updateAmbientBehaviour=t=>ambient.update(t);return {root,diagnostics,ambient};
  }catch(error){root.traverse(n=>{n.geometry?.dispose();n.material?.dispose();n.userData.disposeAssetTextures?.();});throw error;}
  finally{for(const loaded of loadedAssets.values())disposeAssetScene(loaded.scene);}
 }

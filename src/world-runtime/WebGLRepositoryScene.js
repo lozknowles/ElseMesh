@@ -1,6 +1,7 @@
 import {createSplatSceneAdapter} from './SplatSceneAdapter.js';
 import {buildMediaScreenHousing} from './MediaScreen.js';
 import {buildWebGLNativeIsland} from './WebGLNativeIsland.js';
+import {createRepositoryAmbientBehaviour} from './RepositoryAmbientBehaviour.js';
 import {buildRepositoryTraffic} from './RepositoryTraffic.js';
 import {buildRepositoryLandscape,addLandscapeCollisions,landscapeAssets,installRepositoryLandscapeMaterial} from './RepositoryLandscape.js';
 import { T, resolveWorldMatrices,effectiveObjectState,buildComputerGeometry,disposeComputerGeometry,inspectAndLoadAsset,disposeAssetScene,acquireNeonGeometry,sampleNeonEffect,createTreeGeometry,buildFeatureGeometry } from './vendor/world-engine-contract.js';
@@ -124,6 +125,7 @@ export async function buildWebGLRepositoryScene(descriptor,camera,options={}){
    else if(['box','sphere','cylinder','cone'].includes(object.kind))add(item,object.kind==='sphere'?new T.SphereGeometry(.8,24,16):object.kind==='cylinder'?new T.CylinderGeometry(.65,.65,1.6,24):object.kind==='cone'?new T.ConeGeometry(.8,1.6,24):new T.BoxGeometry(1.6,1.6,1.6),object.color);
    else throw Error('Unsupported WebGL repository object '+object.kind);
   }
+  const ambient=createRepositoryAmbientBehaviour(project);candidate.ambient=ambient;
   const groups=new Map(),cache=new Map(),screensByObject=new Map((project.terminals??[]).filter(t=>t.screenObjectId).map(t=>[t.screenObjectId,t.kind]));
   for(const object of allObjects.filter(o=>o.kind==='glb'&&effectiveObjectState(allObjects,o.id).visible)){const kind=screensByObject.get(object.id),key=object.assetId+JSON.stringify(object.materialOverrides??[])+(kind??'')+(object.landscapeChunk??'');if(!groups.has(key))groups.set(key,{objects:[],kind});groups.get(key).objects.push(object);}
   for(const {objects,kind}of groups.values()){
@@ -137,14 +139,14 @@ export async function buildWebGLRepositoryScene(descriptor,camera,options={}){
      const slot=loaded.materialIndices.get(part.material)??-1;let material=retro??materialCache.get(part.material);
      if(!material){material=part.material.clone();const override=first.materialOverrides?.find(o=>o.materialIndex===slot);if(override?.color!==undefined)material.color.set(override.color);if(override?.roughness!==undefined)material.roughness=override.roughness;if(override?.metalness!==undefined)material.metalness=override.metalness;materialCache.set(part.material,material);}
      const mesh=new T.InstancedMesh(part.geometry,material,objects.length);mesh.userData.editorObjectIds=objects.map(o=>o.id);
-     for(let i=0;i<objects.length;i++){mesh.setMatrixAt(i,matrices.get(objects[i].id));if(objects[i].landscapeTint)mesh.setColorAt(i,new T.Color().fromArray(objects[i].landscapeTint));}mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;root.add(mesh);primitives++;
+     for(let i=0;i<objects.length;i++){mesh.setMatrixAt(i,matrices.get(objects[i].id));if(objects[i].landscapeTint)mesh.setColorAt(i,new T.Color().fromArray(objects[i].landscapeTint));}mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;ambient.register(mesh,objects,matrices);root.add(mesh);primitives++;
     }
    });for(const object of objects)candidate.assets.push({objectId:object.id,primitives,kind,backend:'webgl2'});
   }
   candidate.assetBatchCount=groups.size;if(!project.nativeIsland){candidate.forest=forest(project,matrices,time);root.add(candidate.forest);}
   const water=project.nativeIsland||project.splatScene?null:sea(project,time);if(water)root.add(water);
   for(const feature of project.features??[]){if(feature.visible===false)continue;for(const part of buildFeatureGeometry(feature,project)){const wet=['water','foam'].includes(part.semantic);root.add(new T.Mesh(part.geometry,standard(part.color,wet?{roughness:.22,transparent:true,opacity:.9,metalness:.1}:{})));}}
-  const landscape=buildRepositoryLandscape(project);root.add(landscape);candidate.landscape=landscape;candidate.landscapeCollisions=addLandscapeCollisions(project,candidate.colliders);const update=root.userData.updateWebGL;root.userData.updateWebGL=t=>{update(t);landscape.userData.updateLandscape(t);};
+  const landscape=buildRepositoryLandscape(project);root.add(landscape);candidate.landscape=landscape;candidate.landscapeCollisions=addLandscapeCollisions(project,candidate.colliders);const update=root.userData.updateWebGL;root.userData.updateWebGL=t=>{update(t);landscape.userData.updateLandscape(t);ambient.update(t);};
   candidate.traffic=await buildRepositoryTraffic(project,candidate);
   root.updateMatrixWorld(true);return candidate;
  }catch(error){disposeWebGLRepositoryScene(candidate);throw error;}
