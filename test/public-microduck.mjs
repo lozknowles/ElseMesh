@@ -21,7 +21,7 @@ export function makeFixture({candidates,createVisual,config}={}){
 async function install(f){await Promise.all(f.candidates.map(c=>f.duck.install(c)));f.duck.update(1/30);assert.ok(f.duck.actor);}
 async function advance(duck,seconds,onTick=()=>{}){for(let n=0;n<seconds*30;n++){duck.update(1/30);if(duck.actor?.pending)await duck.actor.transferPromise;onTick(n/30);}}
 test('one controller repeatedly walks the reciprocal portals with two permanent readiness-stable visuals',async()=>{
- const f=makeFixture();await install(f);const before=f.candidates.map(c=>webGLRepositoryReadinessSignature(c));await advance(f.duck,160);assert.ok(f.duck.actor.traversalCount>=2);assert.equal(f.counts().created,2);assert.equal(f.duck.diagnostics().worlds.filter(w=>w.visible).length,1);assert.deepEqual(f.candidates.map(c=>webGLRepositoryReadinessSignature(c)),before);assert.equal(f.duck.actor.id,'public-microduck');f.duck.stop();assert.deepEqual(f.counts(),{created:2,disposed:2});
+ const f=makeFixture();await install(f);const before=f.candidates.map(c=>webGLRepositoryReadinessSignature(c));await advance(f.duck,160);assert.ok(f.duck.actor.traversalCount>=2);assert.equal(f.counts().created,2);assert.equal(f.duck.diagnostics().worlds.filter(w=>w.visible).length,1);assert.deepEqual(f.candidates.map(c=>webGLRepositoryReadinessSignature(c)),before);assert.equal(f.duck.actor.id,'public-microduck');f.duck.stop();assert.equal(f.counts().disposed,0);for(const c of f.candidates)f.duck.releaseCandidate(c);assert.deepEqual(f.counts(),{created:2,disposed:2});
 });
 test('bounded steering turns in place without instantaneous body yaw or walking feet',()=>{
  const actor=new AutonomousCharacter({worldId:'a',terrain:{heightAt:()=>0},colliders:new Colliders(),config:{speed:.22,turnRate:1.8}});actor.path=[new Vector3(1,0,0)];actor.transition('Navigate');const before=actor.position.clone();actor.update(1/30);assert.ok(Math.abs(actor.yaw)<=1.8/30+1e-8);assert.equal(actor.clip,'Turn');assert.ok(actor.position.equals(before));for(let i=0;i<60;i++)actor.update(1/30);assert.ok(actor.position.x>0);assert.equal(actor.clip,'Walk');
@@ -49,4 +49,10 @@ test('late visual load after stop cannot attach a half-registered graph and a ne
 test('public metadata and notices contain no local source paths and do not ship the full GLB',async()=>{
  const {readFile,stat}=await import('node:fs/promises');for(const name of ['manifest.json','collision-proxy.json','ATTRIBUTION.md','LICENSE-MODELS.md']){const body=await readFile(new URL('../public/models/microduck/'+name,import.meta.url),'utf8');assert.doesNotMatch(body,/\/fast\/|\/home\/|[A-Za-z]:\\|blend_location/);}
  const docs=await readFile(new URL('../docs/MICRODUCK-ASSET.md',import.meta.url),'utf8');assert.doesNotMatch(docs,/\/fast\/|\/home\/|[A-Za-z]:\\/);assert.match(docs,/CC BY-NC-SA/);await assert.rejects(stat(new URL('../public/models/microduck/microduck-full.glb',import.meta.url)),{code:'ENOENT'});
+});
+
+test('replacement installation retains old GPU graph until retirement and cannot stop the new actor on late cleanup',async()=>{
+ const f=makeFixture();await install(f);const old=f.candidates[0],replacement={...old,root:new T.Group()};f.setActive(replacement);f.records.get('a').candidate=replacement;
+ await f.duck.install(replacement);assert.equal(f.counts().disposed,0);assert.equal(f.duck.retired.size,1);assert.ok(old.root.children.length);f.duck.update(1/30);const actor=f.duck.actor;assert.ok(actor);const pose=actor.position.toArray();f.duck.releaseCandidate(old);assert.equal(f.counts().disposed,1);assert.equal(f.duck.actor,actor);assert.deepEqual(actor.position.toArray(),pose);assert.equal(f.duck.context('a').root,replacement.root);
+ f.duck.stop();for(const c of [old,replacement,f.candidates[1]])f.duck.releaseCandidate(c);assert.deepEqual(f.counts(),{created:3,disposed:3});
 });

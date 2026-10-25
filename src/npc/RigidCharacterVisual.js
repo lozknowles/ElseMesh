@@ -6,9 +6,21 @@ import {T} from '../world-runtime/vendor/world-engine-contract.js';
 
 const installedSources=new Map();
 export const microduckUrl=()=>(import.meta.env?.BASE_URL||'/')+'models/microduck/microduck-realtime.glb';
-export function loadPinnedMicroduck(url=microduckUrl()){
+export function loadPinnedMicroduck(url=microduckUrl(),{fetcher=fetch,timeoutMs=10000}={}){
  if(installedSources.has(url))return installedSources.get(url);
- const pending=(async()=>{const response=await fetch(url,{cache:'no-cache'});if(!response.ok)throw Error('Microduck asset unavailable');const bytes=await response.arrayBuffer();if(bytes.byteLength!==MICRODUCK_BYTES)throw Error('Microduck asset byte count mismatch');const sha=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');if('sha256:'+sha!==MICRODUCK_ASSET_VERSION)throw Error('Microduck asset integrity mismatch');return parseGLB(bytes);})();
+ const pending=(async()=>{
+  const controller=new AbortController(),limit=Math.min(10000,Math.max(1,Number(timeoutMs)||10000));let reader;
+  const timer=setTimeout(()=>controller.abort(Error('Microduck asset deadline exceeded')),limit);
+  try{
+   const response=await fetcher(url,{cache:'no-cache',signal:controller.signal});if(!response.ok)throw Error('Microduck asset unavailable');
+   // Fetch exposes decoded bytes; compressed transfer Content-Length is not the model size.
+   if(!response.body?.getReader)throw Error('Microduck asset stream unavailable');reader=response.body.getReader();const chunks=[];let size=0;
+   while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>MICRODUCK_BYTES)throw Error('Microduck asset exceeds byte limit');chunks.push(value);}
+   if(size!==MICRODUCK_BYTES)throw Error('Microduck asset byte count mismatch');
+   const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
+   const sha=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');if('sha256:'+sha!==MICRODUCK_ASSET_VERSION)throw Error('Microduck asset integrity mismatch');return parseGLB(bytes.buffer);
+  }finally{clearTimeout(timer);controller.abort();void reader?.cancel().catch(()=>{});}
+ })();
  installedSources.set(url,pending);pending.catch(()=>{if(installedSources.get(url)===pending)installedSources.delete(url);});return pending;
 }
 const REQUIRED=['Idle','Walk','Turn','Stop','Look','EnterPortal','ExitPortal'];
