@@ -13,6 +13,10 @@ import {execFileSync} from 'node:child_process';
 import {installWarehouseWebGLInstrumentation} from './warehouse-webgl-instrumentation.mjs';
 import {installWarehouseReadbackDiagnostics} from './warehouse-readback-diagnostics.mjs';
 import {installWarehouseFrameBudgetDiagnostics} from './warehouse-frame-budget-diagnostics.mjs';
+import {installWarehouseLifecycleDiagnostics} from './warehouse-lifecycle-diagnostics.mjs';
+import {installCanonicalGenerationPrototype} from './canonical-generation-prototype.mjs';
+import {runCanonicalQualification} from './warehouse-generation-camera-oracle.mjs';
+import {runWarehouseRotationOracle} from './warehouse-rotation-oracle.mjs';
 import {runWarehouseSplatKeyOracle} from './warehouse-splat-key-oracle.mjs';
 import {createWebGLMergeSorter} from './webgl-merge-sort-prototype.mjs';
 import {createWebGLGatherSorter} from './webgl-gather-sort-prototype.mjs';
@@ -33,6 +37,13 @@ const report={schema:1,label:option('--label','unlabelled'),startedAt:new Date()
  caveats:['Published Warehouse uses WebGL2: native portal transform optimisation has zero direct execution here.','Full frame CPU measures the actual app update callback, excluding rAF observer and camera preparation; submission time is not GPU duration.','No GPU completion/readback waits occur inside timed frames. Cadence is browser/vsync limited.','Math.random seeded; app callback receives fixed dt=1/60 and frame time. Each scenario starts at common logical frame6000+scenarioIndex*(180+sampledFrames) after readiness. Asset-loading completion and premeasurement Microduck state may still vary between boots. Microduck and ambient workloads remain active.','Camera route uses free camera around authored positions; it is a rendering regression route, not player collision/traversal acceptance. Screenshots are visual checkpoints, not identical-frame pixel comparisons.']};
 report.sampledFrames=Number(option('--sample-frames','180'));if(!Number.isInteger(report.sampledFrames)||report.sampledFrames<180||report.sampledFrames>1800||report.sampledFrames%180)throw Error('Sample count must be a multiple of180 between180and1800');
 report.observeLongTasks=args.includes('--observe-longtasks');
+report.lifecycleObserve=args.includes('--lifecycle-observe');
+report.frameClockControlRequested=args.includes('--frame-clock-control');
+report.rotationOracleRequested=args.includes('--rotation-oracle');
+report.generationCameraOracleRequested=args.includes('--generation-camera-oracle');
+if(report.rotationOracleRequested||report.generationCameraOracleRequested){report.diagnosticOnly=true;report.acceptedOptimizationTiming=false;report.caveats.push('Explicit post-timing generation-camera experiment. The candidate is never enabled during timing or in production; exact settled outputs do not qualify unsynchronised moving publication or FPS.');}
+if(report.lifecycleObserve)report.lifecycleObserverSha256=createHash('sha256').update(await readFile(new URL('./warehouse-lifecycle-diagnostics.mjs',import.meta.url))).digest('hex');
+if(report.lifecycleObserve){report.diagnosticOnly=true;report.acceptedOptimizationTiming=false;report.caveats.push('Lifecycle observer records existing Spark generation/sort inputs and work counts. Diagnostic overhead is present; inferred reasons are not authoritative GPU execution causes.');}
 report.splatKeyOracleRequested=args.includes('--splat-key-oracle');
 if(report.splatKeyOracleRequested){report.diagnosticOnly=true;report.acceptedOptimizationTiming=false;report.splatKeyOraclePhase='post-timing';report.caveats.push('Splat key oracle is an explicit post-timing diagnostic: temporarily pauses frame delivery, captures existing GPU keys and compares CPU candidates through the installed sorter on copies. No candidate ordering is installed; rejected exact ordering is a valid diagnostic result.');}
 report.gpuSortOracleRequested=args.includes('--gpu-sort-oracle');
@@ -41,6 +52,7 @@ if(!['point-scatter','fragment-gather'].includes(gpuSortMethod))throw Error('--g
 if((args.includes('--gpu-sort-method')||gpuSortStages)&&!report.gpuSortOracleRequested)throw Error('GPU sort method/stages require --gpu-sort-oracle');
 if(gpuSortStages&&gpuSortMethod!=='point-scatter')throw Error('--gpu-sort-stages requires point-scatter');
 if(report.gpuSortOracleRequested&&report.splatKeyOracleRequested)throw Error('CPU and GPU sort oracles require separate browser sessions');
+if([report.gpuSortOracleRequested,report.splatKeyOracleRequested,report.rotationOracleRequested,report.generationCameraOracleRequested].filter(Boolean).length>1)throw Error('Choose one post-timing oracle per browser session');
 if(report.gpuSortOracleRequested){report.diagnosticOnly=true;report.acceptedOptimizationTiming=false;report.gpuSortOraclePhase='post-timing';report.gpuSortMethod=gpuSortMethod;report.gpuSortStages=gpuSortStages;report.caveats.push('GPU sorting prototype is an explicit post-timing diagnostic with bounded synthetic/captured-key comparisons; rendered pixel equality is not tested. No prototype result is published or admitted as an optimisation.');}
 report.readbackDiagnostic=args.includes('--readback-observe')?{usage:option('--readback-usage','original'),restorePack:args.includes('--readback-restore-pack'),drainQueue:args.includes('--readback-drain-queue')}:null;
 if(report.readbackDiagnostic){report.diagnosticOnly=true;report.acceptedOptimizationTiming=false;report.caveats.push('Readback lifecycle/copy diagnostic only; wrappers and selected controlled allocation/binding experiment change behaviour/overhead. Cadence is not acceptance evidence.');}
@@ -93,6 +105,10 @@ try{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const address=server.address(),origin='http://127.0.0.1:'+address.port;
  progress('browser-start');browser=await chromium.launch(report.launch);report.browserVersion=browser.version();
  page=await browser.newPage({viewport:report.viewport,deviceScaleFactor:report.deviceScaleFactor});page.setDefaultTimeout(20000);
+ if(report.frameClockControlRequested){
+  progress('empty-page-frame-clock-control');await page.bringToFront();
+  report.frameClockControl=await page.evaluate(()=>new Promise((resolve,reject)=>{const intervals=[];let previous=null,warm=30,frameId;const timer=setTimeout(()=>{cancelAnimationFrame(frameId);reject(Error('Empty-page frame clock exceeded ten seconds'));},10000);function frame(at){if(previous!==null&&warm--<=0)intervals.push(at-previous);previous=at;if(intervals.length===120){clearTimeout(timer);resolve({intervals,frames:intervals.length,cadenceFps:1000*intervals.length/intervals.reduce((sum,value)=>sum+value,0),visibility:document.visibilityState,devicePixelRatio,scope:'Empty page before game loading, not a GPU throughput measurement or proof of a particular OS/session cause.'});}else frameId=requestAnimationFrame(frame);}frameId=requestAnimationFrame(frame);}));
+ }
  if(profile==='trace'){
   report.trace={status:'waiting-for-selected-sampling',maximumDurationMs:10000,bufferSizeKiB:16384,clockSyncIds:[],clockSyncErrors:[],bufferUsage:[],note:'One short diagnostic interval in the selected gold-door sample only. Trace timing has observer overhead; event categories are evidence candidates, not automatic GPU/worker bottleneck attribution.'};
   await page.exposeFunction('__warehouseProfileStage',event=>{if(traceStartPromise||!event.stage.startsWith('gold-sunset-'))return;traceStartPromise=(async()=>{report.trace.startRequestedAt=Date.now();report.trace.browserClockAtRequest=event;traceSession=await browser.newBrowserCDPSession();traceCompletePromise=new Promise(resolve=>traceSession.once('Tracing.tracingComplete',resolve));traceSession.on('Tracing.bufferUsage',usage=>report.trace.bufferUsage.push({at:Date.now(),...usage}));report.trace.categories=['toplevel','devtools.timeline','v8','v8.execute','blink.user_timing','gpu','cc','viz','disabled-by-default-devtools.timeline','disabled-by-default-devtools.timeline.frame','disabled-by-default-gpu.service'];await traceSession.send('Tracing.start',{transferMode:'ReturnAsStream',streamFormat:'json',streamCompression:'none',bufferUsageReportingInterval:1000,traceConfig:{recordMode:'recordContinuously',traceBufferSizeInKb:16384,includedCategories:report.trace.categories}});traceStarted=true;report.trace.status='collecting';report.trace.startConfirmedAt=Date.now();const syncId='warehouse-start-'+report.trace.startRequestedAt;report.trace.clockSyncIds.push(syncId);await traceSession.send('Tracing.recordClockSyncMarker',{syncId}).catch(error=>report.trace.clockSyncErrors.push(String(error)));traceStopTimer=setTimeout(()=>void finishTrace('ten-second-cap'),10000);})().catch(error=>{report.trace.status='unavailable-or-failed';report.trace.error=String(error);report.errors.push('Trace start: '+String(error));});return traceStartPromise;});
@@ -148,7 +164,7 @@ try{
    });
   }});
   setInterval(()=>{if(b.scenario&&performance.now()-b.lastFrameAt>5000){b.error='Actual game frame loop stalled for more than 5 seconds';b.done=true;b.scenario=null;}},1000);
- },{observe:report.observeLongTasks,splatKeyOracle:report.splatKeyOracleRequested||report.gpuSortOracleRequested});
+ },{observe:report.observeLongTasks,splatKeyOracle:report.splatKeyOracleRequested||report.gpuSortOracleRequested||report.rotationOracleRequested||report.generationCameraOracleRequested});
  progress('app-load');await page.goto(origin+'/',{waitUntil:'domcontentloaded'});await page.bringToFront();
  await page.waitForFunction(()=>window.__repositoryWorldApp?.host.active&&window.__repositoryWorldApp.portals.mode==='published'&&window.__repositoryWorldApp.portals.enabled,null,{timeout:120000});
  const dismiss=page.getByRole('button',{name:'Dismiss',exact:true});if(await dismiss.isVisible())await dismiss.click();const panel=page.locator('#panel-toggle');if(await panel.isVisible())await panel.click();await page.locator('canvas').focus();
@@ -185,6 +201,7 @@ try{
  report.before=await page.evaluate(()=>{const a=window.__repositoryWorldApp,b=window.__warehouseBenchmark;return {at:Date.now(),readiness:b.observeReadiness({requireLive:true,diagnostic:true}),duck:a.publicDuck.diagnostics(),portals:a.portals.diagnostics(),mediaActive:!!a.media?.active,simulationFrame:b.simulationFrame};});
  if(profile!=='off'){report.profileInstallation=await page.evaluate(installWarehouseWebGLInstrumentation,{mode:profile});report.caveats.push('Diagnostic '+profile+' observer overhead is enabled; use a separate adjacent unprofiled run for reference.');}
  if(report.readbackDiagnostic)report.readbackInstallation=await page.evaluate(installWarehouseReadbackDiagnostics,report.readbackDiagnostic);
+ if(report.lifecycleObserve)report.lifecycleInstallation=await page.evaluate(installWarehouseLifecycleDiagnostics,{});
  if(report.frameBudget)report.frameBudgetInstallation=await page.evaluate(installWarehouseFrameBudgetDiagnostics,{budget:report.frameBudget});
  report.measurementStartAt=Date.now();
  report.scenarios=[];
@@ -227,8 +244,18 @@ try{
  }
  report.nativePlantWorkloadAfterTiming=await page.evaluate(()=>{const a=window.__repositoryWorldApp,batches=[];a.host.active.root.traverse(node=>{if(!node.userData?.nativePlantSpecies&&!node.userData?.mediaOcclusionPlant)return;const materials=(Array.isArray(node.material)?node.material:[node.material]).filter(Boolean);batches.push({objectId:node.id,species:node.userData.nativePlantSpecies??null,instances:node.count??1,indexCount:node.geometry?.index?.count??null,positionCount:node.geometry?.attributes?.position?.count??null,groups:node.geometry?.groups?.map(group=>({start:group.start,count:group.count,materialIndex:group.materialIndex}))??[],materials:materials.map(material=>({id:material.id,type:material.type,key:material.customProgramCacheKey?.()??null,defines:material.defines??null}))});});return {batches,stats:a.host.active.nativeIsland?.stats?.()??null};});
  if(report.frameBudget)report.frameBudgetProfile=await page.evaluate(()=>{const p=window.__warehouseBenchmark.frameBudget,s=p.snapshot();p.dispose();window.__warehouseBenchmark.frameBudget=null;return s;});
+ if(report.lifecycleObserve)report.lifecycleProfile=await page.evaluate(()=>{const p=window.__warehouseBenchmark.lifecycleProfile,s=p.snapshot();p.dispose();return s;});
  if(report.readbackDiagnostic)report.readbackProfile=await page.evaluate(()=>{const p=window.__warehouseBenchmark.readbackProfile,s=p.snapshot();p.dispose();return s;});
  if(profile!=='off')report.profile=await page.evaluate(()=>{const profile=window.__warehouseBenchmark.profile,snapshot=profile.snapshot();profile.dispose();return snapshot;});
+ if(report.rotationOracleRequested||report.generationCameraOracleRequested){
+  const name=report.generationCameraOracleRequested?'generationCameraOracle':'rotationOracle';progress('post-timing-'+name);
+  if(report.generationCameraOracleRequested)await page.addScriptTag({content:'window.__installCanonicalGenerationPrototype = '+installCanonicalGenerationPrototype.toString()+';'});
+  try{report[name]=await page.evaluate(report.generationCameraOracleRequested?runCanonicalQualification:runWarehouseRotationOracle,{timeoutMs:report.generationCameraOracleRequested?90000:45000});}
+  catch(error){report[name]={status:'unavailable-or-failed',sessionInvalidated:true,error:String(error?.stack??error)};}
+  const persistImages=async(value,parts=[])=>{if(!value||typeof value!=='object')return;for(const[key,item]of Object.entries(value)){if(typeof item==='string'&&item.startsWith('data:image/png;base64,')){const suffix=[name,...parts,key].join('-').replace(/[^a-zA-Z0-9_-]/g,'_'),file=output.replace(/\.json$/i,'')+'-'+suffix+'.png';await writeFile(file,Buffer.from(item.split(',')[1],'base64'));value[key]=file;}else await persistImages(item,[...parts,key]);}};await persistImages(report[name]);
+  progress('post-timing-'+name+':complete',{status:report[name].status});
+  if(report[name].sessionInvalidated||(report.generationCameraOracleRequested&&!report[name].passed))throw Error(name+' failed or rejected; discard session before subsequent checks');
+ }
  if(report.splatKeyOracleRequested){
   progress('post-timing-splat-key-oracle');
   try{report.splatKeyOracle=await page.evaluate(runWarehouseSplatKeyOracle,{timeoutMs:20000,maxExamples:8,sortVariants:2});}
