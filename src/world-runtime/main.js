@@ -1,5 +1,6 @@
 import './MobileControls.css';
 import {OpeningProgress} from './OpeningProgress.js';
+import {renderWebGLOpaqueDepthPrepass,getQualifiedWarehouseDepthOccluders} from './WebGLOpaqueDepthPrepass.js';
 import { repositoryWeatherShelters, setMistShelters } from './WeatherShelter.js';
 import {MediaScreen,collectMediaScreenOccluders,mediaScreenCellVisibility} from './MediaScreen.js';
 import {RepositoryPortalSky} from './RepositoryPortalSky.js';
@@ -163,8 +164,14 @@ async function init(){
  const avatar=isWebGL?new WebGLRepositoryAvatar(engine.scene,{prepareResources:engine.prepareRepositoryResources}):new ReadiedRepositoryAvatar(engine.scene,{model:{wheelPivot:{position:new N.Vector3()},lines:{deckY:0},group:new N.Group()},getYaw:()=>0},{prepareResources:engine.prepareRepositoryResources});
  arrivals=new PortalArrivalController({runtime:portals,localAvatar:avatar});
  const openingPlayer={avatarAppearance:loadAppearance()};
+ const opaqueDepthPrepass={enabled:true,phase:'idle',lastResult:null,occluders:()=>getQualifiedWarehouseDepthOccluders(host.active)};
+ const renderMainScene=()=>{
+  opaqueDepthPrepass.lastResult=renderWebGLOpaqueDepthPrepass({renderer,scene:engine.scene,camera:engine.camera,occluders:opaqueDepthPrepass.occluders(),enabled:opaqueDepthPrepass.enabled,onPhase:phase=>{opaqueDepthPrepass.phase=phase;}});
+  return opaqueDepthPrepass.lastResult;
+ };
  const app={publicDuck,media,objectAccess,accessPanel,controlsHelp,engine,input,host,renderer,post,weather,retro,portals,avatar,arrivals,followCamera,camera:engine.camera,freeCam:false,get player(){return host.active?.player??openingPlayer;},fly:{yaw:0,pitch:0,velocity:new N.Vector3(),setPose(position,yaw,pitch){this.yaw=yaw;this.pitch=pitch;engine.camera.position.copy(position);engine.camera.quaternion.setFromEuler(new N.Euler(pitch,yaw,0,'YXZ'));engine.camera.updateMatrixWorld();}},thirdIsland:{active:false},monorail:{state:'off'},setFreeCam(value){this.freeCam=!!value;},gpu:isWebGL?null:GPU,backend:selected.backend,fallbackReason:selected.fallbackReason,session:null,...repositoryWorldActions({host,portals,report})};
  let welcomeMuted=false;try{welcomeMuted=localStorage.getItem('elsemesh.world-welcome-muted/1')==='1';}catch{}
+ if(isWebGL)Object.assign(app,{opaqueDepthPrepass,renderMainScene});
  const isWelcomeMuted=()=>welcomeMuted||!!app.audio?.muted||!!app.audioMuted;
  const welcomeSpeech=new LocalWelcomeSpeech({isMuted:isWelcomeMuted});
  welcomeView=new WorldWelcomeView({isMuted:isWelcomeMuted,onMute:value=>{welcomeMuted=value;try{localStorage.setItem('elsemesh.world-welcome-muted/1',value?'1':'0');}catch{}welcomeSpeech.tick();},onReplayAudio:()=>{const welcome=worldWelcome?.context()?.active.project.welcome;if(validWorldWelcome(welcome)&&welcome.audio)welcomeSpeech.play(welcome.text);}});
@@ -239,7 +246,7 @@ async function init(){
    if(host.active)avatar.update(dt,host.active.player,engine.camera,app.freeCam||followCamera.enabled||eyeActive);else avatar.group.visible=false;
    portals.update(dt,time,{allowCrossing:!eyeActive,viewCamera:eyeFrame?.camera??engine.camera,viewWorldId:eyeFrame?.target.worldId??host.active?.identity.worldId});publicDuck?.update(dt);if(eyeActive){eyeFrame=playerEyes.controller.update();eyeActive=!!eyeFrame;}if(playerEyes&&performance.now()>=(playerEyes.nextPanelAt??0)){playerEyes.panel.refresh();playerEyes.nextPanelAt=performance.now()+250;}arrivals.update();portalEffects.update(dt,time);input.endFrame();
    const env=host.environment()??{timeOfDay:14,cloudCoverage:.49,windSpeed:6,sunAzimuth:0};let weatherState;const water=host.active?.project.water;
-   if(isWebGL){weatherState=updateWebGLRepositoryEnvironment(engine,host.active,time,env);renderer.toneMapping=host.active?.splatScene?.expectedToneMapping??backendPortals.views.ordinaryToneMapping;let eyeDrawn=false;if(eyeFrame){eyeFrame.camera.aspect=engine.width/engine.height;eyeFrame.camera.updateProjectionMatrix();try{eyeDrawn=playerEyes.renderer.render(eyeFrame,{width:engine.width,height:engine.height,time});}catch(error){playerEyes.lastError=String(error?.message??error);playerEyes.ownView('Player eye rendering unavailable');report('Player eyes unavailable: '+playerEyes.lastError);}if(eyeDrawn)playerEyes.drawnFrames++;else playerEyes.ownView('Player scene authorization changed');}if(!eyeDrawn){portals.render({width:engine.width,height:engine.height,time});host.active?.nativeIsland?.bindView(engine.camera);renderer.render(engine.scene,engine.camera);}}
+   if(isWebGL){weatherState=updateWebGLRepositoryEnvironment(engine,host.active,time,env);renderer.toneMapping=host.active?.splatScene?.expectedToneMapping??backendPortals.views.ordinaryToneMapping;let eyeDrawn=false;if(eyeFrame){eyeFrame.camera.aspect=engine.width/engine.height;eyeFrame.camera.updateProjectionMatrix();try{eyeDrawn=playerEyes.renderer.render(eyeFrame,{width:engine.width,height:engine.height,time});}catch(error){playerEyes.lastError=String(error?.message??error);playerEyes.ownView('Player eye rendering unavailable');report('Player eyes unavailable: '+playerEyes.lastError);}if(eyeDrawn)playerEyes.drawnFrames++;else playerEyes.ownView('Player scene authorization changed');}if(!eyeDrawn){portals.render({width:engine.width,height:engine.height,time});host.active?.nativeIsland?.bindView(engine.camera);renderMainScene();}}
    else{const shelters=repositoryWeatherShelters(host.active?.project);setMistShelters(medium.uniforms,shelters);clouds.coverage.value=env.cloudCoverage??.49;G.windSpeed.value=env.windSpeed??6;
    G.seaLevel.value=host.active?.nativeIsland?.water.seaLevel??host.active?.project.water?.level??0;
     for(const [key,value]of Object.entries(repositoryMediumWaterSettings(host.active?.project,engine.camera.position,time)))medium.uniforms.fields[key].value=value;

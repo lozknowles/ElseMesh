@@ -1,6 +1,7 @@
 import {createSplatSceneAdapter} from './SplatSceneAdapter.js';
 import {buildMediaScreenHousing} from './MediaScreen.js';
 import {buildWebGLNativeIsland} from './WebGLNativeIsland.js';
+import {isEligibleWebGLDepthOccluder} from './WebGLOpaqueDepthPrepass.js';
 import {createRepositoryAmbientBehaviour} from './RepositoryAmbientBehaviour.js';
 import {buildRepositoryTraffic} from './RepositoryTraffic.js';
 import {buildRepositoryLandscape,addLandscapeCollisions,landscapeAssets,installRepositoryLandscapeMaterial} from './RepositoryLandscape.js';
@@ -13,6 +14,10 @@ import { makeRetroScreenMaterial } from '../world/PortalRetroScreens.js';
 import { buildRecipe } from '../world/PortalInteriorRecipe.js';
 
 const standard=(color,extra={})=>new T.MeshStandardMaterial({color,roughness:.85,side:T.DoubleSide,...extra});
+// Opt in only the verified authored Warehouse brick batches. Their original
+// boxes preserve all window/door gaps; other worlds and asset types stay unchanged.
+const warehouseDepthAssets=new Set(['warehouse:box-brick','warehouse:box-brickDark']);
+const warehouseDepthWorld='elsemesh.world:2842c4f2-93a0-4492-b942-e53e524de319';
 const screens=new Map(buildRecipe().screens.map(s=>[s.id,s]));
 /** Reuses the installed game's original canvas artwork; no native GPU is initialized. */
 export function buildWebGLRetroMaterial(kind){
@@ -108,6 +113,7 @@ function sea(project,time){
 export async function buildWebGLRepositoryScene(descriptor,camera,options={}){
  const project=descriptor.project,root=new T.Group(),candidate={root,descriptor,terrain:descriptor.terrain,colliders:new Colliders(),query:repositoryWaterQuery(project.water,project),assets:[],loadedAssets:new Set()};
  candidate.project=project;root.name='repository-world:'+descriptor.worldId;const time={value:0};root.userData.updateWebGL=t=>{time.value=t;};
+ candidate.depthOccluders=[];
  try{
   if(project.splatScene){candidate.splatScene=await createSplatSceneAdapter(project,{...options.splatScene,camera});candidate.terrain=candidate.splatScene.terrain;candidate.colliders=candidate.splatScene.colliders;candidate.clearance=candidate.splatScene.clearance;candidate.query=repositoryWaterQuery(null,null);Object.defineProperty(candidate,'backendQualification',{enumerable:true,get:()=>candidate.splatScene.diagnostics()});root.add(candidate.splatScene.root);}
   for(const b of descriptor.boxes)candidate.colliders.addBox(new Vector3(...b.center),new Vector3(...b.half),0,{walkable:b.walkable,solid:b.solid,tag:b.id});
@@ -140,6 +146,7 @@ export async function buildWebGLRepositoryScene(descriptor,camera,options={}){
      if(!material){material=part.material.clone();const override=first.materialOverrides?.find(o=>o.materialIndex===slot);if(override?.color!==undefined)material.color.set(override.color);if(override?.roughness!==undefined)material.roughness=override.roughness;if(override?.metalness!==undefined)material.metalness=override.metalness;materialCache.set(part.material,material);}
      const mesh=new T.InstancedMesh(part.geometry,material,objects.length);mesh.userData.editorObjectIds=objects.map(o=>o.id);
      for(let i=0;i<objects.length;i++){mesh.setMatrixAt(i,matrices.get(objects[i].id));if(objects[i].landscapeTint)mesh.setColorAt(i,new T.Color().fromArray(objects[i].landscapeTint));}mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;ambient.register(mesh,objects,matrices);root.add(mesh);primitives++;
+     if(descriptor.worldId===warehouseDepthWorld&&project.nativeIsland&&warehouseDepthAssets.has(asset.id)&&!kind&&objects.every(object=>!object.ambientBehaviour&&!object.materialOverrides?.length)&&isEligibleWebGLDepthOccluder(mesh))candidate.depthOccluders.push(mesh);
     }
    });for(const object of objects)candidate.assets.push({objectId:object.id,primitives,kind,backend:'webgl2'});
   }

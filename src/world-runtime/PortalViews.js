@@ -162,7 +162,9 @@ export class PortalViews {
    if(e.viewRenderer){
     e.viewRenderer.setSize(size.width,size.height);
     e.viewRenderer.clearColor=[horizon.r??horizon.x,horizon.g??horizon.y,horizon.b??horizon.z,1];
-    e.viewRenderer.render({frameBlock:e.block,filter:o=>!o.userData.portalAperture&&!o.material?.userData.portalAperture,defines:{PORTAL_CLIP:1,PORTAL_VIEW:1}});
+    // View-dependent animation and LOD above are settled before sharing transforms
+    // across opaque, refraction and transparent passes. Never reuse across views.
+    this.meshRenderer.withSceneTransforms(e.scene,()=>e.viewRenderer.render({frameBlock:e.block,filter:o=>!o.userData.portalAperture&&!o.material?.userData.portalAperture,defines:{PORTAL_CLIP:1,PORTAL_VIEW:1}}));
     // LOD storage and material buffers are mutable across views. Submit before rebinding.
     GPU.submit();
    }else this.meshRenderer.render(e.scene,{label:'portal:'+e.id,kind:'color',camera:cam,frameBlock:e.block,
