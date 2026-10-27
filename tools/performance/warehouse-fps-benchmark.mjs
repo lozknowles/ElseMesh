@@ -13,6 +13,11 @@ import {execFileSync} from 'node:child_process';
 import {installWarehouseWebGLInstrumentation} from './warehouse-webgl-instrumentation.mjs';
 import {installWarehouseReadbackDiagnostics} from './warehouse-readback-diagnostics.mjs';
 import {installWarehouseFrameBudgetDiagnostics} from './warehouse-frame-budget-diagnostics.mjs';
+import {runWarehouseSplatKeyOracle} from './warehouse-splat-key-oracle.mjs';
+import {createWebGLMergeSorter} from './webgl-merge-sort-prototype.mjs';
+import {createWebGLGatherSorter} from './webgl-gather-sort-prototype.mjs';
+import {runWarehouseGpuSortOracle} from './warehouse-gpu-sort-oracle.mjs';
+import {profileWebGLMergeStages} from './webgl-sort-stage-diagnostics.mjs';
 import {validateWarehousePlantOrder} from './warehouse-plant-order-visuals.mjs';
 
 const args=process.argv.slice(2),option=(key,fallback)=>args.includes(key)?args[args.indexOf(key)+1]:fallback;
@@ -28,6 +33,15 @@ const report={schema:1,label:option('--label','unlabelled'),startedAt:new Date()
  caveats:['Published Warehouse uses WebGL2: native portal transform optimisation has zero direct execution here.','Full frame CPU measures the actual app update callback, excluding rAF observer and camera preparation; submission time is not GPU duration.','No GPU completion/readback waits occur inside timed frames. Cadence is browser/vsync limited.','Math.random seeded; app callback receives fixed dt=1/60 and frame time. Each scenario starts at common logical frame6000+scenarioIndex*(180+sampledFrames) after readiness. Asset-loading completion and premeasurement Microduck state may still vary between boots. Microduck and ambient workloads remain active.','Camera route uses free camera around authored positions; it is a rendering regression route, not player collision/traversal acceptance. Screenshots are visual checkpoints, not identical-frame pixel comparisons.']};
 report.sampledFrames=Number(option('--sample-frames','180'));if(!Number.isInteger(report.sampledFrames)||report.sampledFrames<180||report.sampledFrames>1800||report.sampledFrames%180)throw Error('Sample count must be a multiple of180 between180and1800');
 report.observeLongTasks=args.includes('--observe-longtasks');
+report.splatKeyOracleRequested=args.includes('--splat-key-oracle');
+if(report.splatKeyOracleRequested){report.diagnosticOnly=true;report.acceptedOptimizationTiming=false;report.splatKeyOraclePhase='post-timing';report.caveats.push('Splat key oracle is an explicit post-timing diagnostic: temporarily pauses frame delivery, captures existing GPU keys and compares CPU candidates through the installed sorter on copies. No candidate ordering is installed; rejected exact ordering is a valid diagnostic result.');}
+report.gpuSortOracleRequested=args.includes('--gpu-sort-oracle');
+const gpuSortMethod=option('--gpu-sort-method','point-scatter'),gpuSortStages=args.includes('--gpu-sort-stages');
+if(!['point-scatter','fragment-gather'].includes(gpuSortMethod))throw Error('--gpu-sort-method must be point-scatter or fragment-gather');
+if((args.includes('--gpu-sort-method')||gpuSortStages)&&!report.gpuSortOracleRequested)throw Error('GPU sort method/stages require --gpu-sort-oracle');
+if(gpuSortStages&&gpuSortMethod!=='point-scatter')throw Error('--gpu-sort-stages requires point-scatter');
+if(report.gpuSortOracleRequested&&report.splatKeyOracleRequested)throw Error('CPU and GPU sort oracles require separate browser sessions');
+if(report.gpuSortOracleRequested){report.diagnosticOnly=true;report.acceptedOptimizationTiming=false;report.gpuSortOraclePhase='post-timing';report.gpuSortMethod=gpuSortMethod;report.gpuSortStages=gpuSortStages;report.caveats.push('GPU sorting prototype is an explicit post-timing diagnostic with bounded synthetic/captured-key comparisons; rendered pixel equality is not tested. No prototype result is published or admitted as an optimisation.');}
 report.readbackDiagnostic=args.includes('--readback-observe')?{usage:option('--readback-usage','original'),restorePack:args.includes('--readback-restore-pack'),drainQueue:args.includes('--readback-drain-queue')}:null;
 if(report.readbackDiagnostic){report.diagnosticOnly=true;report.acceptedOptimizationTiming=false;report.caveats.push('Readback lifecycle/copy diagnostic only; wrappers and selected controlled allocation/binding experiment change behaviour/overhead. Cadence is not acceptance evidence.');}
 report.frameBudget=Number(option('--frame-budget','0'));if(![0,2,3,64].includes(report.frameBudget))throw Error('Frame budget must be0,2,3,64');if(report.frameBudget){if(report.readbackDiagnostic?.drainQueue)throw Error('Frame budget and drain are separate experiments');report.diagnosticOnly=true;report.acceptedOptimizationTiming=false;report.caveats.push('GPU frame budget diagnostic: app submissions are deferred until budget is available; FPS includes deferred rAF intervals. No logical route frames omitted.');}
@@ -44,6 +58,8 @@ const changedProductionFiles=execFileSync('git',['diff','--name-only','HEAD','--
 for(const path of new Set(['src/world-runtime/main.js','src/world-runtime/PortalViews.js','src/world-runtime/WebGLPortalViews.js','src/world-runtime/SplatSceneAdapter.js','src/world-runtime/WebGLNativeIsland.js','src/world-runtime/SplatPortalProjection.js','src/engine/render/SceneRenderer.js','src/engine/render/MeshRenderer.js','src/engine/scene/Object3D.js','public/published-worlds.json','public/opening-world.json','tools/performance/warehouse-fps-benchmark.mjs','tools/performance/warehouse-webgl-instrumentation.mjs',...changedProductionFiles]))report.sourceHashes[path]=await readFile(resolve(root,path)).then(bytes=>createHash('sha256').update(bytes).digest('hex'),error=>error.code==='ENOENT'?'deleted':Promise.reject(error));
 report.catalog=JSON.parse(await readFile(resolve(root,'public/published-worlds.json'),'utf8'));
 for(const path of ['src/world-runtime/WebGLOpaqueDepthPrepass.js','tools/performance/warehouse-depth-prepass-visuals.mjs','tools/performance/warehouse-plant-order-visuals.mjs','tools/performance/warehouse-plant-order-diagnostics.mjs','tools/performance/warehouse-readback-diagnostics.mjs','tools/performance/warehouse-frame-budget-diagnostics.mjs'])report.sourceHashes[path]=createHash('sha256').update(await readFile(resolve(root,path))).digest('hex');
+if(report.splatKeyOracleRequested){const path='tools/performance/warehouse-splat-key-oracle.mjs';report.splatKeyOracleSourceSha256=report.sourceHashes[path]=createHash('sha256').update(await readFile(resolve(root,path))).digest('hex');}
+if(report.gpuSortOracleRequested){report.gpuSortSources={};for(const name of ['webgl-merge-sort-prototype.mjs','webgl-gather-sort-prototype.mjs','warehouse-gpu-sort-oracle.mjs','webgl-sort-stage-diagnostics.mjs']){const path='tools/performance/'+name;report.gpuSortSources[name]=report.sourceHashes[path]=createHash('sha256').update(await readFile(resolve(root,path))).digest('hex');}}
 for(const world of report.catalog.worlds){const bytes=await readFile(resolve(root,'public',world.bundlePath,'world.json'));if(createHash('sha256').update(bytes).digest('hex')!==world.contentDigest)throw Error('Local bundle manifest differs from catalog: '+world.worldId);}
 const progress=(stage,details={})=>{const item={at:new Date().toISOString(),stage,...details};report.progress.push(item);process.stderr.write(JSON.stringify({progress:item})+'\n');};
 let server,browser,page,closing=false,traceSession=null,traceStartPromise=null,traceStopPromise=null,traceCompletePromise=null,traceStopTimer=null,traceStarted=false;
@@ -89,7 +105,7 @@ try{
  page.on('requestfailed',request=>{if(closing)return;const event=networkEvent('request-failed',request,{error:request.failure()?.errorText});report.requestFailures.push(event);if(event.asset)report.assetErrors.push(event);});
  page.on('request',request=>{if(closing)return;requestIds.set(request,++requestSequence);networkEvent('request-started',request);if(request.resourceType()==='script'||request.resourceType()==='stylesheet'){report.productionBuild.resourceURLs.push(request.url());if(/\/(?:@vite|@id|@fs)\/|node_modules\/\.vite/.test(request.url()))report.errors.push('Development module URL in production benchmark: '+request.url());}});
  await page.route('**/*',route=>{const url=route.request().url();if(url.startsWith(origin+'/')||url.startsWith('data:')||url.startsWith('blob:'))return route.continue();report.externalRequests.push(url);return route.abort('blockedbyclient');});
- await page.addInitScript(observe=>{
+ await page.addInitScript(({observe,splatKeyOracle})=>{
   let seed=1052025;Math.random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
   const b=window.__warehouseBenchmark={simulationFrame:0,scenario:null,stage:'boot',rows:[],done:false,error:null,portalCpu:0,portalDraws:0,lastFrameAt:performance.now(),originalUpdates:[],consumedResponses:[],fetchEvents:[]};let app;
   // Observe successful consumption without changing requests, source readers, or aborts.
@@ -106,7 +122,9 @@ try{
    record('observation-start');
    try{b.longTaskObserver=new PerformanceObserver(list=>{for(const entry of list.getEntries())b.browserObservations.longTasks.push({startTime:entry.startTime,at:performance.timeOrigin+entry.startTime,duration:entry.duration,name:entry.name});});b.longTaskObserver.observe({type:'longtask',buffered:true});}catch(error){b.browserObservations.error=String(error);}
   }
-  const requestFrame=window.requestAnimationFrame.bind(window);window.requestAnimationFrame=callback=>{const deliver=timestamp=>{if(b.readbackDrain?.active){if(b.readbackDrain?.active)b.readbackDrain.deferredCallbacks=(b.readbackDrain.deferredCallbacks??0)+1;requestFrame(deliver);return;}b.activeRafTimestamp=timestamp;callback(timestamp);};return requestFrame(deliver);};
+  const requestFrame=window.requestAnimationFrame.bind(window);
+  if(splatKeyOracle){b.splatOracleGateAvailable=true;window.requestAnimationFrame=callback=>{const deliver=timestamp=>{if(b.splatOraclePaused||b.readbackDrain?.active){if(b.readbackDrain?.active)b.readbackDrain.deferredCallbacks=(b.readbackDrain.deferredCallbacks??0)+1;requestFrame(deliver);return;}b.activeRafTimestamp=timestamp;callback(timestamp);};return requestFrame(deliver);};}
+  else window.requestAnimationFrame=callback=>{const deliver=timestamp=>{if(b.readbackDrain?.active){if(b.readbackDrain?.active)b.readbackDrain.deferredCallbacks=(b.readbackDrain.deferredCallbacks??0)+1;requestFrame(deliver);return;}b.activeRafTimestamp=timestamp;callback(timestamp);};return requestFrame(deliver);};
   Object.defineProperty(window,'__repositoryWorldApp',{configurable:true,get:()=>app,set:value=>{
    app=value;const start=app.engine.start.bind(app.engine);app.engine.start=update=>start((_dt,_time)=>{
     if(b.frameBudget&&!b.frameBudget.shouldSubmit())return;
@@ -130,7 +148,7 @@ try{
    });
   }});
   setInterval(()=>{if(b.scenario&&performance.now()-b.lastFrameAt>5000){b.error='Actual game frame loop stalled for more than 5 seconds';b.done=true;b.scenario=null;}},1000);
- },report.observeLongTasks);
+ },{observe:report.observeLongTasks,splatKeyOracle:report.splatKeyOracleRequested||report.gpuSortOracleRequested});
  progress('app-load');await page.goto(origin+'/',{waitUntil:'domcontentloaded'});await page.bringToFront();
  await page.waitForFunction(()=>window.__repositoryWorldApp?.host.active&&window.__repositoryWorldApp.portals.mode==='published'&&window.__repositoryWorldApp.portals.enabled,null,{timeout:120000});
  const dismiss=page.getByRole('button',{name:'Dismiss',exact:true});if(await dismiss.isVisible())await dismiss.click();const panel=page.locator('#panel-toggle');if(await panel.isVisible())await panel.click();await page.locator('canvas').focus();
@@ -173,6 +191,7 @@ try{
  const goldRoute=report.environment.route.find(route=>route.name==='gold-sunset-parallax'),selectedRoutes=scenarioSelection==='portal-motion'?[goldRoute]:scenarioSelection==='portal-stationary'?[{...goldRoute,name:'gold-sunset-stationary',lateral:0}]:report.environment.route;
  if(report.comparisonBlocks)selectedRoutes.splice(0,selectedRoutes.length,...[...'BCCB'].map((variant,i)=>({...goldRoute,name:goldRoute.name+'-block'+(i+1)+'-'+variant,comparisonVariant:variant})));
  report.selectedRoutes=selectedRoutes;
+ if(report.gpuSortOracleRequested&&!selectedRoutes.some(route=>route.name==='gold-sunset-parallax'))throw Error('--gpu-sort-oracle requires an ordinary gold-sunset-parallax route; use --scenario portal-motion or all without comparison blocks');
  const summarize=values=>{const sorted=[...values].sort((a,b)=>a-b),rank=p=>sorted[Math.max(0,Math.ceil(sorted.length*p)-1)],sum=values.reduce((a,b)=>a+b,0);return {count:values.length,total:sum,mean:sum/values.length,median:rank(.5),p95:rank(.95),p99:rank(.99),min:sorted[0],max:sorted.at(-1)};};
  for(const [scenarioIndex,route] of selectedRoutes.entries()){
   let blockState=null;
@@ -210,6 +229,22 @@ try{
  if(report.frameBudget)report.frameBudgetProfile=await page.evaluate(()=>{const p=window.__warehouseBenchmark.frameBudget,s=p.snapshot();p.dispose();window.__warehouseBenchmark.frameBudget=null;return s;});
  if(report.readbackDiagnostic)report.readbackProfile=await page.evaluate(()=>{const p=window.__warehouseBenchmark.readbackProfile,s=p.snapshot();p.dispose();return s;});
  if(profile!=='off')report.profile=await page.evaluate(()=>{const profile=window.__warehouseBenchmark.profile,snapshot=profile.snapshot();profile.dispose();return snapshot;});
+ if(report.splatKeyOracleRequested){
+  progress('post-timing-splat-key-oracle');
+  try{report.splatKeyOracle=await page.evaluate(runWarehouseSplatKeyOracle,{timeoutMs:20000,maxExamples:8,sortVariants:2});}
+  catch(error){report.splatKeyOracle={diagnosticOnly:true,acceptanceEvidence:false,status:'unavailable-or-failed',error:String(error.stack??error)};}
+  progress('post-timing-splat-key-oracle:complete',{status:report.splatKeyOracle.status,exactOrderingPromising:report.splatKeyOracle.exactOrderingPromising??false});
+  if(report.splatKeyOracle.status==='unavailable-or-failed'){report.splatKeyOracle.sessionInvalidated=true;throw Error('Splat key oracle failed; discard this browser session before any further visual checks: '+report.splatKeyOracle.error);}
+ }
+ if(report.gpuSortOracleRequested){
+  await page.addScriptTag({content:'window.__createWebGLMergeSorter = '+(gpuSortMethod==='fragment-gather'?createWebGLGatherSorter:createWebGLMergeSorter).toString()+';'});
+  if(gpuSortStages)await page.addScriptTag({content:'window.__profileWebGLMergeStages = '+profileWebGLMergeStages.toString()+';'});
+  progress('post-timing-gpu-sort-oracle');
+  try{report.gpuSortOracle=await page.evaluate(runWarehouseGpuSortOracle,{route:selectedRoutes.find(route=>route.name==='gold-sunset-parallax'),timeoutMs:90000,profileStages:gpuSortStages,method:gpuSortMethod});}
+  catch(error){report.gpuSortOracle={diagnosticOnly:true,status:'unavailable-or-failed',error:String(error.stack??error)};}
+  progress('post-timing-gpu-sort-oracle:complete',{status:report.gpuSortOracle.status,synthetics:report.gpuSortOracle.synthetics?.length??0,captures:report.gpuSortOracle.captures?.length??0});
+  if(report.gpuSortOracle.status==='unavailable-or-failed'){report.gpuSortOracle.sessionInvalidated=true;throw Error('GPU sort oracle failed; discard this browser session before any further visual checks: '+report.gpuSortOracle.error);}
+ }
  if(args.includes('--visual-checks')){
   progress('post-timing-plant-order-visuals');
   report.plantOrderVisuals=await page.evaluate(visualValidator,{includeUnchangedImages:true,extended:args.includes('--extended-visuals')});

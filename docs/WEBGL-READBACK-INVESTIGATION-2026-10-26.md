@@ -38,3 +38,5 @@ The lifecycle helper preserves original Promise identity and reports pending cal
 The user authorised pushing `codex/portal-fps-20261025`, without deployment. Production rendering code remains identical to the previously tested foliage-fix snapshot. The rejected allocation and scheduling experiments are opt-in tooling only. The earlier performance reports describe historical uncommitted states; this handoff supersedes those Git-status statements, not their measurements or limitations.
 
 Fresh portal and published-world checks passed 280 tests before the push. The earlier exact GPU and actual-world visual evidence is retained; it is not represented as newly rerun. The next performance step is a repeated unprofiled baseline with adequate disk headroom and accounted-for competing GPU work. A safe readback fix remains open.
+
+That retest is now recorded in [the 27 October fresh-start report](WEBGL-FRESH-START-2026-10-27.md). Four independent browser starts still varied from 25.75 to 38.62 FPS at the Sunset portal, and a CPU replacement failed exact sorting equivalence. No new runtime fix was retained.
