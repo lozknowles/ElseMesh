@@ -1,5 +1,6 @@
 import './MobileControls.css';
 import {GraphicsPanel} from './GraphicsPanel.js';
+import {WebGLSunsetOutput} from './WebGLSunsetOutput.js';
 import {graphicsSceneEligible} from './GraphicsRuntimeState.js';
 import {OpeningProgress} from './OpeningProgress.js';
 import {renderWebGLOpaqueDepthPrepass,getQualifiedWarehouseDepthOccluders} from './WebGLOpaqueDepthPrepass.js';
@@ -165,13 +166,17 @@ async function init(){
  arrivals=new PortalArrivalController({runtime:portals,localAvatar:avatar});
  const openingPlayer={avatarAppearance:loadAppearance()};
  const opaqueDepthPrepass={enabled:true,phase:'idle',lastResult:null,occluders:()=>getQualifiedWarehouseDepthOccluders(host.active)};
+ let sunsetOutput=null;
  const renderMainScene=()=>{
-  opaqueDepthPrepass.lastResult=renderWebGLOpaqueDepthPrepass({renderer,scene:engine.scene,camera:engine.camera,occluders:opaqueDepthPrepass.occluders(),enabled:opaqueDepthPrepass.enabled,onPhase:phase=>{opaqueDepthPrepass.phase=phase;}});
-  return opaqueDepthPrepass.lastResult;
+  const draw=()=>{
+   opaqueDepthPrepass.lastResult=renderWebGLOpaqueDepthPrepass({renderer,scene:engine.scene,camera:engine.camera,occluders:opaqueDepthPrepass.occluders(),enabled:opaqueDepthPrepass.enabled,onPhase:phase=>{opaqueDepthPrepass.phase=phase;}});
+   return opaqueDepthPrepass.lastResult;
+  };
+  return sunsetOutput?sunsetOutput.renderMain(draw,{scene:engine.scene,camera:engine.camera,ordinary:true}):draw();
  };
  const app={publicDuck,media,objectAccess,accessPanel,controlsHelp,engine,input,host,renderer,post,weather,retro,portals,avatar,arrivals,followCamera,camera:engine.camera,freeCam:false,get player(){return host.active?.player??openingPlayer;},fly:{yaw:0,pitch:0,velocity:new N.Vector3(),setPose(position,yaw,pitch){this.yaw=yaw;this.pitch=pitch;engine.camera.position.copy(position);engine.camera.quaternion.setFromEuler(new N.Euler(pitch,yaw,0,'YXZ'));engine.camera.updateMatrixWorld();}},thirdIsland:{active:false},monorail:{state:'off'},setFreeCam(value){this.freeCam=!!value;},gpu:isWebGL?null:GPU,backend:selected.backend,fallbackReason:selected.fallbackReason,session:null,...repositoryWorldActions({host,portals,report})};
  let welcomeMuted=false;try{welcomeMuted=localStorage.getItem('elsemesh.world-welcome-muted/1')==='1';}catch{}
- if(isWebGL)Object.assign(app,{opaqueDepthPrepass,renderMainScene});
+ if(isWebGL){sunsetOutput=new WebGLSunsetOutput({renderer,getActive:()=>host.active,getPortals:()=>portals});Object.assign(app,{opaqueDepthPrepass,renderMainScene,sunsetOutput});}
  const isWelcomeMuted=()=>welcomeMuted||!!app.audio?.muted||!!app.audioMuted;
  const welcomeSpeech=new LocalWelcomeSpeech({isMuted:isWelcomeMuted});
  welcomeView=new WorldWelcomeView({isMuted:isWelcomeMuted,onMute:value=>{welcomeMuted=value;try{localStorage.setItem('elsemesh.world-welcome-muted/1',value?'1':'0');}catch{}welcomeSpeech.tick();},onReplayAudio:()=>{const welcome=worldWelcome?.context()?.active.project.welcome;if(validWorldWelcome(welcome)&&welcome.audio)welcomeSpeech.play(welcome.text);}});
@@ -287,7 +292,7 @@ async function init(){
   document.querySelector('#panel h1').textContent=active.project.metadata.name;
   if(installation.kind==='published'){report('Warehouse and Sunset · single player');document.querySelector('#portal-status').textContent='Walk through the gold Sunset door beside the Dock portal. Return through the doorway in Sunset.';}else report('Published island · revision '+(active.identity.resolvedCommit??validateOpeningWorld(config).source.ref).slice(0,12)+' · '+selected.backend);
  })().catch(error=>{openingProgress.fail(error.message);report('Opening world could not load: '+error.message);document.querySelector('#portal-status').textContent='Opening world unavailable. Retry by reloading, or choose a repository.';});
- window.addEventListener('pagehide',()=>{graphics?.dispose();playerEyes?.dispose();media.dispose();refraction?.dispose();objectAccess.invalidate();worldWelcome.dispose();welcomeView.dispose();controlsHelp.dispose();portals.dispose();portalEffects.dispose();retro.dispose();avatar.dispose();host.dispose();engine.stop();if(isWebGL)engine.dispose();else GPU.device?.destroy();});report('ElseMesh '+selected.backend+' ready. Open a world repository folder or public GitHub source.');
+ window.addEventListener('pagehide',()=>{graphics?.dispose();sunsetOutput?.dispose();playerEyes?.dispose();media.dispose();refraction?.dispose();objectAccess.invalidate();worldWelcome.dispose();welcomeView.dispose();controlsHelp.dispose();portals.dispose();portalEffects.dispose();retro.dispose();avatar.dispose();host.dispose();engine.stop();if(isWebGL)engine.dispose();else GPU.device?.destroy();});report('ElseMesh '+selected.backend+' ready. Open a world repository folder or public GitHub source.');
  window.dispatchEvent(new CustomEvent('repository-world-ready',{detail:app}));
 }
 init().catch(error=>{console.error(error);openingProgress.fail(error.message);report(error.message);});

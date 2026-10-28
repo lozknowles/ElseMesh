@@ -1,8 +1,40 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {T} from '../src/world-runtime/vendor/world-engine-contract.js';
-import {WebGLPortalViews,portalTargetSize,portalDestinationPlane} from '../src/world-runtime/WebGLPortalViews.js';
+import {WebGLPortalViews,portalTargetSize,portalDestinationPlane,webGLPortalInView,portalApertureIntersectsFrustum} from '../src/world-runtime/WebGLPortalViews.js';
 const pose=(position=[0,0,0],yaw=0)=>({position,yaw,width:2,height:3});
+test('a nearby return aperture entirely behind the camera does not draw its destination',()=>{
+ const {views,renderer,mainCamera}=setup();let draws=0;renderer.render=()=>draws++;
+ const source=pose();views.setDestination('return',{candidate:{root:new T.Group()},authorizedView:true,source,destination:pose([10,0,0]),state:'live'});
+ mainCamera.position.set(0,0,.3);mainCamera.lookAt(0,0,1);mainCamera.updateMatrixWorld();
+ const f=new T.Frustum().setFromProjectionMatrix(new T.Matrix4().multiplyMatrices(mainCamera.projectionMatrix,mainCamera.matrixWorldInverse));
+ assert.equal(f.intersectsSphere(new T.Sphere(new T.Vector3(),Math.hypot(2,3)/2)),true,'old sphere admitted this invisible door');
+ assert.equal(webGLPortalInView(mainCamera,source),false);views.render();assert.equal(draws,0);
+ mainCamera.lookAt(0,0,0);assert.equal(webGLPortalInView(mainCamera,source),true);views.render();assert.equal(draws,1);assert.equal(views.getAperture('return').userData.portalViewState,'live');views.dispose();
+});
+test('aperture plane rejection retains partial, grazing, rotated and large enclosing portals',()=>{
+ const plane=new T.Plane(new T.Vector3(1,0,0),0),frustum={planes:[plane]};
+ assert.equal(portalApertureIntersectsFrustum(frustum,pose([-2,0,0])),false);
+ for(const x of [-1-1e-8,-1,-.5,0,2])assert.equal(portalApertureIntersectsFrustum(frustum,pose([x,0,0])),true);
+ assert.equal(portalApertureIntersectsFrustum(frustum,pose([-.5,0,0],Math.PI/2)),false);
+ assert.equal(portalApertureIntersectsFrustum(frustum,{...pose([-20,0,0]),width:100}),true);
+ // Plane support equals the greatest signed distance of the actual four corners.
+ for(let i=0;i<120;i++){
+  const source={position:[Math.sin(i)*3,Math.cos(i)*2,i/30-2],yaw:i*.13,width:.3+i%7,height:.2+i%5};
+  const n=new T.Vector3(Math.sin(i*.31),Math.cos(i*.43),Math.cos(i*.17)).normalize(),p=new T.Plane(n,Math.sin(i*.71));
+  const corners=[-1,1].flatMap(sx=>[-1,1].map(sy=>new T.Vector3(source.position[0]+sx*source.width/2*Math.cos(source.yaw),source.position[1]+sy*source.height/2,source.position[2]-sx*source.width/2*Math.sin(source.yaw))));
+  const max=Math.max(...corners.map(c=>p.distanceToPoint(c)));
+  if(Math.abs(max)>1e-5)assert.equal(portalApertureIntersectsFrustum({planes:[p]},source),max>=0);
+ }
+});
+test('near-plane crossings retain the aperture when even one side remains visible',()=>{
+ const camera=new T.PerspectiveCamera(65,1,.1,100);camera.updateMatrixWorld();
+ const f=new T.Frustum().setFromProjectionMatrix(new T.Matrix4().multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse));
+ assert.equal(portalApertureIntersectsFrustum(f,{...pose([0,0,-.1]),width:1,height:1}),true,'on near plane');
+ assert.equal(portalApertureIntersectsFrustum(f,{...pose([0,0,-.04]),width:1,height:1}),false,'wholly before near plane');
+ assert.equal(portalApertureIntersectsFrustum(f,{...pose([0,0,0],Math.PI/4),width:2,height:2}),true,'crosses eye and near planes');
+ assert.equal(portalApertureIntersectsFrustum(f,{...pose([0,0,-2],-Math.PI/4),width:8,height:8}),true,'opposite yaw and enclosing aperture');
+});
 function setup(){
  const renderer={clippingPlanes:[],localClippingEnabled:false,autoClear:false,target:{main:true},viewport:new T.Vector4(4,5,600,400),scissor:new T.Vector4(6,7,300,200),scissorTest:true,color:new T.Color('red'),alpha:.4,
  getRenderTarget(){return this.target;},getViewport(v){return v.copy(this.viewport);},getScissor(v){return v.copy(this.scissor);},getScissorTest(){return this.scissorTest;},getClearColor(c){return c.copy(this.color);},getClearAlpha(){return this.alpha;},

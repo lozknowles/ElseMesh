@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {validatePublishedWorldCatalog} from '../src/world-runtime/PublishedWorldCatalog.js';
+import {patchOutputSurface,outputSurfaceManifestName,outputSurfaceTransformVersion} from '../tools/output-surface-transform.mjs';
 const arg=process.env.PUBLIC_SUNSET_PACKAGE;
 if(!arg)throw Error('PUBLIC_SUNSET_PACKAGE must identify the generated publication candidate');
 const root=await fs.realpath(arg),sha=b=>createHash('sha256').update(b).digest('hex');
@@ -61,5 +62,19 @@ test('publication retains the current editor and Original Island pins plus expli
  const publication=JSON.parse(await fs.readFile(path.join(root,'publication.json'),'utf8'));
  assert.match(publication.engineCommit,/^[a-f0-9]{40}$/);assert.match(publication.editorCommit,/^[a-f0-9]{40}$/);
  const original=publication.optionalWorldRepositories.find(row=>row.worldId==='elsemesh.world:470d2706-d459-4cb6-92d8-d4074289bea5');assert.ok(original);assert.equal(original.commit,'21a8a59117d8e83ee7a7aa42f426486b05ad9ecc');assert.equal(original.contentDigest,'c64b45e75fe4b421dfb6b0e487c5c41eac7c6583e129029987ecad173abef214');assert.equal(original.bundledWithOpening,false);
- const provenance=JSON.parse(await fs.readFile(new URL('../src/world-runtime/vendor/world-engine-contract.provenance.json',import.meta.url),'utf8'));assert.equal(sha(await fs.readFile(new URL('../src/world-runtime/vendor/world-engine-contract.js',import.meta.url))),provenance.bundleSha256);assert.equal(publication.worldContract.bundleSha256,provenance.bundleSha256);assert.equal(publication.worldContract.commit,provenance.commit);assert.equal(publication.worldContract.baseBundleSha256,provenance.baseBundleSha256??provenance.bundleSha256);assert.deepEqual(publication.worldContract.downstreamPatches,provenance.downstreamPatches??[]);
+ const provenance=JSON.parse(await fs.readFile(new URL('../src/world-runtime/vendor/world-engine-contract.provenance.json',import.meta.url),'utf8'));const sourceContract=await fs.readFile(new URL('../src/world-runtime/vendor/world-engine-contract.js',import.meta.url),'utf8');assert.equal(publication.worldContract.sourceNormalization,'UTF-8 LF');assert.equal(sha(sourceContract.replaceAll('\r\n','\n')),provenance.bundleSha256);assert.equal(publication.worldContract.bundleSha256,provenance.bundleSha256);assert.equal(publication.worldContract.commit,provenance.commit);assert.equal(publication.worldContract.baseBundleSha256,provenance.baseBundleSha256??provenance.bundleSha256);assert.deepEqual(publication.worldContract.downstreamPatches,provenance.downstreamPatches??[]);
+});
+
+
+test('generated publication preserves separately hashed output-surface derivative and its final chunk closure',async()=>{
+ const publication=JSON.parse(await fs.readFile(path.join(root,'publication.json'),'utf8')),reference=publication.outputSurfaceDerivative;
+ assert.ok(reference,'Separate output-surface provenance is required');assert.equal(reference.manifest,outputSurfaceManifestName);
+ const file=path.join(root,reference.manifest),info=await fs.lstat(file);assert.ok(info.isFile()&&!info.isSymbolicLink());
+ const bytes=await fs.readFile(file),manifest=JSON.parse(bytes);assert.equal(sha(bytes),reference.sha256);assert.equal(manifest.schema,'elsemesh.output-surface-derivative/1');assert.equal(manifest.version,outputSurfaceTransformVersion);assert.equal(reference.version,manifest.version);assert.equal(manifest.integration,'bounded-opt-in');
+ const sourceContract=await fs.readFile(new URL('../src/world-runtime/vendor/world-engine-contract.js',import.meta.url),'utf8'),expected=patchOutputSurface(sourceContract).manifest;
+ assert.equal(manifest.source.path,'src/world-runtime/vendor/world-engine-contract.js');assert.equal(manifest.source.normalization,'UTF-8 LF');assert.equal(manifest.source.upstreamBytesUnmodified,true);assert.equal(manifest.source.sha256,sha(sourceContract.replaceAll('\r\n','\n')));assert.equal(reference.upstreamSourceSha256,manifest.source.sha256);assert.equal(manifest.source.sha256,publication.worldContract.bundleSha256);
+ assert.equal(manifest.transform.path,'tools/output-surface-transform.mjs');assert.equal(manifest.transform.version,outputSurfaceTransformVersion);assert.equal(manifest.transform.sha256,sha(await fs.readFile(new URL('../tools/output-surface-transform.mjs',import.meta.url))));assert.equal(reference.transformSha256,manifest.transform.sha256);assert.deepEqual(manifest.transform.edits,expected.edits);
+ assert.equal(manifest.transformedModule.sha256,expected.outputSha256);assert.equal(reference.transformedModuleSha256,expected.outputSha256);assert.notEqual(manifest.transformedModule.sha256,manifest.source.sha256);assert.deepEqual(reference.finalChunks,manifest.finalChunks);
+ const chunks=Object.entries(manifest.finalChunks);assert.ok(chunks.length>0&&chunks.length<=256);assert.equal(manifest.transformedModule.chunks.length,1);assert.ok(Object.hasOwn(manifest.finalChunks,manifest.transformedModule.chunks[0]));
+ for(const [name,digest]of chunks){assert.match(name,/^assets\/[A-Za-z0-9_-][A-Za-z0-9_.-]*\.js$/);assert.ok(!name.includes('..'));assert.match(digest,/^[a-f0-9]{64}$/);const chunk=path.join(root,name),stat=await fs.lstat(chunk);assert.ok(stat.isFile()&&!stat.isSymbolicLink());assert.equal(sha(await fs.readFile(chunk)),digest,name);}
 });

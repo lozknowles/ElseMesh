@@ -24,3 +24,20 @@ test('prepass is reversible and unsupported backends do not claim experiments en
  const {app,control}=setup([]);control.setPrepass(false);assert.equal(app.opaqueDepthPrepass.enabled,false);control.reset();assert.equal(app.opaqueDepthPrepass.enabled,true);
  app.backend='webgpu';control.setFarTrees(true);assert.equal(control.snapshot().farTrees,false);assert.equal(control.snapshot().supported,false);
 });
+test('Sunset choice survives world transitions with fresh resources but reset and disposal clear it',()=>{
+ const {app,control}=setup([]),calls=[];
+ let enabled=false;
+ app.sunsetOutput={snapshot:()=>({enabled,active:false,reason:'test'}),setEnabled(value){enabled=value;calls.push(['enable',value]);},reset(reason){enabled=false;calls.push(['reset',reason]);}};
+ app.engine={maxOutputPixels:2100000};
+ control.setSunsetOutput(true);assert.equal(control.snapshot().sunsetOutput.enabled,true);
+ control.reset({keepSunset:true});assert.equal(enabled,true);assert.deepEqual(calls.slice(-2),[['reset','world-or-settings-reset'],['enable',true]]);
+ assert.equal(app.engine.maxOutputPixels,2100000);
+ control.reset();assert.equal(enabled,false);
+ control.setSunsetOutput(true);control.dispose();assert.equal(enabled,false);
+ assert.throws(()=>control.setSunsetOutput(true),/disposed/);
+});
+test('Sunset experiment cannot be enabled for an unsupported backend',()=>{
+ const {app,control}=setup([]);app.backend='webgpu';let enabled;
+ app.sunsetOutput={setEnabled(value){enabled=value;},snapshot:()=>({enabled})};
+ control.setSunsetOutput(true);assert.equal(enabled,false);
+});

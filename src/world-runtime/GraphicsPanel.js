@@ -48,10 +48,12 @@ export class GraphicsPanel {
   this.prepassStatus=element('p',null,'graphics-note');this.prepassStatus.id='graphics-prepass-status';experiments.append(this.prepassStatus);
   toggle('farTrees','Distant-tree draw order · experimental','Session only. May improve overdraw, but can change foliage overlap. Off by default.',value=>this.experiments.setFarTrees(value));
   this.experimentStatus=element('p',null,'graphics-note');experiments.append(this.experimentStatus);
+  toggle('sunsetOutput','Sunset supersampling · experimental','Session only. Uses a different antialiasing path at twice the screen resolution in each direction. Active only inside the verified Sunset world; off by default.',value=>this.experiments.setSunsetOutput(value));
+  this.sunsetStatus=element('p',null,'graphics-note');this.sunsetStatus.id='graphics-sunset-status';experiments.append(this.sunsetStatus);
   const pending=element('details',null,'graphics-research');pending.append(element('summary','Other experiments'));
-  pending.append(element('p','Turn-only sort reuse still needs moving-scene and safe-toggle checks. GPU sorting was exact in tests but took about 12 ms per sort. Neither is available as a runtime switch yet.'));
+  pending.append(element('p','Turn-only sort reuse and GPU sorting still need whole-game performance and lifecycle validation. Neither is available as a runtime switch yet.'));
   pending.append(element('p','A reduced sorting-frequency trial did not give a repeatable walking FPS improvement, so it is not offered here.'));
-  pending.append(element('p','This Sunset asset has no usable splat LOD tree. Antialiasing requires a renderer restart and also affects the Warehouse geometry. These options are not changed automatically.'));
+  pending.append(element('p','The Sunset experiment keeps all scene detail and the selected screen resolution. It does not change the Warehouse rendering path or remove GPU readback stalls. This Sunset asset has no usable splat LOD tree.'));
   this.storageNote=element('p',null,'graphics-note');const footer=element('footer'),reset=element('button','Restore defaults');reset.type='button';reset.id='graphics-reset';reset.onclick=()=>this.reset();footer.append(reset);
   this.dialog.append(header,this.readout,this.status,this.form,experiments,pending,this.storageNote,footer);document.body.append(this.button,this.dialog);
   this.button.onclick=()=>this.show();close.onclick=()=>this.close();
@@ -77,7 +79,7 @@ export class GraphicsPanel {
   if(this.disposed)return;this.experiments.refresh();this.model.observe(timestamp,{eligible:eligible&&!this.contextLost,visible:!document.hidden});this.apply();
   if(timestamp>=this.nextRefresh){this.nextRefresh=timestamp+500;this.refresh();}
  }
- worldChanging(){this.close();this.experiments.reset();this.model.configure(this.model.snapshot().settings);this.apply();this.refresh();}
+ worldChanging(){this.close();this.experiments.reset({keepSunset:true});this.model.configure(this.model.snapshot().settings);this.apply();this.refresh();}
  reset(){this.experiments.reset();this.model.configure({...GRAPHICS_DEFAULTS});this.apply();try{this.storage?.removeItem(STORAGE);}catch{}this.storageNote.textContent='Standard quality restored. Saved overrides and experiments cleared.';this.refresh();return this.snapshot();}
  snapshot(){return{...this.model.snapshot(),experiments:this.experiments.snapshot(),backend:this.app.backend,renderSize:[this.app.engine.width,this.app.engine.height],contextLost:this.contextLost};}
  refresh(){
@@ -91,6 +93,12 @@ export class GraphicsPanel {
   this.controls.minimumScale.disabled=s.mode!=='target30';
   const preset=Object.keys(GRAPHICS_PRESETS).find(name=>{const p=GRAPHICS_PRESETS[name];return s.maxOutputPixels===p.maxOutputPixels&&s.portalLongEdge===p.portalLongEdge;})??'custom';this.controls.preset.value=preset;if(this.legacy)this.legacy.value=preset==='capture'?'capture':'standard';
   this.controls.prepass.checked=state.experiments.prepass;this.controls.farTrees.checked=state.experiments.farTrees;
+  const sunset=state.experiments.sunsetOutput;this.controls.sunsetOutput.checked=sunset.enabled;
+  this.sunsetStatus.textContent=!sunset.enabled?'Sunset supersampling: off.':sunset.active?
+   `Sunset supersampling: active · ${sunset.internalSize.width} × ${sunset.internalSize.height} internal → ${sunset.outputSize.width} × ${sunset.outputSize.height} screen.`:
+   ['awaiting-eligible-main','active-pinned-sunset-required','live-pinned-readiness-required'].includes(sunset.reason)?'Sunset supersampling: enabled; waiting for a ready Sunset main view.':
+   sunset.reason==='fixed-2x-target-limit'?'Sunset supersampling: unavailable at this size on this device. Original rendering remains active.':
+   'Sunset supersampling: enabled; unavailable for this view. Original rendering remains active.';
   const prepass=state.experiments;this.prepassStatus.textContent=!prepass.supported?'Wall optimisation is unavailable in this renderer.':!prepass.prepass?'Wall optimisation: off.':prepass.prepassUsed?'Wall optimisation: active.':prepass.prepassUsed===null?'Wall optimisation: enabled; waiting for a frame.':prepass.prepassReason==='no-eligible-occluders'?'Wall optimisation: enabled; unavailable in this scene.':'Wall optimisation: enabled; not used for this view.';
   this.experimentStatus.textContent=!state.experiments.supported?'These techniques are available in WebGL mode.':state.experiments.farTrees?`${state.experiments.changedTreeBatches} distant-tree batches changed. Restore defaults to return to the validated order.`:'Experimental draw ordering is off. Sorting and readback behaviour are unchanged.';
  }

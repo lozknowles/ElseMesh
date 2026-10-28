@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {packageOutputSurfaceDerivative} from './output-surface-transform.mjs';
 import {validatePublishedWorldCatalog} from '../src/world-runtime/PublishedWorldCatalog.js';
 import {loadWorldSource,repositoryDigest} from '../src/world-runtime/vendor/world-engine-contract.js';
 const [buildArg,worldArg,outputArg,previousPagesArg]=process.argv.slice(2);
@@ -74,6 +75,9 @@ if(priorPublication.editorCommit!==undefined){if(!/^[a-f0-9]{40}$/.test(priorPub
 if(priorPublication.optionalWorldRepositories!==undefined){const rows=priorPublication.optionalWorldRepositories;if(!Array.isArray(rows)||rows.length>16)throw Error('Invalid optional world provenance');for(const row of rows){if(!/^elsemesh[.]world:[a-f0-9-]{36}$/.test(row.worldId)||!/^https:\/\/github[.]com\/lozknowles\/[A-Za-z0-9_-]+$/.test(row.repository)||!/^[a-f0-9]{40}$/.test(row.commit)||!/^[a-f0-9]{64}$/.test(row.contentDigest)||typeof row.bundledWithOpening!=='boolean')throw Error('Invalid optional world pin');}preserved.optionalWorldRepositories=rows;}
 const engineRoot=fileURLToPath(new URL('..',import.meta.url)),engineCommit=spawnSync('git',['-C',engineRoot,'rev-parse','HEAD'],{encoding:'utf8'}).stdout.trim();if(!/^[a-f0-9]{40}$/.test(engineCommit))throw Error('Missing engine source revision');
 const contractProvenance=JSON.parse(await fs.readFile(new URL('../src/world-runtime/vendor/world-engine-contract.provenance.json',import.meta.url),'utf8'));
-const sourceContract=new Uint8Array(await fs.readFile(new URL('../src/world-runtime/vendor/world-engine-contract.js',import.meta.url)));if(await repositoryDigest(sourceContract)!==contractProvenance.bundleSha256)throw Error('World contract provenance mismatch');
-await fs.writeFile(path.join(output,'publication.json'),JSON.stringify({schema:'elsemesh.publication/1',...preserved,engineCommit,worldContract:{commit:contractProvenance.commit,bundleSha256:contractProvenance.bundleSha256,baseBundleSha256:contractProvenance.baseBundleSha256??contractProvenance.bundleSha256,downstreamPatches:contractProvenance.downstreamPatches??[]},worldRepositoryCommit:commit,openingWorldId:opening.worldId,worlds:catalog.worlds,routes:catalog.routes,scene:{count:719538,assetSha256:loaded.project.splatScene.asset.sha256,physicsSha256:loaded.project.splatScene.physics.sha256},previousPublicEditorPreserved:true},null,2)+'\n');
+const sourceContract=await fs.readFile(new URL('../src/world-runtime/vendor/world-engine-contract.js',import.meta.url),'utf8');if(await repositoryDigest(new TextEncoder().encode(sourceContract.replaceAll('\r\n','\n')))!==contractProvenance.bundleSha256)throw Error('World contract provenance mismatch');
+// Upstream contract provenance covers its unchanged source bytes only.
+// Record and preserve the build derivative separately, including final chunks.
+const outputSurfaceDerivative=await packageOutputSurfaceDerivative(build,output);
+await fs.writeFile(path.join(output,'publication.json'),JSON.stringify({schema:'elsemesh.publication/1',outputSurfaceDerivative,...preserved,engineCommit,worldContract:{sourceNormalization:'UTF-8 LF',commit:contractProvenance.commit,bundleSha256:contractProvenance.bundleSha256,baseBundleSha256:contractProvenance.baseBundleSha256??contractProvenance.bundleSha256,downstreamPatches:contractProvenance.downstreamPatches??[]},worldRepositoryCommit:commit,openingWorldId:opening.worldId,worlds:catalog.worlds,routes:catalog.routes,scene:{count:719538,assetSha256:loaded.project.splatScene.asset.sha256,physicsSha256:loaded.project.splatScene.physics.sha256},previousPublicEditorPreserved:true},null,2)+'\n');
 console.log(JSON.stringify({output,worldRepositoryCommit:commit,sunsetBytes:total,worlds:catalog.worlds}));

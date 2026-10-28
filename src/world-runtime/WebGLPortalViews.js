@@ -30,7 +30,20 @@ export function withWebGLPortalRenderState(renderer,draw){
 export function webGLPortalInView(sourceCamera,source){
  sourceCamera.updateMatrixWorld();const position=new T.Vector3().setFromMatrixPosition(sourceCamera.matrixWorld),normal=new T.Vector3(Math.sin(source.yaw||0),0,Math.cos(source.yaw||0));
  if(normal.dot(position.sub(new T.Vector3(...source.position)))<=0)return false;
- const frustum=new T.Frustum().setFromProjectionMatrix(new T.Matrix4().multiplyMatrices(sourceCamera.projectionMatrix,sourceCamera.matrixWorldInverse));return frustum.intersectsSphere(new T.Sphere(new T.Vector3(...source.position),Math.hypot(source.width||2,source.height||3)/2));
+ const frustum=new T.Frustum().setFromProjectionMatrix(new T.Matrix4().multiplyMatrices(sourceCamera.projectionMatrix,sourceCamera.matrixWorldInverse));return portalApertureIntersectsFrustum(frustum,source);
+}
+/** Conservative plane test of the actual flat aperture. A bounding sphere can
+ * intersect the view even when the whole return door is behind the camera.
+ * Reject only when all four corners are outside one plane; retain grazing edges.
+ */
+export function portalApertureIntersectsFrustum(frustum,source){
+ const [x,y,z]=source.position,cos=Math.cos(source.yaw||0),sin=Math.sin(source.yaw||0),halfWidth=(source.width||2)/2,halfHeight=(source.height||3)/2;
+ for(const {normal:n,constant}of frustum.planes){
+  const center=n.x*x+n.y*y+n.z*z+constant,radius=Math.abs(n.x*cos-n.z*sin)*halfWidth+Math.abs(n.y)*halfHeight;
+  const tolerance=1e-7*Math.max(1,Math.abs(n.x*x)+Math.abs(n.y*y)+Math.abs(n.z*z)+Math.abs(constant)+radius);
+  if(Number.isFinite(center)&&Number.isFinite(radius)&&center+radius < -tolerance)return false;
+ }
+ return true;
 }
 /** Draw an already authorized resident scene without parenting or owning it. */
 export function drawWebGLPortal({renderer:r,sourceCamera,camera:cam,source,destination,scene,candidate,target,width,height,time=0,ordinaryToneMapping}){
@@ -84,7 +97,7 @@ export class WebGLPortalViews{
    if(e.state!=='live'||!e.authorizedView||!e.candidate||!e.source||!e.destination)continue;
    const normal=new T.Vector3(Math.sin(e.source.yaw||0),0,Math.cos(e.source.yaw||0));
    if(normal.dot(position.clone().sub(new T.Vector3(...e.source.position)))<=0)continue;
-   if(!frustum.intersectsSphere(new T.Sphere(new T.Vector3(...e.source.position),Math.hypot(e.source.width||2,e.source.height||3)/2)))continue;
+   if(!portalApertureIntersectsFrustum(frustum,e.source))continue;
    const size=portalTargetSize(width,height,this.maxLongEdge);e.target.setSize(size.width,size.height);
    const toneMapped=!e.candidate.splatScene;if(e.material.toneMapped!==toneMapped){e.material.toneMapped=toneMapped;e.material.needsUpdate=true;}
    try{drawWebGLPortal({renderer:r,sourceCamera:m,camera:e.camera,source:e.source,destination:e.destination,scene:e.scene,candidate:e.candidate,target:e.target,width:size.width,height:size.height,time,ordinaryToneMapping:this.ordinaryToneMapping});e.hasImage=true;this._status(e,true);}

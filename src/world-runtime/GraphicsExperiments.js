@@ -22,7 +22,8 @@ export class GraphicsExperiments {
   if(this.farTrees)this.applyOrders();return this.snapshot();
  }
  setPrepass(enabled){if(this.app.backend==='webgl2'&&this.app.opaqueDepthPrepass)this.app.opaqueDepthPrepass.enabled=enabled===true;return this.snapshot();}
- reset(){this.setFarTrees(false);this.setPrepass(true);}
- snapshot(){const prepass=this.app.opaqueDepthPrepass;return{supported:this.app.backend==='webgl2',farTrees:this.farTrees,changedTreeBatches:this.count,prepass:prepass?.enabled??false,prepassUsed:prepass?.lastResult?.used??null,prepassReason:prepass?.lastResult?.reason??null};}
- dispose(){if(this.disposed)return;this.restoreOrders();this.roots=[];this.farTrees=false;this.setPrepass(true);this.disposed=true;}
+ setSunsetOutput(enabled){if(this.disposed)throw Error('Graphics experiments disposed');this.app.sunsetOutput?.setEnabled(enabled===true&&this.app.backend==='webgl2');return this.snapshot();}
+ reset({keepSunset=false}={}){const enabled=keepSunset&&this.app.sunsetOutput?.snapshot().enabled;this.setFarTrees(false);this.setPrepass(true);this.app.sunsetOutput?.reset('world-or-settings-reset');if(enabled)this.setSunsetOutput(true);}
+ snapshot(){const prepass=this.app.opaqueDepthPrepass;return{supported:this.app.backend==='webgl2',farTrees:this.farTrees,changedTreeBatches:this.count,prepass:prepass?.enabled??false,prepassUsed:prepass?.lastResult?.used??null,prepassReason:prepass?.lastResult?.reason??null,sunsetOutput:this.app.sunsetOutput?.snapshot()??{enabled:false,active:false,reason:'unavailable'}};}
+ dispose(){if(this.disposed)return;this.restoreOrders();this.roots=[];this.farTrees=false;this.setPrepass(true);this.app.sunsetOutput?.reset('graphics-disposed');this.disposed=true;}
 }
