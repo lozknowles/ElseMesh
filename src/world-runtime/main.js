@@ -1,4 +1,6 @@
 import './MobileControls.css';
+import {GraphicsPanel} from './GraphicsPanel.js';
+import {graphicsSceneEligible} from './GraphicsRuntimeState.js';
 import {OpeningProgress} from './OpeningProgress.js';
 import {renderWebGLOpaqueDepthPrepass,getQualifiedWarehouseDepthOccluders} from './WebGLOpaqueDepthPrepass.js';
 import { repositoryWeatherShelters, setMistShelters } from './WeatherShelter.js';
@@ -69,9 +71,9 @@ async function init(){
  openingProgress.advance('renderer-ready');
  let openingLoading=false,pendingOpeningReady=null,openingTargetWorldId=null,openingTargetDigest=null,openingExpectedGeneration=null;
  const captureQuality=new URLSearchParams(location.search).get('quality')==='capture';engine.maxOutputPixels=captureQuality?2100000:1000000;engine.resize();
- let playerEyes=null,eyeInputContext=null;
+ let playerEyes=null,eyeInputContext=null,graphics=null;
  let media,mediaContext=null,objectAccess,accessPanel,controlsHelp,worldWelcome,welcomeView,activeComputerId=null,interactionPending=false,interactionContext=null;
- const input=new Input(engine.canvas,{touchRoot:touchLayer,keyboardLookBlocked:()=>playerEyes?.panel.open||terminal.open||retro.active||!!media?.controlsOpen||controlsHelp?.open||accessPanel?.root.open});
+ const input=new Input(engine.canvas,{touchRoot:touchLayer,keyboardLookBlocked:()=>graphics?.open||playerEyes?.panel.open||terminal.open||retro.active||!!media?.controlsOpen||controlsHelp?.open||accessPanel?.root.open});
  const ownerMode=()=>portals.config?.protocol==='elsemesh.owner-runtime/1';
  const interactionState=()=>({active:host.active,hostGeneration:host.generation,inputEnabled:input.enabled,transport:portals.transport,connection:portals.transport.connectionEpoch,sessionId:portals.transport.membership?.sessionId,generation:portals.transport.generation});
  const canResume=()=>canResumeObjectInteraction(interactionContext,{active:host.active,hostGeneration:host.generation,pending:portals.pending,authorityOffline:portals.authorityOffline,transport:portals.transport,connected:portals.connected,ownerMode:ownerMode()});
@@ -159,8 +161,6 @@ async function init(){
   if(ownerMode()){if(!objectAccess.snapshot)await objectAccess.read();await objectAccess.use(object.id,'media.play');}
   if(host.active!==active||!mediaReady())return;mediaContext=interactionState();media.enter(object,active);
  }catch(error){report(error.message);}finally{interactionPending=false;}}
- const qualityControl=document.querySelector('#render-quality');qualityControl.value=captureQuality?'capture':'standard';
- const setQuality=value=>{const high=value==='capture';engine.maxOutputPixels=high?2100000:1000000;portals.views.maxLongEdge=high?1024:512;engine.resize();};qualityControl.onchange=()=>setQuality(qualityControl.value);setQuality(qualityControl.value);
  const avatar=isWebGL?new WebGLRepositoryAvatar(engine.scene,{prepareResources:engine.prepareRepositoryResources}):new ReadiedRepositoryAvatar(engine.scene,{model:{wheelPivot:{position:new N.Vector3()},lines:{deckY:0},group:new N.Group()},getYaw:()=>0},{prepareResources:engine.prepareRepositoryResources});
  arrivals=new PortalArrivalController({runtime:portals,localAvatar:avatar});
  const openingPlayer={avatarAppearance:loadAppearance()};
@@ -178,7 +178,7 @@ async function init(){
  worldWelcome=new WorldWelcomeController({getContext:()=>{const t=portals.transport,a=host.active,owner=ownerMode();return {active:a,transport:t,connection:t.connectionEpoch,worldId:a?.identity.worldId,contentDigest:a?.identity.contentDigest,sessionId:t.membership?.sessionId,generation:t.generation,authorityEpoch:t.membership?.world?.epoch,playerNodeId:t.identity?.nodeId,ownerMode:owner,visible:document.visibilityState!=='hidden',ready:!!a&&!portals.pending&&!portals.authorityOffline&&(!owner||(portals.connected&&!t.closed&&!t.frozen&&t.worldId===a.identity.worldId))};},present:welcome=>!document.querySelector('dialog[open]')&&welcomeView.show(welcome),clear:()=>welcomeView.hide(),speech:welcomeSpeech});
  app.worldWelcome=worldWelcome;
  const avatarChooser=new AvatarChooser({app});app.avatarChooser=avatarChooser;
- window.addEventListener('keydown',event=>{if(event.code==='KeyK'&&!retro.active&&!terminal.open&&!media?.controlsOpen&&!portals.pending)avatarChooser.show();});
+ window.addEventListener('keydown',event=>{if(event.code==='KeyK'&&!graphics?.open&&!retro.active&&!terminal.open&&!media?.controlsOpen&&!portals.pending)avatarChooser.show();});
  const followButton=document.querySelector('#follow-player');const setFollow=enabled=>{if(enabled)alignAvatarToPlayerView(avatar,host.active?.player);followCamera.setEnabled(enabled);followButton.textContent=enabled?'First-person view · V':'Follow player · V';post?.taau.resetHistory();engine.canvas.focus();};followButton.onclick=()=>setFollow(!followCamera.enabled);followButton.textContent=followCamera.enabled?'First-person view · V':'Follow player · V';
  const canToggleView=()=>input.enabled&&!retro.active&&!terminal.open&&!media?.controlsOpen&&!avatarChooser.dialog.open&&!portals.pending&&!portals.authorityOffline;
  window.addEventListener('keydown',event=>{if(event.code==='KeyV'&&canToggleView())setFollow(!followCamera.enabled);});
@@ -190,7 +190,7 @@ async function init(){
  window.__repositoryWorldApp=app;
  if(isWebGL){
   const [{PlayerEyeView},{PlayerEyeControls},{PlayerEyePanel},{RepositoryPlayerEyes},{WebGLPlayerEyeRenderer}]=await Promise.all([import('./PlayerEyeView.js'),import('./PlayerEyeControls.js'),import('./PlayerEyePanel.js'),import('./RepositoryPlayerEyes.js'),import('./WebGLPlayerEyeRenderer.js')]);
-  const uiClear=()=>!terminal.open&&!retro.active&&!media?.controlsOpen&&!interactionPending&&!controlsHelp.open&&!accessPanel.root.open&&!avatarChooser.dialog.open&&!playerEyes?.panel.open;
+  const uiClear=()=>!graphics?.open&&!terminal.open&&!retro.active&&!media?.controlsOpen&&!interactionPending&&!controlsHelp.open&&!accessPanel.root.open&&!avatarChooser.dialog.open&&!playerEyes?.panel.open;
   const safeSession=()=>!engine.renderer.getContext?.()?.isContextLost?.()&&!!host.active&&host.active.player.mode==='walk'&&portals.connected&&!portals.pending&&!portals.authorityOffline&&!portals.transport.closed&&!portals.transport.frozen&&portals.transport.worldId===host.active.identity.worldId&&uiClear();
   const sameViewer=()=>!eyeInputContext||(eyeInputContext.active===host.active&&eyeInputContext.hostGeneration===host.generation&&eyeInputContext.transport===portals.transport&&eyeInputContext.connection===portals.transport.connectionEpoch&&eyeInputContext.sessionId===portals.transport.membership?.sessionId&&eyeInputContext.generation===portals.transport.generation);
   const roster=new RepositoryPlayerEyes({runtime:portals,timeoutMs:3000,allowCrossWorld:allowCrossWorldEyes});
@@ -206,8 +206,12 @@ async function init(){
   const notice=document.createElement('section');notice.id='player-eye-panel';notice.style.cssText='position:fixed;top:16px;right:16px;z-index:45;max-width:260px;padding:8px;background:#101d2bf2;color:#e0ebe9;font:13px system-ui';const button=document.createElement('button');button.type='button';button.disabled=true;button.textContent='God view';const help=document.createElement('p');help.textContent='Shared player views require WebGL viewing mode.';notice.append(button,help);document.body.append(notice);
  }
 
+ let graphicsInputContext=null;
+ graphics=new GraphicsPanel({app,captureQuality,canOpen:()=>!!host.active&&!portals.pending&&!terminal.open&&!retro.active&&!media?.controlsOpen&&!interactionPending&&!controlsHelp.open&&!accessPanel.root.open&&!avatarChooser.dialog.open&&!playerEyes?.panel.open,
+  onOpen:()=>{playerEyes?.ownView('Graphics menu opened');graphicsInputContext=interactionState();input.suspend();},
+  onClose:()=>{resumeUI(graphicsInputContext);graphicsInputContext=null;}});app.graphics=graphics;
  const sessionStatus=document.querySelector('#session-status');
- host.beforeActivate=async()=>{playerEyes?.panel.setOpen(false);playerEyes?.ownView('Viewer world is changing');media?.exit();worldWelcome?.reset();objectAccess.invalidate();controlsHelp.close();accessPanel.root.open=false;accessPanel.render(null);if(retro.active)retro.clear();document.querySelector('#apply-update').disabled=true;document.querySelector('#update-status').textContent='';app.session?.disconnect();if(terminal.open)terminal.close();};
+ host.beforeActivate=async()=>{graphics?.worldChanging();playerEyes?.panel.setOpen(false);playerEyes?.ownView('Viewer world is changing');media?.exit();worldWelcome?.reset();objectAccess.invalidate();controlsHelp.close();accessPanel.root.open=false;accessPanel.render(null);if(retro.active)retro.clear();document.querySelector('#apply-update').disabled=true;document.querySelector('#update-status').textContent='';app.session?.disconnect();if(terminal.open)terminal.close();};
  const makeSession=()=>new RepositorySession(host,{trustedOwners:new Set([document.querySelector('#session-url').value.trim()]),onStatus:value=>sessionStatus.textContent=value});
  document.querySelector('#session-identity').onclick=()=>void(async()=>{const session=app.session??makeSession();document.querySelector('#public-identity').textContent=JSON.stringify(await session.publicIdentity(),null,2);})().catch(error=>sessionStatus.textContent=error.message);
  document.querySelector('#session-connect').onclick=()=>void(async()=>{const file=document.querySelector('#admission').files[0];if(!file||file.size>100000)throw Error('Select an operator admission JSON under 100 KB.');const proof=JSON.parse(await file.text());if(portals.mode==='published')portals.disconnect();app.session?.disconnect();app.session=makeSession();await app.session.connect(proof);})().catch(error=>sessionStatus.textContent=error.message);
@@ -231,13 +235,14 @@ async function init(){
  document.querySelector('#remote').onclick=()=>void(async()=>{const source=await resolveGitHubWorldSource(parseGitHubWorldLocation(document.querySelector('#github').value));await app.load(source);})().catch(error=>report(error.message));
  engine.start((dt,time)=>{
   try{
+   graphics.beforeFrame(performance.now(),{eligible:graphicsSceneEligible({active:host.active,openingLoading,portals,eyeActive:playerEyes?.controller.status().active})});
    if(!isWebGL){GPU.beginFrame();G.time.value=time;G.dt.value=dt;G.exposure.value=.55;}
    if(!terminal.open&&!retro.active&&!media?.active&&!interactionPending){objectAccess.lease=null;interactionContext=null;activeComputerId=null;}
    if(ownerMode())objectAccess.tick();
    const touchActive=input.touchInterface&&touchGameplayReady();
    if(touchWasActive&&!touchActive)input._clearTransientInput();
    touchWasActive=touchActive;if(touchLayer)touchLayer.hidden=!touchActive;
-   const canMove=!terminal.open&&!retro.active&&!media?.controlsOpen&&!interactionPending&&!controlsHelp.open&&!accessPanel.root.open&&!portals.pending&&!portals.authorityOffline&&!app.freeCam&&!playerEyes?.panel.open;
+   const canMove=!graphics.open&&!terminal.open&&!retro.active&&!media?.controlsOpen&&!interactionPending&&!controlsHelp.open&&!accessPanel.root.open&&!portals.pending&&!portals.authorityOffline&&!app.freeCam&&!playerEyes?.panel.open;
    if(playerEyes?.controller.status().active&&!playerEyes.controls.maintain())playerEyes.ownView('Viewer session changed');
    let eyeActive=!!playerEyes?.controller.status().active,eyeFrame=eyeActive?playerEyes.controller.update():null;eyeActive=!!eyeFrame;
     if(eyeActive||!app.freeCam)host.update(dt,time,{move:eyeActive||canMove,interact:!eyeActive&&canMove,viewCamera:eyeFrame&&eyeFrame.target.worldId===host.active?.identity.worldId?eyeFrame.camera:engine.camera});
@@ -282,7 +287,7 @@ async function init(){
   document.querySelector('#panel h1').textContent=active.project.metadata.name;
   if(installation.kind==='published'){report('Warehouse and Sunset · single player');document.querySelector('#portal-status').textContent='Walk through the gold Sunset door beside the Dock portal. Return through the doorway in Sunset.';}else report('Published island · revision '+(active.identity.resolvedCommit??validateOpeningWorld(config).source.ref).slice(0,12)+' · '+selected.backend);
  })().catch(error=>{openingProgress.fail(error.message);report('Opening world could not load: '+error.message);document.querySelector('#portal-status').textContent='Opening world unavailable. Retry by reloading, or choose a repository.';});
- window.addEventListener('pagehide',()=>{playerEyes?.dispose();media.dispose();refraction?.dispose();objectAccess.invalidate();worldWelcome.dispose();welcomeView.dispose();controlsHelp.dispose();portals.dispose();portalEffects.dispose();retro.dispose();avatar.dispose();host.dispose();engine.stop();if(isWebGL)engine.dispose();else GPU.device?.destroy();});report('ElseMesh '+selected.backend+' ready. Open a world repository folder or public GitHub source.');
+ window.addEventListener('pagehide',()=>{graphics?.dispose();playerEyes?.dispose();media.dispose();refraction?.dispose();objectAccess.invalidate();worldWelcome.dispose();welcomeView.dispose();controlsHelp.dispose();portals.dispose();portalEffects.dispose();retro.dispose();avatar.dispose();host.dispose();engine.stop();if(isWebGL)engine.dispose();else GPU.device?.destroy();});report('ElseMesh '+selected.backend+' ready. Open a world repository folder or public GitHub source.');
  window.dispatchEvent(new CustomEvent('repository-world-ready',{detail:app}));
 }
 init().catch(error=>{console.error(error);openingProgress.fail(error.message);report(error.message);});
