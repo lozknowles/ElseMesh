@@ -1,0 +1,49 @@
+{
+  "schema": "elsemesh.output-surface-derivative/1",
+  "version": "1.0.0",
+  "integration": "bounded-opt-in",
+  "limitations": [
+    "Only explicitly registered ordinary render targets use this output policy; default, XR and unregistered offscreen targets retain their existing behavior.",
+    "WebGLSunsetOutput owns Spark final-output handling after its normal object callback. Registration alone changes neither scene detail nor rendering resolution."
+  ],
+  "source": {
+    "path": "src/world-runtime/vendor/world-engine-contract.js",
+    "normalization": "UTF-8 LF",
+    "sha256": "98bcd32c879ccdd4ba4ad0e04039c98aa9958ad4b4e0a741a5562ea915a12a5f",
+    "upstreamBytesUnmodified": true
+  },
+  "transform": {
+    "path": "tools/output-surface-transform.mjs",
+    "version": "1.0.0",
+    "sha256": "9a29c28b22b4a1d1106ad1519e01d43b60a782d41615b231d5d95c791c41aef5",
+    "edits": [
+      "renderer-owned registration",
+      "unlit colors",
+      "program tone mapping",
+      "program output color",
+      "draw output color",
+      "draw tone mapping"
+    ]
+  },
+  "transformedModule": {
+    "sha256": "eb69d23b89eb41d22cd9e92d0ea0a06de48bbe6c517c2ad51e1762dd0e67190b",
+    "chunks": [
+      "assets/world-engine-contract-DH5HBdQJ.js"
+    ]
+  },
+  "finalChunks": {
+    "assets/Colliders-BbkKilI-.js": "17cb8cc0817f2e720b22aaecdbf2ab3a5cb71cd426d37a8312e158937bb3dc77",
+    "assets/main-aVDQ0Mdn.js": "6ffbcfa3030c91b6bb9365487ff91b56923d0f70fa836e69a8dd5aae74e1e830",
+    "assets/PlayerEyeControls-CWnrbWq1.js": "007010d9cec58fd310bd4fd5a32849792307e716175d03ccc919cdab944d65d2",
+    "assets/PlayerEyePanel-DRdLArCK.js": "0f23f6d155c6c9a507ca0730fcd27add967a3c44b71f16b5fd4a8a59182dadc6",
+    "assets/PlayerEyeView-DvEGwbv3.js": "efe7fae17e59db0b69d6a8d20e467f15793160cfc815e02fdbcfd0dcd4cd9d18",
+    "assets/RepositoryPlayerEyes-BXZVQ6pq.js": "4986d0f5b08c8ed55a033dd86eecad1ab598c2222ecf19d63f171fbd7fe8401a",
+    "assets/spark.module-DBG10yRQ.js": "c5bf3b37b0855f0dcd7b8ac2bd35c2ff96db0683e85131463f43ca6cbc475eab",
+    "assets/SplatScenePhysics-pKsF9r06.js": "156bd4613b74026487c5a801cd82e5e2472e0f0b116aba6a35ce11299f998bde",
+    "assets/WebGLPlayerEyeRenderer-CRSjtFis.js": "3eaaa573ac4e4b52ddb7fc5d018d254295cb3383099ec6cabf3f90f28e2c0c59",
+    "assets/WebGLPortalViews-C0Kb5SFf.js": "8f34f720285282799abd230489151bf7a46614995aa005eb2941f7db30db4da9",
+    "assets/WebGLRepositoryScene-DVqHFOWw.js": "18b35af521bf417a60e04df5f6eb0845af5da6d17728804bb278ed124e702737",
+    "assets/world-engine-contract-DH5HBdQJ.js": "98ab2fcf6067fdd72e81b3b9a2bd04c6bd0104ccc8dce7488bff7c9b17bf069b"
+  },
+  "scope": "The source hash identifies normalized unchanged upstream bytes. Transform, derivative module and final chunk hashes identify distinct downstream artifacts."
+}
