@@ -134,3 +134,43 @@ The detailed run aligned 14 of 19 candidate publications and 26 of 37 repeat-bas
 During this work Windows changed from active RDP session 1 to disconnected session 1, with console session 2 connected. The Remote Display Adapter disappeared from enumeration. The agent did not change sessions or OS settings. Computer Use confirmed the actual Warehouse document and localhost URL; native monitor capture failed with `CreateForMonitor 0x80070057`, and one accessibility-only recovery succeeded. This environment change and the added observations prohibit timing/throughput comparisons between the two motion runs. The earlier 31.9991 FPS result belongs to the earlier foreground RDP control; it is not asserted as the disconnected session's current ceiling. No uncapped physical-console FPS acceptance was obtained.
 
 The prototype remains default-disabled and production source/assets remain unchanged. Remaining boundaries are ordinary whole-app moving visual equivalence, other eligibility transitions, uncapped fresh-start FPS and the original translating-view readback stalls. The new motion helper is exercised by the frozen standalone package runners, not a new CLI flag. Evidence: `motion-oracle-1.json`, `motion-oracle-2.json`, the retained helper/runner versions and `host-session-display-after-motion.json` under `D:/Codex/ElseMesh-local-desktop-20261027/`. All 13 diagnostic CPU checks, including two serialized motion-entry rejection checks, and syntax checks for the six changed/new tooling modules passed; those checks do not turn the failed GPU motion qualification into a pass. The architect accepted stopping this bounded investigation and a local diagnostic commit, with all remaining qualification gaps disclosed and no runtime adoption, push or deployment.
+
+## 28 October: ordinary-app control and one moving-stall trace
+
+The authorized next pass was bounded to a trustworthy original/original control, a conditional turning-prototype decision, and one moving-stall trace. It began at local `54f3d5f` on `codex/portal-fps-20261025`. No candidate was enabled during this pass; production remains unchanged.
+
+### Session and frame control
+
+Windows initially reported active RDP session 1, console session 4 connected, and the Remote Display Adapter. Computer Use observed the owned localhost test and brought it forward. Two native button calls failed with the same API-state message before measurement. Following review, the owned test runner invoked its own page measurement function. Over 120 intervals after 30 warm callbacks, the page measured **31.9983 FPS**, with every sample visible and focused. The failed native-input attempt is retained separately; it was neither a policy denial nor a game failure.
+
+Later, during the ordinary-app comparison, session 1 was observed disconnected and console 4 connected. The agent made no session or OS changes; the exact transition time is unknown. Thus the earlier ceiling is evidence only for its observed conditions, and no stable uncapped FPS comparison or benefit claim is available.
+
+### Moving stall not reproduced
+
+One headed Edge/Intel Arc WebGL2 trace reused the verified production build after checking all 652 source/asset hashes and built chunk hashes. It sampled 180 moving frames with trace/readback observers and no GPU timer queries. All 161 sample-initiated readbacks completed; synchronous copy calls averaged **2.607 ms**, p95 **3.7 ms**, maximum **4.4 ms**. The retained lifecycle snapshot had no pending calls, live buffers/fences or dropped records. It was taken before observer disposal; its `disposed: false` is not evidence of leaked resources.
+
+The selected trace contained 160 matched copy spans averaging 2.543 ms, maximum 4.201 ms. Nested Chromium `WaitForCmd` totaled 153.568 ms of 406.885 ms, or **37.74%**, versus the earlier long, overwhelmingly command-wait-dominated signature. No trace data loss or configured coverage gaps were reported. The original stall was **not reproduced in this environment**. This is not a fix, and no additional trace or speculative runtime change followed.
+
+### Terrain/foliage matching succeeded; whole-app control remains invalid
+
+The new `warehouse-app-comparison.mjs` runs the actual app callback with seeded randomness, fixed logical dt/time from the first callback, and a finite identical preparation route. Ambient updates and Microduck remain active. It does not pause the app, drain sorts, reset actor/culling state or extend warmup until a comparison passes. Three synchronous diagnostic checkpoints capture the canvas, actual displayed packed/depth buffers and actual GPU ordering texture. These captures perturb subsequent scheduling; this is correctness evidence, never FPS evidence.
+
+The first attempt failed before any game frames because the external static server compared a real Windows path against an unnormalized root and returned HTTP 404. That runner/report were preserved. One narrow correction normalized the root, required HTTP 200 before waiting for the app, and added failure-state capture and a portable path-containment test.
+
+The corrected run completed two fresh-browser original-only runs. At all three matching logical frames, camera/projection, logical time, resident terrain identities/data coverage, terrain geometry and active foliage buffers matched exactly. Displayed packed/depth outputs also matched. **The earlier terrain/foliage control problem was resolved for this finite route.**
+
+However, Microduck became ready at frame 124 in A and frame 118 in A2, leaving actor animation 0.1 seconds apart. Actual published sorting sources also differed: at the first checkpoint, the displayed worker result originated at request frame 435 versus 437. Each GPU ordering hash matched its own observed worker result. Across the runs, 22 of 35 right-side publications matched exact source/key inputs and all 22 matched full ordering and active counts; 13 remained unaligned. This is not evidence of a nondeterministic sorter.
+
+Whole-canvas differences were 25,529 / 24,454 / 25,533 pixels. The first localized difference was on the duck's feet at PNG (624,664); that localization does not explain every differing pixel. All raw checkpoint RGBA, full images, the first mismatch crops, installation frames and displayed-generation evidence are retained. There were no page errors. The control correctly returned `baseline-invalid-stop-candidate`, and no candidate run followed.
+
+### Decision and reproducibility
+
+The architect's decision is **defer runtime adoption**, not reject the candidate: this pass never installed it. Matching complete render input state, including actor animation and displayed splat generation, must be distinguished from ordinary asynchronous behavior. A future acceptance cycle must assess source age, transitions and visible discontinuities without silently aligning away timing changes caused by an optimization. No further harness redesign or GPU run was authorized within this bounded pass.
+
+Completion review tightened comparison admission: canvas, displayed outputs and every required native buffer must have complete valid SHA-256 hashes; hashing must have finished; and the three checkpoint frames must be unique with identical frame sets. Missing data or duplicate checkpoints can no longer pass by comparing equal. Eleven new comparison/entry/path/admission checks and the 13 existing checks passed: **24 CPU tests total**. The actual capture initializer and package resolver remain byte-equivalent to the retained run; only CPU admission/comparison changed. Re-evaluating the retained report passes input admission but still rejects baseline state/visual equality. No GPU rerun was needed. New helper syntax passed and all 652 production files plus the experimental prototype remained unchanged. Run the CPU checks with:
+
+```sh
+node --test test/warehouse-generation-camera-diagnostic.mjs test/warehouse-generation-camera-motion-diagnostic.mjs test/warehouse-lifecycle-diagnostics.mjs tools/performance/warehouse-app-comparison.test.mjs
+```
+
+Evidence is under `D:/Codex/ElseMesh-qualification-20261028/`: `app-aa-2-summary.json`, `app-aa-2-admission-review.json`, `moving-trace-summary.json`, `frame-control-auto/visible-frame-control.json`, both original/comparison failure records, frozen runners/helper copies, host observations and `architect-gates.txt`. The new helper is standalone diagnostic tooling; the actual run used its retained package runner, not a new application import or CLI mode. Fresh-start performance, ordinary moving visual acceptance and the original readback stalls remain unresolved. No push or deployment occurred.
