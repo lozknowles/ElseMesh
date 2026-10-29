@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import {readFile,realpath,stat,mkdir,writeFile} from 'node:fs/promises';
+import {resolve,sep,extname} from 'node:path';
+import {createServer} from 'vite';
+import {chromium} from 'playwright';
+const root=await realpath(process.env.ELSEMESH_WAREHOUSE_SOURCE??process.argv[2]??'../opening-world');
+const out=resolve(process.env.ELSEMESH_LOD_EVIDENCE??'.local-evidence/presentation-lod');await mkdir(out,{recursive:true});
+const server=await createServer({appType:'custom',server:{host:'127.0.0.1',port:0},logLevel:'error'});
+server.middlewares.use(async(req,res,next)=>{if(!/^\/(?:index\.html)?(?:\?|$)/.test(req.url))return next();try{res.setHeader('Content-Type','text/html');res.end(await server.transformIndexHtml('/',await readFile('index.html','utf8')));}catch(e){next(e);}});await server.listen();let browser;
+try{
+ browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{channel:'msedge'})});const page=await browser.newPage({viewport:{width:1280,height:720}}),errors=[],requests=[];
+ page.on('response',r=>{if(r.status()>=400)requests.push({path:new URL(r.url()).pathname,status:r.status()});});
+ page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!(/Failed to load resource/.test(m.text())&&m.location().url.endsWith('/runtime-config')))errors.push(m.text());});
+ const config=JSON.parse(await readFile('public/opening-world.json','utf8'));
+ const catalog=JSON.parse(await readFile('public/published-worlds.json','utf8'));
+ await page.route('**/opening-world.json',route=>route.fulfill({json:{...config,schema:'elsemesh.opening-world/2',bundlePath:'worlds/loz-opening/'}}));
+ await page.route('**/worlds/**',async route=>{let rel;try{const pathname=new URL(route.request().url()).pathname,entry=catalog.worlds.find(w=>pathname.startsWith('/'+w.bundlePath));if(!entry)throw Error('unknown world');rel=decodeURIComponent(pathname.slice(entry.bundlePath.length+1));if(!rel||rel.includes('..')||rel.includes('\\'))throw Error('invalid path');const worldRoot=entry.worldId===config.worldId?root:await realpath(resolve(root,'worlds/sunset'));const file=await realpath(resolve(worldRoot,rel));if(!file.startsWith(worldRoot+sep)||!(await stat(file)).isFile())throw Error('outside pinned world');const type={'.json':'application/json','.glb':'model/gltf-binary','.png':'image/png','.jpg':'image/jpeg'}[extname(file)]??'application/octet-stream';await route.fulfill({body:await readFile(file),contentType:type});}catch(error){requests.push({sourcePath:rel,code:error.code??error.message});await route.fulfill({status:404,body:''});}});
+ await page.goto('http://127.0.0.1:'+server.httpServer.address().port+'/?renderer=webgl2',{waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>window.__repositoryWorldApp?.host.active&&document.querySelector('#opening-splash')?.hidden===true,null,{timeout:Number(process.env.ELSEMESH_WAREHOUSE_TIMEOUT??120000)}).catch(async error=>{console.log(JSON.stringify({startup:await page.evaluate(()=>({status:document.querySelector('#status')?.textContent,splash:document.querySelector('#opening-splash-status')?.textContent,app:!!window.__repositoryWorldApp,active:!!window.__repositoryWorldApp?.host.active})),errors,requests}));await page.screenshot({path:resolve(out,'warehouse-startup-failure.png')});throw error;});
+ await page.waitForFunction(()=>!!window.__repositoryWorldApp?.host.active?.player,null,{timeout:120000});
+ const before=await page.evaluate(()=>{const a=window.__repositoryWorldApp;return{worldId:a.host.active.identity.worldId,digest:a.host.active.identity.contentDigest,position:a.player.position.toArray(),backend:a.backend,frames:a.engine.frame,boxes:a.host.active.colliders.boxes.length,loadedAvatar:!!(a.avatar.model||a.avatar.scanned),status:document.querySelector('#status').textContent};});
+ assert.equal(before.worldId,config.worldId);assert.equal(before.digest,config.contentDigest);assert.equal(before.backend,'webgl2');assert.ok(before.boxes>0);
+ await page.waitForFunction(()=>[...window.__repositoryWorldApp.portals.views.entries.values()].some(e=>e.aperture.userData.portalViewState==='live'&&e.hasImage),null,{timeout:90000});
+ await page.locator('canvas').first().click({position:{x:700,y:300}});await page.keyboard.down('w');await page.waitForTimeout(700);await page.keyboard.up('w');
+ const after=await page.evaluate(()=>{const a=window.__repositoryWorldApp;return{position:a.player.position.toArray(),frames:a.engine.frame,inputEnabled:a.input.enabled,mode:a.player.mode,renderCalls:a.engine.renderer.info.render.calls,portals:a.portals.diagnostics()};});
+ assert.ok(after.frames>before.frames);assert.ok(Math.hypot(...after.position.map((n,i)=>n-before.position[i]))>.01,'held-key movement remains live');
+ await page.evaluate(()=>{const a=window.__repositoryWorldApp;a.player.yaw+=Math.PI/2;});await page.waitForTimeout(250);
+ await page.screenshot({path:resolve(out,'warehouse-source.png')});
+ assert.deepEqual(errors,[]);await writeFile(resolve(out,'warehouse-source-results.json'),JSON.stringify({before,after,errors},null,2));console.log(JSON.stringify({before,after,errors}));
+}finally{await browser?.close();await server.close();}

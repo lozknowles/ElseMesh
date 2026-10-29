@@ -1,8 +1,8 @@
 // Binary glTF (.glb) reader for skinned, animated characters (engine side of loaders; the debris
 // scans use the smaller world/debris/GLB.js). Returns plain data, no GPU objects:
 //
-//   const gltf = await loadGLB( url )            // or parseGLB( arrayBuffer )
-//   gltf.nodes[ i ]  = { name, children: [ ... ], t: [ x, y, z ], r: [ x, y, z, w ], s: [ x, y, z ], mesh, skin }
+//   const gltf = await loadGLB( url )            // or parseGLB( arrayBuffer | ArrayBufferView )
+//   gltf.nodes[ i ]  = { name, children: [ ... ], t: [ x, y, z ], r: [ x, y, z, w ], s: [ x, y, z ], mesh, skin, extras }
 //   gltf.roots       = scene root node indices
 //   gltf.meshes[ i ] = [ { attributes: { POSITION: { array, itemSize, normalized }, ... }, indices, material } ]
 //   gltf.skins[ i ]  = { joints: [ node indices ], inverseBindMatrices: Float32Array( 16 * n ) }
@@ -41,13 +41,20 @@ export async function loadGLB( url ) {
 
 export function parseGLB( buffer ) {
 
+	// Isolate the supplied range, including pooled Buffers and unaligned views.
+	if ( ArrayBuffer.isView( buffer ) ) buffer = buffer.buffer.slice( buffer.byteOffset, buffer.byteOffset + buffer.byteLength );
+
 	const dv = new DataView( buffer );
+	if ( dv.byteLength < 12 ) throw new Error( 'GLB: truncated header' );
 	if ( dv.getUint32( 0, true ) !== 0x46546C67 ) throw new Error( 'GLB: bad magic' );
 	const length = dv.getUint32( 8, true );
+	if ( length < 12 || length > dv.byteLength ) throw new Error( 'GLB: invalid length' );
 	let json = null, bin = null;
 	for ( let o = 12; o < length; ) {
 
+		if ( o + 8 > length ) throw new Error( 'GLB: truncated chunk header' );
 		const len = dv.getUint32( o, true ), type = dv.getUint32( o + 4, true );
+		if ( len > length - o - 8 ) throw new Error( 'GLB: truncated chunk' );
 		if ( type === 0x4E4F534A ) json = JSON.parse( new TextDecoder().decode( new Uint8Array( buffer, o + 8, len ) ) );
 		else if ( type === 0x004E4942 ) bin = new Uint8Array( buffer, o + 8, len );
 		o += 8 + len;
@@ -121,7 +128,7 @@ export function parseGLB( buffer ) {
 
 		}
 
-		return { name: n.name || '', children: n.children || [], t: T.slice(), r: R.slice(), s: S.slice(), mesh: n.mesh, skin: n.skin };
+		return { name: n.name || '', children: n.children || [], t: T.slice(), r: R.slice(), s: S.slice(), mesh: n.mesh, skin: n.skin, extras: n.extras };
 
 	} );
 

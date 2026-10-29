@@ -2,6 +2,7 @@ import {avatarMotionFacing} from '../player/AvatarFacing.js';
 import {createAvatarTransportPresentation,createAvatarTransportMaterialAdapter,prepareWebGLAvatarTransportMaterial} from './AvatarTransportPresentation.js';
 import {T,BuiltinCharacterGLTFLoader} from './vendor/world-engine-contract.js';
 import {AVATAR_STYLES,DEFAULT_APPEARANCE,validateAppearance,appearanceKey} from '../player/AvatarAppearance.js';
+import {avatarLODSource,installAvatarGeometryLOD} from './AvatarGeometryLOD.js';
 
 // Built-in, installed character assets only. Authored world assets retain their
 // separate static-only validation and cannot supply URLs, shaders or animation.
@@ -9,6 +10,7 @@ const BASE=(import.meta.env?.BASE_URL||'/');
 const REQUIRED_CLIPS=['idle','walk','run','helm'];
 const LUMA='vec3(0.2126,0.7152,0.0722)';
 function disposeScene(root){
+ root?.userData.avatarGeometryLOD?.dispose();
  const geometries=new Set(),materials=new Set(),textures=new Set();
  root?.traverse(object=>{if(object.geometry)geometries.add(object.geometry);for(const material of Array.isArray(object.material)?object.material:[object.material]){if(!material)continue;materials.add(material);for(const value of Object.values(material))if(value?.isTexture)textures.add(value);}});
  for(const geometry of geometries)geometry.dispose();for(const material of materials)material.dispose();for(const texture of textures){texture.image?.close?.();texture.dispose();}
@@ -64,7 +66,10 @@ export class WebGLRepositoryAvatar{
    if(this.disposed||version!==this.version){disposeScene(gltf.scene);return false;}
    this.mixer?.stopAllAction();if(this.model){this.group.remove(this.model);this.mixer?.uncacheRoot(this.model);disposeScene(this.model);}
    this.model=gltf.scene;this.asset=asset;this.materials=[...materials];this.group.add(this.model);this.mixer=new T.AnimationMixer(this.model);
-   this.actions=new Map([...clips].map(([name,clip])=>[name,this.mixer.clipAction(clip)]));this.currentClip=null;this.play('idle');this.mixer.update(0);this.error=null;return true;
+   this.actions=new Map([...clips].map(([name,clip])=>[name,this.mixer.clipAction(clip)]));this.currentClip=null;this.play('idle');this.mixer.update(0);this.error=null;
+   const model=this.model,meshes=[];model.traverse(object=>{if(object.isMesh)meshes.push(object);});
+   this.lodReady=avatarLODSource(asset).then(full=>installAvatarGeometryLOD({asset,full,root:model,meshes,engine:T,prepareResources:this.prepareResources?.bind(this),isCurrent:()=>!this.disposed&&this.model===model&&this.asset===asset})).then(lod=>{if(this.disposed||this.model!==model){lod?.dispose();return false;}if(lod)Object.defineProperty(model.userData,'avatarGeometryLOD',{value:lod,configurable:true});return !!lod;}).catch(error=>{if(this.model===model&&!this.disposed)this.lodError=error.message;return false;});
+   return true;
   }catch(error){disposeScene(gltf.scene);throw error;}
  }
  observeVerifiedTransfer(record,worldId){return this.transportPresentation.observeVerifiedTransfer(record,worldId);}

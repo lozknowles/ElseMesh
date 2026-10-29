@@ -1,5 +1,6 @@
 import {createSplatSceneAdapter} from './SplatSceneAdapter.js';
 import {buildMediaScreenHousing} from './MediaScreen.js';
+import {installRepositoryPrimitiveLOD} from './RepositoryPrimitiveLOD.js';
 import {buildWebGLNativeIsland} from './WebGLNativeIsland.js';
 import {isEligibleWebGLDepthOccluder} from './WebGLOpaqueDepthPrepass.js';
 import {createRepositoryAmbientBehaviour} from './RepositoryAmbientBehaviour.js';
@@ -53,7 +54,7 @@ export function disposeWebGLRepositoryScene(candidate){
  candidate.splatScene?.dispose();
  candidate.nativeIsland?.dispose();
  candidate.root?.removeFromParent();const geometries=new Set(),materials=new Set(),textures=new Set();
- candidate.root?.traverse(n=>{if(n.geometry)geometries.add(n.geometry);for(const m of Array.isArray(n.material)?n.material:[n.material])if(m){materials.add(m);for(const value of Object.values(m))if(value?.isTexture)textures.add(value);}});
+ candidate.root?.traverse(n=>{n.userData.disposePresentationLOD?.();if(n.geometry)geometries.add(n.geometry);for(const m of Array.isArray(n.material)?n.material:[n.material])if(m){materials.add(m);for(const value of Object.values(m))if(value?.isTexture)textures.add(value);}});
  for(const g of geometries)g.dispose();for(const m of materials)m.dispose();for(const t of textures)t.dispose();
  for(const loaded of candidate.loadedAssets??[])disposeAssetScene(loaded.scene);
  candidate.loadedAssets?.clear();
@@ -120,7 +121,7 @@ export async function buildWebGLRepositoryScene(descriptor,camera,options={}){
   if(project.nativeIsland){candidate.nativeIsland=await buildWebGLNativeIsland({project,root,camera,options:options.nativeIsland??{}});candidate.terrain=candidate.nativeIsland.data;candidate.query=candidate.nativeIsland.query;candidate.backendQualification=candidate.nativeIsland.stats();const update=root.userData.updateWebGL;root.userData.updateWebGL=t=>{update(t);candidate.nativeIsland.query.setTime(t);};}
   else if(!project.splatScene){const ground=terrainGeometry(project);root.add(new T.Mesh(ground,await terrainMaterial(project,ground)));}
   const generatedAssets=landscapeAssets(project),allObjects=[...project.objects,...generatedAssets],matrices=resolveWorldMatrices(allObjects);candidate.matrices=matrices;
-  const add=(parent,geometry,color)=>parent.add(new T.Mesh(geometry,standard(color)));
+  const add=(parent,geometry,color,kind)=>{const mesh=new T.Mesh(geometry,standard(color));parent.add(mesh);if(kind)installRepositoryPrimitiveLOD(mesh,kind,{api:T});};
   for(const object of project.objects){
    if(object.collisionOnly||['group','tree','glb'].includes(object.kind)||!effectiveObjectState(project.objects,object.id).visible)continue;
    const item=new T.Group();item.userData.editorObjectId=object.id;item.matrixAutoUpdate=false;item.matrix.copy(matrices.get(object.id));root.add(item);
@@ -128,7 +129,7 @@ export async function buildWebGLRepositoryScene(descriptor,camera,options={}){
    else if(object.kind==='computer'){const computer=buildComputerGeometry();try{for(const p of computer.parts){const color=p.emissive?object.computer.screenColor:p.color;item.add(new T.Mesh(p.geometry.clone(),p.emissive?new T.MeshBasicMaterial({color,side:T.DoubleSide}):standard(color)));}}finally{disposeComputerGeometry(computer);}}
    else if(object.kind==='neon-sign'){const neon=buildWebGLNeon(object.neon);neon.userData.neonObjectId=object.id;item.add(neon);}
    else if(object.kind==='building'){add(item,new T.BoxGeometry(3.6,2.2,3).translate(0,1.1,0),object.color);add(item,new T.ConeGeometry(2.7,1.1,4).rotateY(Math.PI/4).translate(0,2.55,0),'#574e42');}
-   else if(['box','sphere','cylinder','cone'].includes(object.kind))add(item,object.kind==='sphere'?new T.SphereGeometry(.8,24,16):object.kind==='cylinder'?new T.CylinderGeometry(.65,.65,1.6,24):object.kind==='cone'?new T.ConeGeometry(.8,1.6,24):new T.BoxGeometry(1.6,1.6,1.6),object.color);
+   else if(['box','sphere','cylinder','cone'].includes(object.kind))add(item,object.kind==='sphere'?new T.SphereGeometry(.8,24,16):object.kind==='cylinder'?new T.CylinderGeometry(.65,.65,1.6,24):object.kind==='cone'?new T.ConeGeometry(.8,1.6,24):new T.BoxGeometry(1.6,1.6,1.6),object.color,object.kind);
    else throw Error('Unsupported WebGL repository object '+object.kind);
   }
   const ambient=createRepositoryAmbientBehaviour(project,{terrain:candidate.terrain});candidate.ambient=ambient;

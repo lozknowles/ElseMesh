@@ -21,6 +21,8 @@ const invitation=createPortalInvitation(ownerA,portal,Date.now()+3600000),accept
 let A,B,dropCommit=false,offline=false;
 function opts(identity,published,delegation,peer,name){return {identity,published,delegation,trustedOwners,peers:[{...peer,invitation,acceptance},{...peer,invitation:reverseInvitation,acceptance:reverseAcceptance}],ledgerPath:join(dir,name+'.json'),policy:{viewPlayers:[playerId,viewerId],enterPlayers:[playerId],capacity:2},readWorld:async()=>({frozen:'data'}),clearance:async({reservations,members})=>!reservations.length&&!members.length,rpc:async(node,operation,payload)=>{if(offline)throw new Error('network timeout'); const target=node===a.nodeId?A:B;const result=await target.dispatch(operation,payload,{callerNodeId:identity.nodeId});if(dropCommit&&operation==='commit'){dropCommit=false;throw new Error('reply lost');}return result;}};}
 const oa=opts(a,pa,da,{published:pb,delegation:db},'a'),ob=opts(b,pb,db,{published:pa,delegation:da},'b');
+// Portal reservations and commit must never invoke the LOCAL spawn allocator.
+ob.localSpawnCandidates=()=>{throw Error('Portal arrival attempted local spawn relocation');};
 async function proof(authority,identity,action,portalId=null,proofSessionId=sessionId){const challenge=await authority.challenge({playerId:playerIdForNode(identity.nodeId),playerNodeId:identity.nodeId,action,sessionId:proofSessionId,portalId});return signObject({protocol:'elsemesh.owner-player-proof/1',challenge},identity);}
 try {
  A=await OwnerWorldAuthority.open(oa);B=await OwnerWorldAuthority.open(ob);
@@ -48,6 +50,7 @@ try {
  const destinationSession=B.ledger.snapshot().members[playerId].sessionId;
  const destinationGrant=await B.subscribe({proof:await proof(B,player,'VIEW',null,destinationSession)});
  const destinationMember=B.state({grantId:destinationGrant.grantId});assert.equal(destinationMember.generation,1);
+ assert.deepEqual(destinationMember.motion.position,B.ledger.snapshot().transfers[second.transferId].reservation.spawn.position);
  await assert.rejects(B.acceptedState({grantId:destinationGrant.grantId,playerId,sessionId:destinationSession,motion:destinationMember.motion,sequence:0,generation:1}),/Stale/);
  const back=await B.prepare({grantId:destinationGrant.grantId,portalId:reversePortal.portalId,proof:await proof(A,player,'ENTER',reversePortal.portalId,destinationSession),motion:destinationMember.motion,avatarAssetId:request.avatarAssetId,inventoryHash:request.inventoryHash,sequence:destinationMember.sequence});
  await B.handoff({transferId:back.transferId});assert.equal(Object.keys(B.ledger.snapshot().members).length,0);assert.equal(A.ledger.snapshot().members[playerId].generation,2);

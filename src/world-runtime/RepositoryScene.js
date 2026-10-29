@@ -1,9 +1,11 @@
 import {buildMediaScreenHousing} from './MediaScreen.js';
+import {installRepositoryPrimitiveLOD} from './RepositoryPrimitiveLOD.js';
 import {buildNativeIsland} from './NativeIsland.js';
 import {buildRepositoryTraffic} from './RepositoryTraffic.js';
 import {buildRepositoryLandscape,addLandscapeCollisions,landscapeAssets} from './RepositoryLandscape.js';
 import * as N from '../engine/index.js';
 import { Material } from '../engine/render/Material.js';
+import { GPU } from '../engine/gpu/GPU.js';
 import { Colliders } from '../world/Colliders.js';
 import { T, resolveWorldMatrices, effectiveObjectState, buildComputerGeometry, disposeComputerGeometry, inspectAndLoadAsset, disposeAssetScene } from './vendor/world-engine-contract.js';
 import { buildRepositoryAssetBatches } from './RepositoryAssetBatches.js';
@@ -28,7 +30,7 @@ export function disposeRepositoryScene(candidate) {
  if(!candidate)return;
  candidate.nativeIsland?.dispose();
  candidate.root.removeFromParent();const materials=new Set(),geometries=new Set();
- candidate.root.traverse(n=>{if(n.geometry)geometries.add(n.geometry);if(n.material)materials.add(n.material);n.userData.disposeAssetTextures?.();n.userData.disposeTerrainImagery?.();n.userData.disposeLandscape?.();});
+ candidate.root.traverse(n=>{if(n.geometry)geometries.add(n.geometry);if(n.material)materials.add(n.material);n.userData.disposePresentationLOD?.();n.userData.disposeAssetTextures?.();n.userData.disposeTerrainImagery?.();n.userData.disposeLandscape?.();});
  for(const g of geometries)g.dispose();
  for(const m of materials)if(!m.userData.sharedBuilderTreeMaterial)m.dispose();
 }
@@ -50,7 +52,7 @@ export async function buildRepositoryScene(descriptor,camera,options={}) {
   const surface=await createNativeTerrainMaterial(project),terrainMesh=new N.Mesh(nativeGeometry(geometry),surface.material);geometry.dispose();terrainMesh.userData.disposeTerrainImagery=surface.dispose;root.add(terrainMesh);
   }
   const generatedAssets=landscapeAssets(project),allObjects=[...project.objects,...generatedAssets],matrices=resolveWorldMatrices(allObjects);
-  const add=(item,geometry,color)=>{item.add(new N.Mesh(nativeGeometry(geometry),new Material({color,roughness:.85,side:'double'})));geometry.dispose();};
+  const add=(item,geometry,color,kind)=>{const mesh=new N.Mesh(nativeGeometry(geometry),new Material({color,roughness:.85,side:'double'}));item.add(mesh);geometry.dispose();if(kind)installRepositoryPrimitiveLOD(mesh,kind,{api:T,convertGeometry:nativeGeometry,retire:dispose=>{if(GPU.encoder)GPU.onSubmit(null,dispose);else dispose();}});};
   for(const object of project.objects){
    if(object.collisionOnly||['group','tree','glb'].includes(object.kind)||!effectiveObjectState(project.objects,object.id).visible)continue;
    const item=new N.Group();item.userData.editorObjectId=object.id;item.matrixAutoUpdate=false;item.matrix.fromArray(matrices.get(object.id).elements);root.add(item);
@@ -62,7 +64,7 @@ export async function buildRepositoryScene(descriptor,camera,options={}) {
     const neon=buildNativeNeon(object.neon,nativeGeometry);neon.userData.neonObjectId=object.id;item.add(neon);
    }else if(object.kind==='building'){
     add(item,new T.BoxGeometry(3.6,2.2,3).translate(0,1.1,0),object.color);add(item,new T.ConeGeometry(2.7,1.1,4).rotateY(Math.PI/4).translate(0,2.55,0),'#574e42');
-   }else add(item,object.kind==='sphere'?new T.SphereGeometry(.8,24,16):object.kind==='cylinder'?new T.CylinderGeometry(.65,.65,1.6,24):object.kind==='cone'?new T.ConeGeometry(.8,1.6,24):new T.BoxGeometry(1.6,1.6,1.6),object.color);
+   }else add(item,object.kind==='sphere'?new T.SphereGeometry(.8,24,16):object.kind==='cylinder'?new T.CylinderGeometry(.65,.65,1.6,24):object.kind==='cone'?new T.ConeGeometry(.8,1.6,24):new T.BoxGeometry(1.6,1.6,1.6),object.color,object.kind);
   }
   const assets=await buildRepositoryAssetBatches(project,allObjects.filter(o=>o.kind==='glb'&&effectiveObjectState(allObjects,o.id).visible),matrices,nativeGeometry,{terrain:candidate.terrain});root.add(assets.root);candidate.assets=assets.diagnostics;candidate.assetBatchCount=assets.root.userData.assetBatchCount;candidate.ambient=assets.ambient;root.userData.updateAmbientBehaviour=t=>assets.ambient.update(t);
   const water=project.nativeIsland?null:buildRepositoryWater(project);if(water)root.add(water);

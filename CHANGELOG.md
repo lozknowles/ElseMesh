@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Accept sliced GLB input views and preserve inert node metadata with container bounds checks.
+- Add per-view visual detail for installed stock avatars and small repository spheres, cylinders and cones. Original world contracts, collisions, appearance and permission checks remain in use; no frame-rate result is claimed.
+- Allocate a nearby supported local spawn when the authored arrival is occupied or blocked, within bounded server-owned limits. Exact signed portal arrivals retain their existing mapping.
+- Include reduced installed avatar geometry in opening-world packages and add focused loader, LOD and atomic admission checks.
+
 ## 0.2.0 — 2026-10-29
 
 ### Added

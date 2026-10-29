@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { canonical, signObject, verifyObject, assetId } from './identity.mjs';
 import { verifyRegionVersion, verifyDelegation, verifyPortalInvitation, createPortalHandoffV2, acceptPortalHandoffV2, mapPortalTransformV2, FEDERATION_CAPABILITIES } from './federation.mjs';
 import { OwnerWorldLedger,currentOwnerTransfer } from './owner-world-ledger.mjs';
+import { LOCAL_SPAWN } from './spawn-allocation.mjs';
 const check = (ok, message) => { if (!ok) throw new Error(message); };
 const digest = value => assetId(Buffer.from(canonical(value)));
 export const playerIdForNode = nodeId => `player:${nodeId.split(':')[1]}`;
@@ -15,7 +16,7 @@ export class OwnerWorldAuthority {
     instance.ledger = await OwnerWorldLedger.open(options.ledgerPath, { authority: options.identity.nodeId, world: instance.region.worldId, content: instance.published.manifestHash, epoch: instance.region.authority.epoch });
     return instance;
   }
-  constructor({ identity, published, delegation, trustedOwners, peers = [], policy = {}, readWorld, clearance, rpc }) {
+  constructor({ identity, published, delegation, trustedOwners, peers = [], policy = {}, readWorld, clearance, localSpawnCandidates, rpc }) {
     this.identity = identity; this.published = published; this.trustedOwners = new Set(trustedOwners);
     this.region = verifyRegionVersion(published, this.trustedOwners);
     check(this.region.authority.nodeId === identity.nodeId, 'Not local world authority');
@@ -23,6 +24,8 @@ export class OwnerWorldAuthority {
     this.delegation = delegation; this.policy = { viewPlayers: [], enterPlayers: [], capacity: 16, ...policy };
     check(Array.isArray(this.policy.viewPlayers) && Array.isArray(this.policy.enterPlayers) && Number.isSafeInteger(this.policy.capacity) && this.policy.capacity > 0 && this.policy.capacity <= 128, 'Invalid explicit policy');
     check(typeof clearance === 'function' && typeof readWorld === 'function', 'World reader and clearance required');
+    check(localSpawnCandidates === undefined || typeof localSpawnCandidates === 'function', 'Invalid trusted local spawn allocator');
+    this.localSpawnCandidates = localSpawnCandidates;
     this.readWorld = readWorld; this.clearance = clearance; this.rpc = rpc; this.peers = new Map(); this.portals = new Map();
     for (const peer of peers) {
       const region = verifyRegionVersion(peer.published, this.trustedOwners);
@@ -62,17 +65,33 @@ export class OwnerWorldAuthority {
   state({ grantId, playerId } = {}) { const grant = this.grant(grantId); check(!playerId || playerId === grant.playerId, 'Player mismatch'); const member = this.ledger.snapshot().members[grant.playerId]; return member ?? null; }
   async enterLocal({ proof, motion }) {
     this.assertCurrent(); check(safeMotion(motion), 'Invalid motion');
-    return this.ledger.transact(async state => { const c = this.consumeProof(state, proof, 'ENTER'); check(!c.portalId && !state.members[c.playerId], 'Existing membership or portal requires transfer'); await this.checkCapacity(state, c.playerId, { position: motion.position, yaw: motion.yaw ?? 0 }); const member = { playerId: c.playerId, playerNodeId: c.playerNodeId, sessionId: c.sessionId, motion, sequence:0, generation:0, status: 'ACTIVE', worldId: this.region.worldId }; state.members[c.playerId] = member; return member; });
+    return this.ledger.transact(async state => {
+      const c = this.consumeProof(state, proof, 'ENTER'); check(!c.portalId && !state.members[c.playerId], 'Existing membership or portal requires transfer');
+      const context = this.capacityContext(state, c.playerId);
+      const positions = this.localSpawnCandidates ? await this.localSpawnCandidates() : [motion.position];
+      check(Array.isArray(positions) && positions.length <= LOCAL_SPAWN.maxCandidates, 'Invalid trusted local spawn candidates');
+      let accepted;
+      for (const position of positions) {
+        const candidate = {...structuredClone(motion), position:structuredClone(position)};
+        check(safeMotion(candidate), 'Invalid trusted local spawn motion');
+        if (await this.clearance({spawn:candidate,playerId:c.playerId,...structuredClone(context)}) === true) { accepted=candidate; break; }
+      }
+      check(accepted, 'Arrival clearance denied');
+      const member = { playerId: c.playerId, playerNodeId: c.playerNodeId, sessionId: c.sessionId, motion:accepted, sequence:0, generation:0, status: 'ACTIVE', worldId: this.region.worldId }; state.members[c.playerId] = member; return member;
+    });
   }
   async acceptedState({ grantId, playerId, sessionId, motion, sequence, generation }, { allowCollisionCorrection = false } = {}) {
     this.assertCurrent(); const grant = this.grant(grantId); check(grant.playerId === playerId && grant.sessionId === sessionId && safeMotion(motion), 'Invalid accepted state');
     return this.ledger.transact(async state => { const member = state.members[playerId]; check(member?.status === 'ACTIVE' && member.sessionId === sessionId, 'Player frozen or absent'); check(Number.isSafeInteger(sequence) && sequence > member.sequence && generation === member.generation, 'Stale accepted state sequence/generation'); const clear = await this.clearance({spawn:motion,playerId,...(allowCollisionCorrection===true?{purpose:'movement',previousMotion:structuredClone(member.motion)}:{}),reservations:Object.values(state.transfers).filter(t=>t.role==='DESTINATION'&&t.status==='RESERVED'),members:Object.values(state.members).filter(m=>m.playerId!==playerId)}); if (clear === false && allowCollisionCorrection === true) return { corrected: true, member: structuredClone(member), rejectedSequence: sequence }; check(clear === true,'Movement clearance denied'); member.motion = structuredClone(motion); member.sequence = sequence; return member; });
   }
-  async checkCapacity(state, playerId, spawn) {
+  capacityContext(state, playerId) {
     const reservations = Object.values(state.transfers).filter(t => t.role === 'DESTINATION' && t.status === 'RESERVED');
     const members = Object.values(state.members); check(!state.members[playerId] && !reservations.some(t=>t.binding.playerId===playerId), 'Player already present/reserved');
     check(members.length + reservations.length < this.policy.capacity, 'Destination capacity full');
-    check(await this.clearance({ spawn, playerId, reservations: structuredClone(reservations), members: structuredClone(members) }) === true, 'Arrival clearance denied');
+    return {reservations:structuredClone(reservations),members:structuredClone(members)};
+  }
+  async checkCapacity(state, playerId, spawn) {
+    check(await this.clearance({ spawn, playerId, ...this.capacityContext(state,playerId) }) === true, 'Arrival clearance denied');
   }
   async prepare({ portalId, proof, motion, avatarAssetId, inventoryHash, sequence = 0, grantId, transferId = randomUUID() }) {
     this.assertCurrent(); const grant = this.grant(grantId); const link = this.portals.get(portalId); check(link?.portal.sourceRegion === this.region.regionId, 'Not source portal');

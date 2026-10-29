@@ -14,7 +14,8 @@ import { RepositoryFederation, challengePayload } from '../../network/repository
 import { FEDERATION_CAPABILITIES } from '../../network/federation.mjs';
 import { isRepositoryContentPath } from '../../src/world-runtime/LocalRepositoryFiles.js';
 import { loadWorldSource, admitFederatedRuntimeWorld, collisionWorldBounds, sampleTerrain } from '../../src/world-runtime/vendor/world-engine-contract.js';
-import {createRepositoryMotionClearance} from '../../network/repository-motion-clearance.mjs';
+import {createRepositoryMotionClearance,createRepositoryGeometrySupport} from '../../network/repository-motion-clearance.mjs';
+import {createLocalSpawnCandidates} from '../../network/spawn-allocation.mjs';
 import {prepareNativeIslandPhysics} from '../../network/repository-native-physics.mjs';
 const exec=promisify(execFile),check=(v,m)=>{if(!v)throw Error(m);},MAX_FILE=128*1024*1024;
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.png':'image/png','.jpg':'image/jpeg','.glb':'model/gltf-binary','.svg':'image/svg+xml','.woff2':'font/woff2'};
@@ -53,6 +54,7 @@ export async function prepareRepositoryConfig(config,identity){
   check(!configured.portals||canonical(configured.portals.map(({invitation,acceptance,...p})=>p))===canonical(project.portals??[]),'Operator portal data disagrees with pinned content');
   const approvals=new Map((configured.portals??[]).map(p=>[p.id,{invitation:p.invitation,acceptance:p.acceptance}]));
   const preparedWorld={...configured,contentDigest:loaded.identity.contentDigest,spawn:project.spawn.position,portals:(project.portals??[]).map(p=>({...p,...approvals.get(p.id)})),clearance,source};if(splatPhysics)Object.defineProperty(preparedWorld,'splatPhysics',{value:splatPhysics,enumerable:false});worlds.push(preparedWorld);
+  Object.defineProperty(preparedWorld,'localSpawnCandidates',{value:createLocalSpawnCandidates({position:project.spawn.position,supportAt:splatPhysics?.terrain.heightAt??createRepositoryGeometrySupport(collisionWorldBounds(project),heightAt),clearance}),enumerable:false});
  }
  return {...config,worlds};
 }

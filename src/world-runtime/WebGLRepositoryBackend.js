@@ -3,6 +3,7 @@ import {repositoryPeerFacing} from '../player/AvatarFacing.js';
 import {repositoryProjectWaterHeight} from './RepositoryWater.js';
 import {T} from './vendor/world-engine-contract.js';
 import {WebGLRepositoryAvatar} from './WebGLRepositoryAvatar.js';
+import {installWebGLPresentationLOD} from '../engine/render/PresentationLOD.js';
 
 // Established ElseMesh compatibility renderer, with repository content injected
 // through the validated host. Movement always uses the installed native Player.
@@ -12,6 +13,7 @@ export function createWebGLRepositoryEngine(container){
  if(!context){canvas.remove();throw Error('Neither WebGPU nor WebGL2 is available on this device.');}
  const renderer=new T.WebGLRenderer({canvas,context,antialias:true});renderer.outputColorSpace=T.SRGBColorSpace;
  renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1;
+ installWebGLPresentationLOD(renderer);
  const camera=new T.PerspectiveCamera(62,1,.06,6000),scene=new T.Scene();
  const engine={canvas,domElement:canvas,camera,scene,renderer,backend:'webgl2',maxOutputPixels:1000000,frame:0,running:false,get width(){return canvas.width;},get height(){return canvas.height;},onResize:[]};
  const resize=()=>{const w=window.innerWidth,h=window.innerHeight,dpr=Math.min(window.devicePixelRatio||1,1.5,Math.sqrt(engine.maxOutputPixels/(w*h)));renderer.setPixelRatio(dpr);renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();for(const fn of engine.onResize)fn(w,h);};
