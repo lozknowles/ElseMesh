@@ -27,9 +27,10 @@ unavailable or altered, the normal conservative occluder path remains in force.
 Playback can continue audibly while the picture is hidden by an obstruction;
 world changes, lost authorization and backgrounding still stop the player.
 
-The ground collision index uses a finer grid than capsule and ray queries while
-retaining the original collision tests and candidate order. The optional captured
-search regression is `test/collider-ground-capture.mjs`; it requires
+Ground collision queries use a bounded hierarchy with a complete 2-metre-grid
+fallback. Capsule and ray queries retain their existing 16-metre grids. All
+paths retain the original collision tests and candidate order. The optional
+captured search regression is `test/collider-ground-capture.mjs`; it requires
 `ELSEMESH_COLLIDER_CAPTURE` and `ELSEMESH_COLLIDER_PROJECT` paths to the
 local retained capture and pinned Sunset connections JSON. The optional
 `ELSEMESH_COLLIDER_RECEIPT` path writes a new receipt. Captures are not

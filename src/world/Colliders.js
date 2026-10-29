@@ -1,5 +1,6 @@
 import * as THREE from '../engine/index.js';
 import { ColliderGrid } from './ColliderGrid.js';
+import { GroundColliderHierarchy } from './GroundColliderHierarchy.js';
 
 // Inclusive walkable footprints need a rounding allowance at shared fitted-cell
 // edges. It is horizontal only: maxY, walkability and capsule resolution stay exact.
@@ -75,13 +76,14 @@ export class Colliders {
 		if ( this._spatialDirty || ! s || s.boxes.records !== this.boxes || s.cylinders.records !== this.cylinders ||
 			s.boxes.length !== this.boxes.length || s.cylinders.length !== this.cylinders.length ) {
 
-			// Ground probes are tiny and numerous during navigation. Keep their dense
-			// cells separate from the original capsule/ray grids and scratch arrays.
-			// All grids retain every record: walkable/solid flags remain live below.
-			this._spatial = {
-				boxes: new ColliderGrid( this.boxes, 'box' ),
-				cylinders: new ColliderGrid( this.cylinders, 'cylinder' ),
-				groundBoxes: new ColliderGrid( this.boxes, 'box', 2 ),
+			// Rebuild every index together. Ground retains a complete2m fallback;
+			// capsule/ray grids remain16m and never share query scratch storage.
+			// Walkable/solid flags stay live in the unchanged narrow phase below.
+			const boxes = new ColliderGrid( this.boxes, 'box' );
+			const cylinders = new ColliderGrid( this.cylinders, 'cylinder' );
+			const groundFallback = new ColliderGrid( this.boxes, 'box', 2 );
+			this._spatial = { boxes, cylinders,
+				groundBoxes: new GroundColliderHierarchy( this.boxes, groundFallback ),
 			};
 			this._spatialDirty = false;
 			if ( stats ) stats.indexRebuilds ++;

@@ -31,6 +31,8 @@ test('actual implementation reproduces the captured failed233-expansion search a
   rotY:decode(b.rotY),cos:decode(b.cos),sin:decode(b.sin),radius:decode(b.radius),top:decode(b.top),bottom:decode(b.bottom)}));
  colliders.cylinders=c.before.cylinders.map(b=>Object.fromEntries(Object.entries(b).map(([k,v])=>[k,k==='tag'?v:decode(v)])));
  const index=colliders._spatialIndex(null);assert.equal(index.groundBoxes.cellSize,2);assert.equal(index.boxes.cellSize,16);assert.equal(index.cylinders.cellSize,16);
+ assert.equal(index.groundBoxes.usingFallback,false,'captured world must actually use the hierarchy');
+ assert.equal(index.groundBoxes.fallback.records,colliders.boxes,'complete fallback shares current records');
  for(const query of c.grids.boxes.queries){const args=query.args.map(decode),baseline=index.boxes.query(...args).slice(),ground=index.groundBoxes.query(...args);
   assert.equal(baseline.length,query.returned);assert.deepEqual(ground,baseline,'exact original ordered candidate list');}
  const tuples=c.ground.map(g=>g.args.map(decode));
@@ -53,5 +55,5 @@ test('actual implementation reproduces the captured failed233-expansion search a
   fs.writeFileSync(path,JSON.stringify({passed:true,at:new Date().toISOString(),captureSha256:sha(captureBytes),groundCellSize:2,capsuleCellSize:16,rayCellSize:16,
    candidateLists:c.grids.boxes.queries.length,groundCalls:calls,lastExpanded:nav.lastExpanded,path:result,diagnosticInstrumentedSearchWallMs:wallMs,
    note:'Actual imported Colliders/Navigation implementation; no grid derivative, cache or quantization. Instrumented CPU replay is not gameplay timing.',
-   sourceHashes:Object.fromEntries(['../src/world/ColliderGrid.js','../src/world/Colliders.js','../src/npc/Navigation.js'].map(p=>[p,sha(fs.readFileSync(new URL(p,import.meta.url)))]))},null,2)+'\n');}
+   sourceHashes:Object.fromEntries(['../src/world/ColliderGrid.js','../src/world/GroundColliderHierarchy.js','../src/world/Colliders.js','../src/npc/Navigation.js'].map(p=>[p,sha(fs.readFileSync(new URL(p,import.meta.url)))]))},null,2)+'\n');}
 });
