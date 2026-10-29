@@ -79,7 +79,15 @@ test('two real owner authorities accept native Player ordinary .05s stair update
  const before=authority.ledger.snapshot().members[f.playerId],grant=Object.values(authority.ledger.snapshot().grants).find(g=>g.playerId===f.playerId&&g.sessionId===before.sessionId),edge=[3.06546,4.03,-76.46349];
  await assert.rejects(authority.acceptedState({grantId:grant.grantId,playerId:f.playerId,sessionId:before.sessionId,motion:{position:edge,velocity:[0,0,0],yaw:0,pitch:0},sequence:before.sequence+1,generation:before.generation,purpose:'movement',previousMotion:{position:[3,4.03,-76.6]}}),/Movement clearance denied/);
  assert.deepEqual(authority.ledger.snapshot().members[f.playerId],before);
- const blockerId='player:'+f.blocker.nodeId.split(':')[1],challenge=await authority.challenge({playerId:blockerId,playerNodeId:f.blocker.nodeId,action:'ENTER',sessionId:'elsemesh-session:strict-stair-side'});await assert.rejects(authority.enterLocal({proof:signObject({protocol:'elsemesh.owner-player-proof/1',challenge},f.blocker),motion:{position:edge,velocity:[0,0,0],yaw:0,pitch:0}}),/Arrival clearance denied/);assert.equal(authority.ledger.snapshot().members[blockerId],undefined);
+ const blockerId='player:'+f.blocker.nodeId.split(':')[1],blockerProof=async()=>signObject({protocol:'elsemesh.owner-player-proof/1',challenge:await authority.challenge({playerId:blockerId,playerNodeId:f.blocker.nodeId,action:'ENTER',sessionId:'elsemesh-session:strict-stair-side'})},f.blocker);
+ const safe=await authority.enterLocal({proof:await blockerProof(),motion:{position:edge,velocity:[0,0,0],yaw:0,pitch:0}});
+ assert.deepEqual(safe.motion.position,[0,3,-81.8],'untrusted edge input cannot replace the immutable authored local spawn');
+ await authority.ledger.transact(state=>{delete state.members[blockerId];return null;});
+ const originalCandidates=authority.localSpawnCandidates;
+ try{authority.localSpawnCandidates=()=>[[...edge]];
+  await assert.rejects(authority.enterLocal({proof:await blockerProof(),motion:{position:edge,velocity:[0,0,0],yaw:0,pitch:0}}),/Arrival clearance denied/);
+  assert.equal(authority.ledger.snapshot().members[blockerId],undefined);
+ }finally{authority.localSpawnCandidates=originalCandidates;}
  const originalClearance=authority.clearance;let internal;authority.clearance=async info=>{internal=info;return originalClearance(info);};await authority.acceptedState({grantId:grant.grantId,playerId:f.playerId,sessionId:before.sessionId,motion:{position:edge,velocity:[0,0,0],yaw:0,pitch:0},sequence:before.sequence+1,generation:before.generation,purpose:'arrival',previousMotion:{position:[999,999,999]}},{allowCollisionCorrection:true});assert.equal(internal.purpose,'movement');assert.deepEqual(internal.previousMotion,before.motion);authority.clearance=originalClearance;
 
  const origins=f.runtimes.map(r=>'http://127.0.0.1:'+r.address.port);for(const origin of origins){assert.equal((await fetch(origin+'/editor/native-preview.html')).headers.get('content-security-policy'),"frame-ancestors 'self'; base-uri 'self'; object-src 'none'");for(const p of ['/worlds.html','/other.html','/nested/editor/native-preview.html'])assert.equal((await fetch(origin+p)).headers.get('content-security-policy'),"frame-ancestors 'none'; base-uri 'self'; object-src 'none'");}

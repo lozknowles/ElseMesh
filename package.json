@@ -3,6 +3,9 @@
   "version": "0.2.0",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5189",
+    "test:loader-lod-spawn": "node --test test/gltf-input-views.mjs test/presentation-lod.mjs test/avatar-lod-assets.mjs test/avatar-geometry-lod.mjs test/local-spawn-allocation.mjs test/owner-world-authority.mjs test/ground-collider-hierarchy.mjs test/texture-submit-lifetime.mjs test/native-island-runtime.mjs",
+    "test:lod:browser": "node test/presentation-lod-browser.mjs && node test/presentation-lod-native-browser.mjs",
+    "test:owner-integration": "node --test --test-concurrency=4 test/eyes-consent-server.mjs test/owner-browser-roundtrip.mjs test/owner-motion-correction.mjs test/owner-runtime-upgrade.mjs test/owner-world-revision.mjs test/owner-world-runtime.mjs test/player-gaze-owner.mjs test/owner-stair-clearance.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "test": "node test/render-quality.mjs && node test/survival-toggle.mjs && node test/game-logic.mjs && node test/cave-system.mjs && node test/monorail-route.mjs && node test/engine-smoke.mjs && node --test test/cursor-look.mjs test/helicopter.mjs test/helicopter-touch.mjs test/helicopter-online.mjs test/terrain-shading-quality.mjs test/static-cache.mjs test/tree-wildlife.mjs test/item-economy.mjs test/item-online.mjs test/building-002-layout.mjs test/portal-warehouse.mjs test/fourth-island.mjs test/island-five.mjs test/world-location.mjs test/port-road-graph.mjs test/port-traffic.mjs test/port-gatehouse-asset.mjs test/port-collision.mjs",

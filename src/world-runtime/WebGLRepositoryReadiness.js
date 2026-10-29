@@ -7,15 +7,15 @@ export async function prepareWebGLRepositoryResources({renderer,camera,root,targ
  if(!root||!renderer)throw Error('WebGL preparation dependencies required');
  const scene=new T.Scene();for(const n of targetScene?.children??[])if(n.isLight)scene.add(n.clone());
  const parent=root.parent,index=parent?.children.indexOf(root),visibility=[];root.traverse(n=>{visibility.push([n,n.visible,n.frustumCulled]);n.visible=true;if(n.isMesh)n.frustumCulled=false;});
- const target=new T.WebGLRenderTarget(1,1),oldTarget=renderer.getRenderTarget(),oldPlanes=renderer.clippingPlanes,oldAuto=renderer.autoClear;let wait;
- try{scene.add(root);renderer.setRenderTarget(target);renderer.autoClear=true;
+ const target=new T.WebGLRenderTarget(1,1),oldTarget=renderer.getRenderTarget(),oldPlanes=renderer.clippingPlanes,oldAuto=renderer.autoClear,oldLOD=renderer.presentationLODPreparing;let wait;
+ try{scene.add(root);renderer.presentationLODPreparing=true;renderer.setRenderTarget(target);renderer.autoClear=true;
   renderer.clippingPlanes=[];renderer.render(scene,camera);
   renderer.clippingPlanes=[new T.Plane(new T.Vector3(0,0,1),0)];renderer.render(scene,camera);
   wait=renderer.compileAsync(scene,camera,targetScene);
  }finally{
   root.removeFromParent();if(parent){parent.add(root);const at=parent.children.indexOf(root);parent.children.splice(at,1);parent.children.splice(index,0,root);}
   for(const [n,visible,cull]of visibility){n.visible=visible;n.frustumCulled=cull;}
-  renderer.clippingPlanes=oldPlanes;renderer.autoClear=oldAuto;renderer.setRenderTarget(oldTarget);
+  renderer.presentationLODPreparing=oldLOD;renderer.clippingPlanes=oldPlanes;renderer.autoClear=oldAuto;renderer.setRenderTarget(oldTarget);
  }
  try{await wait;return {ready:true};}finally{target.dispose();scene.clear();}
 }

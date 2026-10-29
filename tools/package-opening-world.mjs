@@ -47,7 +47,7 @@ for(const relative of selected){
  total+=info.size;if(total>120*1024*1024)throw Error('World repository exceeds the package byte limit.');
 }
 const buildFiles=['index.html','worlds.html','assets','clouds','textures/smaa','images/loz-warehouse-island.svg'];
-const characterFiles=['stock-player.glb','stock-female.glb','avatar-male.png','avatar-female.png','LICENSE-Rocketbox.md'];
+const characterFiles=['stock-player.glb','stock-female.glb','stock-player-medium.glb','stock-player-low.glb','stock-female-medium.glb','stock-female-low.glb','avatar-male.png','avatar-female.png','LICENSE-Rocketbox.md'];
 for(const name of buildFiles)await fs.access(path.join(build,name));
 for(const name of characterFiles)await fs.access(path.join(build,'models/characters',name));
 async function inspect(directory){

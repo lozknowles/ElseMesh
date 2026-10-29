@@ -3,6 +3,15 @@ import {RenderTarget} from '../engine/gpu/Texture.js';
 import {SCENE_FORMATS,DEPTH_FORMAT} from '../engine/render/SceneRenderer.js';
 import {createAvatarTransportPresentation,createAvatarTransportMaterialAdapter} from './AvatarTransportPresentation.js';
 import {PlayerAvatar} from '../player/PlayerAvatar.js';
+import {installAvatarGeometryLOD} from './AvatarGeometryLOD.js';
+import {BufferGeometry} from '../engine/geometry/BufferGeometry.js';
+import {BufferAttribute} from '../engine/geometry/BufferAttribute.js';
+import {Group} from '../engine/scene/Group.js';
+
+function retireAvatarGeometry(dispose){
+ const complete=()=>Promise.resolve(GPU.queue?.onSubmittedWorkDone()).then(dispose,dispose);
+ if(GPU.encoder)GPU.onSubmit(null,complete);else complete();
+}
 /** Reuses App.precompile: collect every mesh, request async pipelines, no draws.
  * Flags are restored synchronously before yielding to the running source frame.
  */
@@ -45,14 +54,22 @@ export class ReadiedRepositoryAvatar extends PlayerAvatar{
  observeVerifiedTransfer(record,worldId){return this.transportPresentation?.observeVerifiedTransfer(record,worldId)??false;}
  dispose(){this.transportPresentation?.dispose();super.dispose();}
  async loadCharacter(){
-  const work=super.loadCharacter(),version=this.loadVersion;await work;
+  const asset=this.characterAsset,work=super.loadCharacter(),version=this.loadVersion;await work;
   if(this.disposed||version!==this.loadVersion)return;
   const model=this.scanned;if(!model)return;
   model.group.visible=false;
   // Native shader skinning needs current posed bounds for visibility/TV occlusion.
   // This is the existing per-model conservative bounds path, updated with every pose.
   model.enableAnimatedBounds?.();
-  try{await this.prepareResources?.(this.group);if(this.scanned===model&&!this.disposed)model.group.visible=true;}
+  try{await this.prepareResources?.(this.group);if(this.scanned===model&&!this.disposed&&version===this.loadVersion){
+   model.group.visible=true;
+   if(model.gltf&&model.meshes){
+    let retired=false,lod;const dispose=model.dispose.bind(model);
+    model.dispose=()=>{if(retired)return;retired=true;lod?.dispose();dispose();};
+    // Optional detail never delays original character readiness or hides it.
+    model.lodReady=installAvatarGeometryLOD({asset,full:model.gltf,root:model.group,meshes:model.meshes,engine:{BufferGeometry,BufferAttribute,Group},prepareResources:this.prepareResources?.bind(this),isCurrent:()=>!retired&&!this.disposed&&this.scanned===model&&version===this.loadVersion,retire:retireAvatarGeometry}).then(value=>{if(retired||this.disposed||this.scanned!==model||version!==this.loadVersion){value?.dispose();return false;}lod=value;return !!value;}).catch(error=>{if(!retired&&this.scanned===model)model.lodError=error.message;return false;});
+   }
+  }}
   catch(error){model.group.visible=false;throw error;}
  }
 }

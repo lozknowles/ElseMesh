@@ -6,6 +6,7 @@ import { SceneLighting } from './wgsl/lighting.js';
 import { FrameUniforms } from './Frame.js';
 import { Frustum, Matrix4, Sphere, Vector3 } from '../math/index.js';
 import { DrawListPool } from './DrawListPool.js';
+import { presentationGeometryForView } from './PresentationLOD.js';
 
 // Draws scene meshes: geometry upload, pipeline cache, per-draw uniforms, culling and sorting.
 //
@@ -476,7 +477,7 @@ export class MeshRenderer {
 
 	}
 
-	collect( scene, { camera, layerMask = 0xffffffff, filter = null, kind = 'main', cull = true, late = false }, pooled = null ) {
+	collect( scene, { camera, layerMask = 0xffffffff, filter = null, kind = 'main', cull = true, late = false, frameBlock = FrameUniforms, viewport }, pooled = null ) {
 
 		// Scratch belongs to this active collection, not to the module. A filter or
 		// onBeforeRender callback can collect another camera/scene synchronously.
@@ -488,6 +489,7 @@ export class MeshRenderer {
 		state.camera = camera; state.layerMask = layerMask; state.filter = filter;
 		state.kind = kind; state.cull = cull; state.lists = lists; state.pooled = pooled;
 		state.all = this.precompiling;
+		state.presentationHeight = viewport?.[3] ?? frameBlock?.fields?.resolution?.value?.y;
 		state.depthSort = this.optimizeOpaqueDepthSort && ! this.precompiling && kind === 'main' && ! late && !! camera?.isPerspectiveCamera;
 		try {
 
@@ -565,7 +567,7 @@ export class MeshRenderer {
 
 	_addItems( o, state ) {
 
-		const geo = o.geometry;
+		const geo = state.all || state.kind === 'depth' ? o.geometry : presentationGeometryForView(o, state.camera, state.presentationHeight);
 		const mats = Array.isArray( o.material ) ? o.material : null;
 		const e = o.matrixWorld.elements, cp = state.camPos;
 		const dx = e[ 12 ] - cp.x, dy = e[ 13 ] - cp.y, dz = e[ 14 ] - cp.z;

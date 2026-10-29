@@ -13,11 +13,26 @@ import {pinnedRepository} from '../tools/networking/repository-world-server.mjs'
 import {createWorld,packWorldRepository,loadWorldSource} from '../src/world-runtime/vendor/world-engine-contract.js';
 const git=(root,args)=>execFileSync('git',['-C',root,...args],{encoding:'utf8'}).trim();
 const next=ws=>new Promise((resolve,reject)=>{const error=e=>{ws.off('message',message);reject(e);},message=b=>{ws.off('error',error);resolve(JSON.parse(b));};ws.once('message',message);ws.once('error',error);});
+function assertArrivalPresentation(presence,{requestStarted,responseReceived,receipt,authority,transferId,playerId,sourceWorldId,destinationWorldId,generation,epoch}){
+ const arrival=presence.players.find(p=>p.playerId===playerId);assert.ok(arrival,'committed player is present');
+ const expiresAt=receipt.committedAt+3000;
+ if(responseReceived<expiresAt)assert.ok(arrival.presentation,'a request completed within the lease requires presentation');
+ else if(requestStarted>=expiresAt)assert.equal(arrival.presentation,undefined,'a request started after the lease requires absence');
+ // A request spanning expiry may observe either state; every returned proof must be exact.
+ for(const player of presence.players){if(player.presentation===undefined)continue;const p=player.presentation;
+  assert.equal(verifyObject(p,new Set([authority])),true);
+  assert.equal(p.protocol,'elsemesh.portal-presentation/1');assert.equal(p.type,'portal-arrival');
+  assert.equal(p.transferId,transferId);assert.equal(p.playerId,playerId);assert.equal(p.playerId,player.playerId);
+  assert.equal(p.playerNodeId,player.nodeId);assert.equal(p.sourceWorldId,sourceWorldId);assert.equal(p.destinationWorldId,destinationWorldId);
+  assert.equal(p.destinationGeneration,generation);assert.equal(p.authorityEpoch,epoch);
+  assert.equal(p.committedAt,receipt.committedAt);assert.equal(p.expiresAt,expiresAt);
+ }
+}
 test('local owner immutable bytes, signed VIEW/ENTER, origin, replay and private configuration',{timeout:30000},async()=>{
  const dir=await mkdtemp(join(tmpdir(),'owner-runtime-'));let runtime,ws;
  try{
   const content=join(dir,'content'),web=join(dir,'web');await mkdir(content);await mkdir(web);await writeFile(join(web,'worlds.html'),'owner runtime');
-  const project=createWorld('Owned world');project.spawn.position=[0,20,0];for(const [path,bytes]of await packWorldRepository(project)){await mkdir(dirname(join(content,path)),{recursive:true});await writeFile(join(content,path),bytes);}
+  const project=createWorld('Owned world');project.spawn.position=[0,20,0];project.terrain.heights.fill(20);for(const [path,bytes]of await packWorldRepository(project)){await mkdir(dirname(join(content,path)),{recursive:true});await writeFile(join(content,path),bytes);}
   git(content,['init','-q']);git(content,['add','.']);git(content,['-c','user.email=test@example.invalid','-c','user.name=Test','commit','-qm','content']);const commit=git(content,['rev-parse','HEAD']);
   const loaded=await loadWorldSource(await pinnedRepository(content,commit)),identity=newIdentity(),owner=newIdentity(),player=newIdentity(),playerId='player:'+player.nodeId.split(':')[1];
   const region={protocol:'elsemesh.region/1',regionId:'elsemesh-region:owned',worldId:'elsemesh-world:owned',version:1,ownerPlayerId:'player:owner',ownerNodeId:owner.nodeId,admins:[],hosts:[identity.nodeId],authority:{nodeId:identity.nodeId,epoch:1},rules:{gravity:1,avatarScale:1,environmentScale:1,timeOfDay:'DAY',weapons:'DISALLOW',movement:['WALK'],requiredCapabilities:[]},assets:[],portals:[],participants:{players:[],npcs:[]}};
@@ -53,7 +68,7 @@ import {OwnerWorldTransport} from '../src/world-runtime/OwnerWorldTransport.js';
 test('two native owner facades over encrypted relay recover prepared and committed replies across restart and return',{timeout:60000},async()=>{
  const dir=await mkdtemp(join(tmpdir(),'owner-facades-')),web=join(dir,'web'),player=newIdentity(),appearance={style:'male',shirt:'#7194aa',trousers:'#27313d',skin:'#805136',hair:'#171512'};
  let relay,A,B,client;const configs=[],identities=[],states=[join(dir,'a-state'),join(dir,'b-state')];
- const projects=[createWorld('A'),createWorld('B')];for(const p of projects)p.spawn.position=[0,20,.2];
+ const projects=[createWorld('A'),createWorld('B')];for(const p of projects){p.spawn.position=[0,20,.2];p.terrain.heights.fill(20);} // Explicit supported floor for admission.
  for(const [i,p]of projects.entries())p.portals=[{id:'elsemesh-portal:'+['a','b'][i],name:'Door',position:[0,21.5,0],yaw:[.4,-.3][i],width:3,height:3,destination:{worldId:projects[1-i].metadata.worldId,regionId:projects[1-i].metadata.regionId,portalId:'elsemesh-portal:'+['b','a'][i]},enabled:true,view:{enabled:true,maxDistance:20},traversal:{enabled:true},policyRef:'approved',visual:{frameColor:'#abcdef',unavailableColor:'#334455'}}];
  async function browser(runtime){
   const origin='http://127.0.0.1:'+runtime.address.port,ws=new WebSocket(origin.replace('http','ws')+'/__worlds',{origin});const challenge=(await next(ws)).challenge;ws.send(JSON.stringify({type:'authenticate',publicKey:player.publicKeyPem,signature:sign(null,Buffer.from(canonical(challenge)),player.privateKeyPem).toString('base64')}));const welcome=await next(ws);assert.equal(welcome.type,'welcome');let n=0;
@@ -76,7 +91,10 @@ test('two native owner facades over encrypted relay recover prepared and committ
   let sequence=member.nextSequence;
   const occupant=newIdentity(),occupantId='player:'+occupant.nodeId.split(':')[1];A.authority.policy.enterPlayers.push(occupantId);
   const occupiedChallenge=await A.authority.challenge({playerId:occupantId,playerNodeId:occupant.nodeId,action:'ENTER',sessionId:'elsemesh-session:occupancy'});
-  await assert.rejects(A.authority.enterLocal({proof:signObject({protocol:'elsemesh.owner-player-proof/1',challenge:occupiedChallenge},occupant),motion:{position:member.position,velocity:[0,0,0],yaw:0,pitch:0}}),/clearance/);
+  const nearby=await A.authority.enterLocal({proof:signObject({protocol:'elsemesh.owner-player-proof/1',challenge:occupiedChallenge},occupant),motion:{position:member.position,velocity:[0,0,0],yaw:0,pitch:0}});
+  assert.deepEqual(nearby.motion.position,[-.8,20,.2]);
+  assert.ok(Math.hypot(nearby.motion.position[0]-member.position[0],nearby.motion.position[2]-member.position[2])>=.65);
+  await A.authority.ledger.transact(state=>{delete state.members[occupantId];return null;});
   let currentYaw=0;const pose=async(worldId,generation)=>{const angle=worldId===aid?.4:-.3;return client.call('accepted-state',{state:{worldId,generation,sequence:sequence++,position:[-.2*Math.sin(angle),20,-.2*Math.cos(angle)],velocity:[-Math.sin(angle),0,-Math.cos(angle)],yaw:currentYaw,appearance}});};
   const prepare=async(source,destination,portalId,sessionId)=>client.call('prepare',{portalId,transferId:crypto.randomUUID(),proof:await client.proof(destination,'ENTER',sessionId,portalId)});
   await pose(aid,0);await client.view(bid,member.sessionId);
@@ -109,7 +127,19 @@ test('two native owner facades over encrypted relay recover prepared and committ
   // Discard handoff/commit acknowledgement and restart source. Bootstrap must locate B.
   client.ws.terminate();await A.close();A=await start(0);client=await browser(A);assert.equal(client.welcome.worldId,bid);
   const committed=await client.call('status',{reservationId:second.id,sourceWorldId:aid});assert.equal(committed.state,'committed');assert.equal(committed.generation,1);assert.ok(Math.abs(committed.yaw-(Math.PI-.7))<1e-10);assert.ok(Math.abs(committed.velocity[0]-Math.sin(-.3))<1e-6);assert.ok(Math.abs(committed.velocity[2]-Math.cos(-.3))<1e-6);
-  await client.view(bid,committed.destinationSessionId);const arrivalPresence=await client.call('presence',{worldId:bid});assert.equal(verifyObject(arrivalPresence.players[0].presentation,new Set([identities[1].nodeId])),true);assert.equal(arrivalPresence.players[0].presentation.destinationWorldId,bid);sequence=committed.nextSequence;currentYaw=committed.yaw;await pose(bid,1);
+  await client.view(bid,committed.destinationSessionId);
+  const receipt=B.authority.ledger.snapshot().transfers[second.id].receipt;
+  assert.equal(verifyObject(receipt,new Set([identities[1].nodeId])),true);
+  const presentationContext={receipt,authority:identities[1].nodeId,transferId:second.id,playerId:'player:'+player.nodeId.split(':')[1],sourceWorldId:aid,destinationWorldId:bid,generation:committed.generation,epoch:configs[1].worlds[0].published.descriptor.authority.epoch};
+  const requestStarted=Date.now(),arrivalPresence=await client.call('presence',{worldId:bid}),responseReceived=Date.now();
+  assertArrivalPresentation(arrivalPresence,{...presentationContext,requestStarted,responseReceived});
+  // Exercise both lease branches deterministically against the real signed presence response.
+  const realNow=Date.now;
+  try{for(const offset of [1000,3000]){const at=receipt.committedAt+offset;Date.now=()=>at;
+   const observed=await client.call('presence',{worldId:bid});
+   assertArrivalPresentation(observed,{...presentationContext,requestStarted:at,responseReceived:at});
+  }}finally{Date.now=realNow;}
+  sequence=committed.nextSequence;currentYaw=committed.yaw;await pose(bid,1);
   await client.view(aid,committed.destinationSessionId);
   const back=await prepare(bid,aid,'elsemesh-portal:b',committed.destinationSessionId);await client.call('ready',{reservationId:back.id,sourceWorldId:bid,contentDigest:back.contentDigest,epoch:back.epoch});await client.call('handoff',{reservationId:back.id,sourceWorldId:bid});const returned=await client.call('commit',{reservationId:back.id,sourceWorldId:bid});assert.equal(returned.destinationWorldId,aid);assert.equal(returned.generation,2);assert.ok(Math.abs(returned.yaw)<1e-10);assert.ok(Math.abs(returned.velocity[0]-Math.sin(.4))<1e-6);assert.ok(Math.abs(returned.velocity[2]-Math.cos(.4))<1e-6);
   assert.equal(Object.keys(A.authority.ledger.snapshot().members).length,1);assert.equal(Object.keys(B.authority.ledger.snapshot().members).length,0);
