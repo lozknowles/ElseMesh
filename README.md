@@ -20,6 +20,12 @@ The engine still contains shared modules needed to bring earlier gameplay into p
 
 ## Current limits
 
-The public snapshot is offline single-player and cannot grant live portal admission to private worlds. The YouTube TV requires an internet connection and the video's own availability; the island and its geometry do not. WebGPU is preferred, with WebGL2 fallback. First-load shader compilation can take time. The downloadable package is static and does not include an owner authority, credentials, private keys or the editable world builder.
+The public snapshot is offline single-player and cannot grant live portal admission to private worlds. The YouTube TV requires an internet connection and the video's own availability; the island and its geometry do not. Published installations currently use WebGL2. First-load shader compilation can take time. The downloadable package is static and does not include an owner authority, credentials, private keys or the editable world builder.
+
+## Rendering work in source version 0.2.0
+
+This source version adds runtime graphics controls, an opt-in Sunset supersampling experiment, improved TV video presentation, and a faster ground-collision broad phase. Supersampling is off by default and applies only to the qualified Sunset world. The graphics controls let players choose runtime quality settings; they do not guarantee a particular frame rate.
+
+These changes describe the repository source. This source-only release leaves the published website and downloadable archive unchanged; the deployment workflow is disabled. Check the [GitHub Releases](https://github.com/lozknowles/ElseMesh/releases) page for a matching release before assuming these changes are in a published build. See [CHANGELOG.md](CHANGELOG.md) for details and known limits.
 
 See [native owner setup](docs/owner-world-setup.md), [world repository quickstart](docs/repository-world-quickstart.md), [implementation evidence](docs/owner-implementation-status.md), [licences](public/credits.html) and [world-attribution records](https://github.com/lozknowles/elsemesh-world-loz-opening-island).
