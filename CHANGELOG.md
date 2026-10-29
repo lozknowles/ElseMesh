@@ -20,4 +20,4 @@
 
 ### Release status
 
-- These notes describe repository source. This source-only release leaves the published website and downloadable archive unchanged; the deployment workflow is disabled. Version 0.2.0 has not been deployed.
+- These notes describe repository source. The website and downloadable archive are separate release artifacts; source changes take effect there only when those artifacts are updated.
