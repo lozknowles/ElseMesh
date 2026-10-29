@@ -1,5 +1,6 @@
 import {canonicalWaterSurfaceExclusions,waterSurfaceExclusionTest} from '../ocean/WaterSurfaceExclusions.js';
 import {T} from './vendor/world-engine-contract.js';
+import {registerRendererMediaSky} from './MediaScreen.js';
 import {NativeIslandTerrain} from './NativeIslandTerrain.js';
 import {NativeIslandTiles} from './NativeIslandTiles.js';
 import {getDetailTexture} from '../world/terrain/DetailTextures.js';
@@ -112,6 +113,63 @@ function terrainMaterial({normal,splat,rect,domain,detail,shore,grass,ready,coar
  shader.fragmentShader=shader.fragmentShader.replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>\n vec2 nativeNXZ=texture2D(nativeNormal,(vNativeWorld.xz-nativeRect.xy)/nativeRect.zw).rg*2.0-1.0;normal=normalize(mat3(viewMatrix)*vec3(nativeNXZ.x,sqrt(max(1.0-dot(nativeNXZ,nativeNXZ),.0025)),nativeNXZ.y));`);
  };material.customProgramCacheKey=()=> 'native-field-terrain-webgl/1:'+coarse;return material;
 }
+/** A ball strictly inside every actual triangular sky facet is a convex subset
+ * of this renderer-created closed sphere. Certify planes once, then compare the
+ * private position/index byte snapshots on each proof: version flags alone do
+ * not detect raw typed-array writes. Those bounded comparisons are intentional.
+ */
+function nativeSkyInteriorCertificate(mesh,material,vertexShader,fragmentShader,uniforms){
+ const geometry=mesh.geometry,position=geometry.attributes.position,index=geometry.index,counts={geometryInspections:1,facetPlaneEvaluations:0,containmentChecks:0,byteComparisonChecks:0,uploadNotifications:0,compileNotifications:0};
+ const attribute=a=>({attribute:a,constructor:a.constructor,array:a.array,buffer:a.array.buffer,byteOffset:a.array.byteOffset,byteLength:a.array.byteLength,itemSize:a.itemSize,count:a.count,normalized:a.normalized,version:a.version,usage:a.usage,gpuType:a.gpuType,bytes:new Uint8Array(a.array.buffer,a.array.byteOffset,a.array.byteLength).slice()});
+ const originalPosition=attribute(position),originalIndex=attribute(index),groups=JSON.stringify(geometry.groups),range={...geometry.drawRange},materialVersion=material.version,glslVersion=material.glslVersion,extensions=JSON.stringify(material.extensions),defines=material.defines,uniformKeys=Object.keys(uniforms).sort().join('|'),uniformEntries=Object.fromEntries(Object.entries(uniforms));
+ let radius=Infinity;
+ for(let i=0;i<index.count;i+=3){
+  const [ia,ib,ic]=[index.array[i],index.array[i+1],index.array[i+2]].map(n=>n*3),p=position.array;
+  const ax=p[ia],ay=p[ia+1],az=p[ia+2],bx=p[ib]-ax,by=p[ib+1]-ay,bz=p[ib+2]-az,cx=p[ic]-ax,cy=p[ic+1]-ay,cz=p[ic+2]-az;
+  const nx=by*cz-bz*cy,ny=bz*cx-bx*cz,nz=bx*cy-by*cx,length=Math.hypot(nx,ny,nz),distance=Math.abs(nx*ax+ny*ay+nz*az)/length;
+  counts.facetPlaneEvaluations++;if(!Number.isFinite(distance)||length<=0){radius=NaN;break;}radius=Math.min(radius,distance);
+ }
+ const margin=Math.max(.001,radius*1e-5),innerRadius=radius-margin,inverse=new T.Matrix4(),point=new T.Vector3();
+ const defaultObject=Object.fromEntries(['onBeforeRender','onAfterRender','onBeforeShadow','onAfterShadow'].map(key=>[key,T.Object3D.prototype[key]])),defaultMaterial={onBeforeRender:T.Material.prototype.onBeforeRender,customProgramCacheKey:T.Material.prototype.customProgramCacheKey};
+ let invalidated=false,invalidationReason=null,released=false;const invalidate=reason=>{invalidated=true;invalidationReason??=reason;};
+ const priorPositionUpload=position.onUploadCallback,priorIndexUpload=index.onUploadCallback,priorCompile=material.onBeforeCompile;
+ function positionUpload(...args){counts.uploadNotifications++;try{if(this!==position||!bytesUnchanged(originalPosition,position))invalidate('position-upload-mismatch');const result=priorPositionUpload.apply(this,args);if(!bytesUnchanged(originalPosition,position))invalidate('position-upload-callback-mismatch');return result;}catch(error){invalidate('position-upload-error');throw error;}}
+ function indexUpload(...args){counts.uploadNotifications++;try{if(this!==index||!bytesUnchanged(originalIndex,index))invalidate('index-upload-mismatch');const result=priorIndexUpload.apply(this,args);if(!bytesUnchanged(originalIndex,index))invalidate('index-upload-callback-mismatch');return result;}catch(error){invalidate('index-upload-error');throw error;}}
+ const compileMatches=shader=>shader?.vertexShader===vertexShader&&shader.fragmentShader===fragmentShader&&Object.keys(shader.defines??{}).length===0&&shader.uniforms===uniforms&&Object.keys(uniforms).sort().join('|')===uniformKeys;
+ function compile(...args){counts.compileNotifications++;try{if(this!==material||!compileMatches(args[0]))invalidate('sky-compile-input-mismatch');const result=priorCompile.apply(this,args);if(!compileMatches(args[0]))invalidate('sky-compiled-shader-mismatch');return result;}catch(error){invalidate('sky-compile-error');throw error;}}
+ // Normal Three lifecycle contract: owner-held callbacks observe every supported
+ // upload/recompile. Current callback replacement fails closed; arbitrary hidden
+ // raw-GL writes or malicious callback replace/upload/restore bypasses are not
+ // claimed observable. No property slots are sealed or made non-configurable.
+ position.onUploadCallback=positionUpload;index.onUploadCallback=indexUpload;material.onBeforeCompile=compile;
+ function bytesUnchanged(saved,current){
+  if(current!==saved.attribute||current.constructor!==saved.constructor||current.isBufferAttribute!==true||current.isGLBufferAttribute||current.isInterleavedBufferAttribute||current.isInstancedBufferAttribute||current.array!==saved.array||current.array.buffer!==saved.buffer||current.array.byteOffset!==saved.byteOffset||current.array.byteLength!==saved.byteLength||current.itemSize!==saved.itemSize||current.count!==saved.count||current.normalized!==saved.normalized||current.version!==saved.version||current.usage!==saved.usage||current.gpuType!==saved.gpuType)return false;
+  const bytes=new Uint8Array(current.array.buffer,current.array.byteOffset,current.array.byteLength);for(let i=0;i<bytes.length;i++)if(bytes[i]!==saved.bytes[i])return false;return true;
+ }
+ function unchanged(){
+  if(invalidated||released||position.onUploadCallback!==positionUpload||index.onUploadCallback!==indexUpload||material.onBeforeCompile!==compile||mesh.geometry!==geometry||mesh.material!==material||geometry.constructor!==T.SphereGeometry||mesh.isSkinnedMesh||mesh.isInstancedMesh||mesh.instanceMatrix||mesh.morphTargetInfluences?.length||Object.keys(geometry.morphAttributes??{}).length||JSON.stringify(geometry.groups)!==groups||geometry.drawRange.start!==range.start||geometry.drawRange.count!==range.count)return false;
+  if(material.type!=='ShaderMaterial'||material.isShaderMaterial!==true||material.glslVersion!==glslVersion||JSON.stringify(material.extensions)!==extensions||material.version!==materialVersion||material.vertexShader!==vertexShader||material.fragmentShader!==fragmentShader||material.customProgramCacheKey!==defaultMaterial.customProgramCacheKey||material.onBeforeRender!==defaultMaterial.onBeforeRender||material.displacementMap||material.skinning||material.morphTargets||material.morphNormals||material.defines!==defines||Object.keys(defines??{}).length||material.uniforms!==uniforms||Object.keys(uniforms).sort().join('|')!==uniformKeys)return false;
+  for(const key of Object.keys(uniformEntries)){const entry=Object.getOwnPropertyDescriptor(uniforms,key),value=entry&&'value'in entry&&entry.value===uniformEntries[key]?Object.getOwnPropertyDescriptor(entry.value,'value'):null;if(!value||!('value'in value)||typeof value.value!=='number'||!Number.isFinite(value.value))return false;}
+  for(let node=mesh;node;node=node.parent)if(node.onBeforeRender!==defaultObject.onBeforeRender||node.onAfterRender!==defaultObject.onAfterRender||node.onBeforeShadow!==defaultObject.onBeforeShadow||node.onAfterShadow!==defaultObject.onAfterShadow)return false;
+  counts.byteComparisonChecks++;return bytesUnchanged(originalPosition,geometry.attributes.position)&&bytesUnchanged(originalIndex,geometry.index);
+ }
+ return {
+  contains(camera,corners){
+   counts.containmentChecks++;if(!Number.isFinite(innerRadius)||innerRadius<=0||!Array.isArray(corners)||corners.length!==4||!unchanged())return false;
+   const matrix=mesh.matrixWorld,e=matrix?.elements,cameraMatrix=camera?.matrixWorld,ce=cameraMatrix?.elements;
+   if(!e||!ce||![...e,...ce].every(Number.isFinite)||e[3]!==0||e[7]!==0||e[11]!==0||e[15]!==1||ce[3]!==0||ce[7]!==0||ce[11]!==0||ce[15]!==1)return false;
+   const determinant=matrix.determinant(),scaleProduct=Math.hypot(e[0],e[1],e[2])*Math.hypot(e[4],e[5],e[6])*Math.hypot(e[8],e[9],e[10]);
+   if(!Number.isFinite(determinant)||!Number.isFinite(scaleProduct)||scaleProduct<=0||Math.abs(determinant)<=scaleProduct*1e-12)return false;
+   inverse.copy(matrix).invert();if(!inverse.elements.every(Number.isFinite))return false;
+   // Use the actual camera world origin, including any camera parent transform.
+   const eye=[ce[12],ce[13],ce[14]];
+   for(const p of [eye,...corners]){if(!Array.isArray(p)||p.length!==3||!p.every(Number.isFinite))return false;point.fromArray(p).applyMatrix4(inverse);if(![point.x,point.y,point.z].every(Number.isFinite)||point.length()>=innerRadius)return false;}
+   return true;
+  },
+  diagnostics:()=>({...counts,innerRadius,facetRadius:radius,margin,snapshotBytes:originalPosition.byteLength+originalIndex.byteLength,invalidated,invalidationReason,released,geometryPolicy:'one-time actual facet-plane inspection plus bounded private byte comparisons at each proof and observed upload',lifecycleScope:'normal owner-held Three upload/compile callbacks; current callback replacement fails closed; arbitrary malicious hidden raw-GL lifecycle bypasses are outside this proof'}),
+  release(){if(released)return;released=true;if(position.onUploadCallback===positionUpload)position.onUploadCallback=priorPositionUpload;if(index.onUploadCallback===indexUpload)index.onUploadCallback=priorIndexUpload;if(material.onBeforeCompile===compile)material.onBeforeCompile=priorCompile;}
+ };
+}
 export function buildWebGLNativeSky(environment={}){
  const uniforms={nativeTime:{value:0},nativeHour:{value:environment.timeOfDay??14},nativeCoverage:{value:environment.cloudCoverage??.49},nativeStorm:{value:environment.weather==='storm'?1:0},nativeWind:{value:environment.windSpeed??6}};
  const vertexShader='varying vec3 skyDirection; void main(){ skyDirection=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }';
@@ -138,8 +196,10 @@ export function buildWebGLNativeSky(environment={}){
   #include <colorspace_fragment>
  }`;
  const material=new T.ShaderMaterial({uniforms,vertexShader,fragmentShader,side:T.BackSide,depthWrite:false,fog:false,toneMapped:false});
- const mesh=new T.Mesh(new T.SphereGeometry(4200,24,16),material);mesh.name='native-island-webgl-sky';mesh.frustumCulled=false;mesh.renderOrder=-1000;
- return{mesh,setEnvironment(value={}){uniforms.nativeHour.value=value.timeOfDay??14;uniforms.nativeCoverage.value=value.cloudCoverage??.49;uniforms.nativeStorm.value=value.weather==='storm'?1:0;uniforms.nativeWind.value=value.windSpeed??6;},update(time,camera){uniforms.nativeTime.value=time;mesh.position.copy(camera.position);},dispose(){mesh.removeFromParent();mesh.geometry.dispose();material.dispose();}};
+ const geometry=new T.SphereGeometry(4200,24,16),mesh=new T.Mesh(geometry,material);mesh.name='native-island-webgl-sky';mesh.frustumCulled=false;mesh.renderOrder=-1000;
+ const interior=nativeSkyInteriorCertificate(mesh,material,vertexShader,fragmentShader,uniforms);let disposed=false,unregister;
+ const sky={mesh,mediaOcclusionDiagnostics:interior.diagnostics,setEnvironment(value={}){uniforms.nativeHour.value=value.timeOfDay??14;uniforms.nativeCoverage.value=value.cloudCoverage??.49;uniforms.nativeStorm.value=value.weather==='storm'?1:0;uniforms.nativeWind.value=value.windSpeed??6;},update(time,camera){uniforms.nativeTime.value=time;mesh.position.copy(camera.position);},dispose(){if(disposed)return;disposed=true;unregister();interior.release();mesh.removeFromParent();geometry.dispose();material.dispose();}};
+ unregister=registerRendererMediaSky(sky,mesh,(camera,corners)=>!disposed&&interior.contains(camera,corners));return Object.freeze(sky);
 }
 export function buildWebGLNativeSea(source,data,time,shoreTexture,heightTexture=shoreTexture){
  const surfaceExclusions=canonicalWaterSurfaceExclusions(source.ocean.surfaceExclusions??[]),excluded=waterSurfaceExclusionTest(surfaceExclusions,'vSeaWorld','glsl');
@@ -207,6 +267,6 @@ export async function buildWebGLNativeIsland({project,root,camera,options={}}){
   const angle=source.ocean.fft.local.windDirection*Math.PI/180,wind={value:new T.Vector2(Math.sin(angle),Math.cos(angle))},gust={value:new T.Vector2()};
   const materials={palm:plantMaterial('palm',time,wind,gust,detail,bark.palm),tree:plantMaterial('tree',time,wind,gust,detail,bark.tree)};plants=buildPlants(source,time,detail,materials);group.add(plants.root);water=buildWebGLNativeSea(source,data,time,shore,coarseHeight);group.add(water.mesh);sky=buildWebGLNativeSky(project.environment);group.add(sky.mesh);
   const frustum=new T.Frustum(),vp=new T.Matrix4(),box=new T.Box3(),bindView=viewCamera=>{sky.update(time.value,viewCamera);viewCamera.updateMatrixWorld();vp.multiplyMatrices(viewCamera.projectionMatrix,viewCamera.matrixWorldInverse);frustum.setFromProjectionMatrix(vp);const {x,z}=viewCamera.position;cache.requestView(x,z,2400,tile=>{box.min.set(tile.bounds[0],tile.minHeight??-90,tile.bounds[1]);box.max.set(tile.bounds[2],tile.maxHeight??200,tile.bounds[3]);return frustum.intersectsBox(box)||Math.hypot((tile.bounds[0]+tile.bounds[2])/2-x,(tile.bounds[1]+tile.bounds[3])/2-z)<180;});plants.updateView(viewCamera);};
-  return{data,water,query:water.query,setEnvironment(value){sky.setEnvironment(value);},async ensureArrival(position){const release=await cache.ensureAt(position[0],position[2],3);arrivalLeases.add(release);return()=>{arrivalLeases.delete(release);release();};},canOccupy(x,z,radius=1){return [[x-radius,z-radius],[x+radius,z-radius],[x-radius,z+radius],[x+radius,z+radius]].every(([px,pz])=>cache.readyAt(px,pz));},bindView,update(dt,viewCamera){time.value+=dt;gust.value.addScaledVector(wind.value,(.7*(project.environment.windSpeed??7)+1.5)*dt);bindView(viewCamera);},stats:()=>({...WEBGL_NATIVE_ISLAND_QUALIFICATION,...cache.stats(),plants:plants.stats(),source:source.sourceStats?.(),terrainPolicy:'exact fine cell heights and captured normal/splat; approximate GLSL surface shading',grassPolicy:'captured density field; blades not implemented'}),dispose(){materials.palm.dispose();materials.tree.dispose();dispose();}};
+  return{data,water,sky,query:water.query,setEnvironment(value){sky.setEnvironment(value);},async ensureArrival(position){const release=await cache.ensureAt(position[0],position[2],3);arrivalLeases.add(release);return()=>{arrivalLeases.delete(release);release();};},canOccupy(x,z,radius=1){return [[x-radius,z-radius],[x+radius,z-radius],[x-radius,z+radius],[x+radius,z+radius]].every(([px,pz])=>cache.readyAt(px,pz));},bindView,update(dt,viewCamera){time.value+=dt;gust.value.addScaledVector(wind.value,(.7*(project.environment.windSpeed??7)+1.5)*dt);bindView(viewCamera);},stats:()=>({...WEBGL_NATIVE_ISLAND_QUALIFICATION,...cache.stats(),plants:plants.stats(),source:source.sourceStats?.(),terrainPolicy:'exact fine cell heights and captured normal/splat; approximate GLSL surface shading',grassPolicy:'captured density field; blades not implemented'}),dispose(){materials.palm.dispose();materials.tree.dispose();dispose();}};
  }catch(error){dispose();throw error;}
 }

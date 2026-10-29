@@ -16,7 +16,24 @@ In an owner session, `media.play` requires the authored ceiling, a private playe
 
 Press E near a TV, then choose **Play on TV**. A fresh user gesture is needed for browser playback policies. Return to game is outside the iframe. Embed refusal, missing client identification and autoplay restrictions are reported rather than replaced by a thumbnail. Playback is local to the authorized viewer, not synchronized across players. Portal previews contain only the inactive TV housing and never start a player or audio request.
 
-The iframe is projected onto the physical screen and conservatively hidden/stopped if the entire screen is not on-screen, front-facing and unobstructed. This is whole-screen hiding, not partial depth compositing. Current posed native avatar bounds, noncolliding props, terrain and vegetation participate in visibility checks.
+The iframe is projected onto the physical screen and clipped to the game canvas.
+When the screen is partly outside the canvas, its visible portion can remain on
+screen; views crossing the camera near plane still fail closed. Visibility is
+proven conservatively in screen cells: only cells with a clear sight volume are
+shown. Current posed native avatar bounds, noncolliding props, terrain and
+vegetation participate. The renderer-owned sky uses a guarded interior proof so
+its enclosing bounding box does not falsely hide the TV. If the proof is
+unavailable or altered, the normal conservative occluder path remains in force.
+Playback can continue audibly while the picture is hidden by an obstruction;
+world changes, lost authorization and backgrounding still stop the player.
+
+The ground collision index uses a finer grid than capsule and ray queries while
+retaining the original collision tests and candidate order. The optional captured
+search regression is `test/collider-ground-capture.mjs`; it requires
+`ELSEMESH_COLLIDER_CAPTURE` and `ELSEMESH_COLLIDER_PROJECT` paths to the
+local retained capture and pinned Sunset connections JSON. The optional
+`ELSEMESH_COLLIDER_RECEIPT` path writes a new receipt. Captures are not
+included in the public game package.
 
 `water-exclusion/1` adds up to sixteen editable, stable-ID world-space surface exclusion boxes. Main, portal, cheap and depth water variants discard final displaced surface fragments inside them. These are rendered-surface exclusions only: water queries, swimming and buoyancy are unchanged. The TV visibility proof trusts only an installed enforcing renderer and strict containment of the camera and all four corners in one box.
 

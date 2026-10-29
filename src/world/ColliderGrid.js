@@ -7,7 +7,10 @@ const EPSILON = 1e-7;
 
 export class ColliderGrid {
 
-	constructor( records, kind ) {
+	constructor( records, kind, cellSize = CELL_SIZE ) {
+
+		if ( ! Number.isFinite( cellSize ) || cellSize <= 0 ) throw new RangeError( 'Collider grid cell size must be finite and positive.' );
+		Object.defineProperty( this, 'cellSize', { value: cellSize, enumerable: true } );
 
 		this.records = records;
 		this.length = records.length;
@@ -37,8 +40,8 @@ export class ColliderGrid {
 
 			}
 			const b = this.bounds[ i ] = [ x - rx - EPSILON, z - rz - EPSILON, x + rx + EPSILON, z + rz + EPSILON ];
-			const x0 = Math.floor( b[ 0 ] / CELL_SIZE ), z0 = Math.floor( b[ 1 ] / CELL_SIZE );
-			const x1 = Math.floor( b[ 2 ] / CELL_SIZE ), z1 = Math.floor( b[ 3 ] / CELL_SIZE );
+			const x0 = Math.floor( b[ 0 ] / cellSize ), z0 = Math.floor( b[ 1 ] / cellSize );
+			const x1 = Math.floor( b[ 2 ] / cellSize ), z1 = Math.floor( b[ 3 ] / cellSize );
 			if ( ! b.every( Number.isFinite ) || rx < 0 || rz < 0 ||
 				! [ x0, z0, x1, z1 ].every( Number.isSafeInteger ) || ( x1 - x0 + 1 ) * ( z1 - z0 + 1 ) > MAX_ENTRY_CELLS ) {
 
@@ -69,8 +72,8 @@ export class ColliderGrid {
 
 		const out = this.candidates;
 		out.length = 0;
-		const x0 = Math.floor( minX / CELL_SIZE ), z0 = Math.floor( minZ / CELL_SIZE );
-		const x1 = Math.floor( maxX / CELL_SIZE ), z1 = Math.floor( maxZ / CELL_SIZE );
+		const x0 = Math.floor( minX / this.cellSize ), z0 = Math.floor( minZ / this.cellSize );
+		const x1 = Math.floor( maxX / this.cellSize ), z1 = Math.floor( maxZ / this.cellSize );
 		if ( ! Number.isSafeInteger( x0 ) || ! Number.isSafeInteger( z0 ) ||
 			! Number.isSafeInteger( x1 ) || ! Number.isSafeInteger( z1 ) || x1 < x0 || z1 < z0 ||
 			( x1 - x0 + 1 ) * ( z1 - z0 + 1 ) > MAX_QUERY_CELLS ) {

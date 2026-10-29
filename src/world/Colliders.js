@@ -75,7 +75,14 @@ export class Colliders {
 		if ( this._spatialDirty || ! s || s.boxes.records !== this.boxes || s.cylinders.records !== this.cylinders ||
 			s.boxes.length !== this.boxes.length || s.cylinders.length !== this.cylinders.length ) {
 
-			this._spatial = { boxes: new ColliderGrid( this.boxes, 'box' ), cylinders: new ColliderGrid( this.cylinders, 'cylinder' ) };
+			// Ground probes are tiny and numerous during navigation. Keep their dense
+			// cells separate from the original capsule/ray grids and scratch arrays.
+			// All grids retain every record: walkable/solid flags remain live below.
+			this._spatial = {
+				boxes: new ColliderGrid( this.boxes, 'box' ),
+				cylinders: new ColliderGrid( this.cylinders, 'cylinder' ),
+				groundBoxes: new ColliderGrid( this.boxes, 'box', 2 ),
+			};
 			this._spatialDirty = false;
 			if ( stats ) stats.indexRebuilds ++;
 
@@ -223,7 +230,7 @@ export class Colliders {
 		if ( stats ) stats.groundQueries ++;
 		const index = this._spatialIndex( stats );
 		const expand = Math.max( 0, pad ) + 0.01;
-		const candidates = index ? index.boxes.query( x - expand, z - expand, x + expand, z + expand ) : null;
+		const candidates = index ? index.groundBoxes.query( x - expand, z - expand, x + expand, z + expand ) : null;
 		let best = - Infinity;
 		for ( let i = 0, n = candidates ? candidates.length : this.boxes.length; i < n; i ++ ) {
 

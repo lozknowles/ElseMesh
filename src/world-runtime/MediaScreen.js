@@ -1,4 +1,19 @@
 import {SkinBounds} from '../engine/render/SkinBounds.js';
+// Renderer-owned identity registration: mesh names/userData cannot grant exclusion.
+const rendererMediaSkies=new WeakMap();
+export function registerRendererMediaSky(owner,mesh,containsSightCone){
+ if(!owner||owner.mesh!==mesh||typeof containsSightCone!=='function'||rendererMediaSkies.has(owner))throw Error('Invalid renderer sky proof registration');
+ const proof={mesh,containsSightCone};rendererMediaSkies.set(owner,proof);
+ return ()=>{if(rendererMediaSkies.get(owner)===proof)rendererMediaSkies.delete(owner);};
+}
+function rendererSkyExcluded(native,node,camera,projection,stats,reasons){
+ const owner=native?.sky,proof=rendererMediaSkies.get(owner);if(!proof||proof.mesh!==node||owner.mesh!==node)return false;
+ const e=node.matrixWorld?.elements,determinant=e&&e.length===16&&e.every(Number.isFinite)?e[0]*(e[5]*e[10]-e[9]*e[6])-e[4]*(e[1]*e[10]-e[9]*e[2])+e[8]*(e[1]*e[6]-e[5]*e[2]):NaN;
+ if(!Number.isFinite(determinant)||determinant===0||e[3]!==0||e[7]!==0||e[11]!==0||e[15]!==1){reasons.push('Renderer sky has an invalid or singular world transform');return false;}
+ try{if(proof.containsSightCone(camera,projection.world)!==true)return false;}catch{return false;}
+ stats.skyInteriorExclusions++;return true;
+}
+
 const ID=/^[A-Za-z0-9_-]{11}$/;
 export function mediaLayout(config){
  if(!config||config.schema!=='elsemesh.media-screen/1'||config.provider!=='youtube'||typeof config.videoId!=='string'||!ID.test(config.videoId??'')||!Number.isFinite(config.width)||config.width<.5||config.width>12||Object.keys(config).some(k=>!['schema','provider','videoId','width'].includes(k)))throw Error('Invalid media screen configuration');
@@ -12,25 +27,55 @@ export function buildMediaScreenHousing(config,{api,material}){
 const transform=(m,p)=>{const e=m.elements??m,[x,y,z]=p,w=e[3]*x+e[7]*y+e[11]*z+e[15];return [(e[0]*x+e[4]*y+e[8]*z+e[12])/w,(e[1]*x+e[5]*y+e[9]*z+e[13])/w,(e[2]*x+e[6]*y+e[10]*z+e[14])/w];};
 function project(camera,p,v){
  const view=transform(camera.matrixWorldInverse,p),e=camera.projectionMatrix.elements??camera.projectionMatrix,[x,y,z]=view,w=e[3]*x+e[7]*y+e[11]*z+e[15];
- if(w<=0||-z<(camera.near??.1))return null;
+ if(!Number.isFinite(w)||w<=0||-z<(camera.near??.1))return null;
  const px=(e[0]*x+e[4]*y+e[8]*z+e[12])/w,py=(e[1]*x+e[5]*y+e[9]*z+e[13])/w,pz=(e[2]*x+e[6]*y+e[10]*z+e[14])/w;
- if(pz>1||pz< -1)return null;return {x:v.left+(px+1)*v.width/2,y:v.top+(1-py)*v.height/2,depth:-z};
+ if(![px,py,pz,-z].every(Number.isFinite)||pz>1||pz< -1)return null;return {x:v.left+(px+1)*v.width/2,y:v.top+(1-py)*v.height/2,depth:-z,w};
+}
+const polygonArea=points=>Math.abs(points.reduce((sum,p,i)=>sum+p.x*points[(i+1)%points.length].y-p.y*points[(i+1)%points.length].x,0))/2;
+function validViewport(v){return v&&[v.left,v.top,v.width,v.height].every(Number.isFinite)&&v.width>2&&v.height>2;}
+/** Clip only the DOM exposure. Original world corners remain the occlusion proof.
+ * Interpolate u/w,v/w,1/w in projected space, then divide: the inverse projective
+ * mapping places the clip polygon in the iframe's untransformed coordinates.
+ */
+function clipScreenQuad(quad,viewport){
+ if(!validViewport(viewport)||quad.length!==4||quad.some(p=>!p||![p.x,p.y,p.w].every(Number.isFinite)||p.w<=0))return null;
+ const uv=[[0,0],[1,0],[1,1],[0,1]],planes=[['x',viewport.left+1,1],['x',viewport.left+viewport.width-1,-1],['y',viewport.top+1,1],['y',viewport.top+viewport.height-1,-1]];
+ let points=quad.map((p,i)=>({x:p.x,y:p.y,u:uv[i][0]/p.w,v:uv[i][1]/p.w,q:1/p.w}));
+ const partial=points.some(p=>planes.some(([axis,edge,sign])=>sign*(p[axis]-edge)<0));
+ for(const [axis,edge,sign]of planes){
+  const input=points;points=[];
+  for(let i=0;i<input.length;i++){
+   const a=input[i],b=input[(i+1)%input.length],insideA=sign*(a[axis]-edge)>=0,insideB=sign*(b[axis]-edge)>=0;
+   if(insideA)points.push(a);
+   if(insideA!==insideB){const t=(edge-a[axis])/(b[axis]-a[axis]),p={};for(const key of ['x','y','u','v','q'])p[key]=a[key]+t*(b[key]-a[key]);points.push(p);}
+  }
+  if(points.length<3)return null;
+ }
+ if(points.some(p=>!Object.values(p).every(Number.isFinite)||p.q<=0))return null;
+ const area=polygonArea(points);if(!Number.isFinite(area)||area<=1e-7)return null;
+ const polygon=points.map(p=>({x:p.x,y:p.y,u:p.u/p.q,v:p.v/p.q}));
+ if(polygon.some(p=>!Object.values(p).every(Number.isFinite)||p.u< -1e-7||p.u>1+1e-7||p.v< -1e-7||p.v>1+1e-7))return null;
+ const percent=n=>Math.min(1,Math.max(0,n))*100;
+ return {area,polygon,partial,clipPath:partial?'polygon('+polygon.map(p=>percent(p.u)+'% '+percent(p.v)+'%').join(',')+')':null};
 }
 export function projectMediaScreen(camera,worldMatrix,config,viewport){
+ if(!validViewport(viewport))return null;
  const s=mediaLayout(config);camera.updateMatrixWorld?.();if(camera.matrixWorldInverse?.copy&&camera.matrixWorld)camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
  const world=[[-s.width/2,s.height/2,s.frontZ],[s.width/2,s.height/2,s.frontZ],[s.width/2,-s.height/2,s.frontZ],[-s.width/2,-s.height/2,s.frontZ]].map(p=>transform(worldMatrix,p));
  const a=world[0],b=world[1],d=world[3],u=b.map((n,i)=>n-a[i]),v=d.map((n,i)=>n-a[i]),normal=[v[1]*u[2]-v[2]*u[1],v[2]*u[0]-v[0]*u[2],v[0]*u[1]-v[1]*u[0]],position=camera.position.toArray?.()??[camera.position.x,camera.position.y,camera.position.z];
  if(normal.reduce((n,c,i)=>n+c*(position[i]-a[i]),0)<=0)return null;
- const quad=world.map(p=>project(camera,p,viewport));if(quad.some(p=>!p||p.x<viewport.left+1||p.x>viewport.left+viewport.width-1||p.y<viewport.top+1||p.y>viewport.top+viewport.height-1))return null;
- const area=Math.abs(quad.reduce((sum,p,i)=>sum+p.x*quad[(i+1)%4].y-p.y*quad[(i+1)%4].x,0))/2;if(area<64)return null;
- return {quad,world,viewport,depth:Math.max(...quad.map(p=>p.depth))};
+ const quad=world.map(p=>project(camera,p,viewport)),clipped=clipScreenQuad(quad,viewport);
+ if(!clipped||clipped.area<64||!screenQuadTransform(quad))return null;
+ return {quad,world,viewport,depth:Math.max(...quad.map(p=>p.depth)),clipPath:clipped.clipPath,viewportPartial:clipped.partial,visiblePolygon:clipped.polygon,visibleArea:clipped.area};
 }
 /** CSS homography maps the iframe rectangle to the real perspective-projected screen quad. */
 export function screenQuadTransform(quad,width=1280,height=720){
+ if(!Array.isArray(quad)||quad.length!==4||quad.some(p=>!p||![p.x,p.y].every(Number.isFinite))||![width,height].every(n=>Number.isFinite(n)&&n>0)||polygonArea(quad)<1e-7)return null;
  const [p0,p1,p2,p3]=quad,dx1=p1.x-p2.x,dx2=p3.x-p2.x,dx3=p0.x-p1.x+p2.x-p3.x,dy1=p1.y-p2.y,dy2=p3.y-p2.y,dy3=p0.y-p1.y+p2.y-p3.y,den=dx1*dy2-dx2*dy1;
  let g=0,h=0;if(Math.abs(dx3)+Math.abs(dy3)>1e-7){if(Math.abs(den)<1e-9)return null;g=(dx3*dy2-dx2*dy3)/den;h=(dx1*dy3-dx3*dy1)/den;}
  const a=p1.x-p0.x+g*p1.x,b=p3.x-p0.x+h*p3.x,d=p1.y-p0.y+g*p1.y,e=p3.y-p0.y+h*p3.y;
- return 'matrix3d('+[a/width,d/width,0,g/width,b/height,e/height,0,h/height,0,0,1,0,p0.x,p0.y,0,1].join(',')+')';
+ const values=[a/width,d/width,0,g/width,b/height,e/height,0,h/height,0,0,1,0,p0.x,p0.y,0,1];
+ return values.every(Number.isFinite)?'matrix3d('+values.join(',')+')':null;
 }
 const sightSubtract=(a,b)=>a.map((n,i)=>n-b[i]);
 const sightCross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
@@ -82,14 +127,17 @@ export function mediaScreenUnobstructed(projection,camera,bounds,{complete=false
 /** Reveal only TV cells whose entire camera sight volume is proven clear. */
 export function mediaScreenCellVisibility(projection,camera,bounds,{complete=false,columns=6,rows=4}={}){
  const hidden={visible:false,partial:false,mask:null,clearCells:0,totalCells:columns*rows};
- if(!complete||!projection||!Number.isInteger(columns)||!Number.isInteger(rows)||columns<1||rows<1||columns*rows>48)return hidden;
+ if(!complete||!projection||!validViewport(projection.viewport)||!Number.isInteger(columns)||!Number.isInteger(rows)||columns<1||rows<1||columns*rows>48)return hidden;
  if(mediaScreenUnobstructed(projection,camera,bounds,{complete:true}))return {visible:true,partial:false,mask:null,clearCells:columns*rows,totalCells:columns*rows};
  const point=(u,v)=>{const [a,b,c,d]=projection.world;return a.map((n,i)=>n*(1-u)*(1-v)+b[i]*u*(1-v)+c[i]*u*v+d[i]*(1-u)*v);};
  const clear=[];
  for(let y=0;y<rows;y++)for(let x=0;x<columns;x++){
   const u0=x/columns,u1=(x+1)/columns,v0=y/rows,v1=(y+1)/rows;
   const cell={world:[point(u0,v0),point(u1,v0),point(u1,v1),point(u0,v1)]};
-  if(mediaScreenUnobstructed(cell,camera,bounds,{complete:true}))clear.push({x,y});
+  if(mediaScreenUnobstructed(cell,camera,bounds,{complete:true})){
+   const clipped=clipScreenQuad(cell.world.map(p=>project(camera,p,projection.viewport)),projection.viewport);
+   if(clipped)clear.push({x,y});
+  }
  }
  if(!clear.length)return hidden;
  const rectangles=clear.map(({x,y})=>'<rect x="'+(1280*x/columns)+'" y="'+(720*y/rows)+'" width="'+(1280/columns)+'" height="'+(720/rows)+'" fill="white"/>').join('');
@@ -174,7 +222,7 @@ function nativePlantIndex(type,wind){
 }
 /** Collects physical meshes including noncolliding props/avatars; forest records stay flat and indexed. */
 export function collectMediaScreenOccluders(active,{camera,projection,screenObjectId,avatarRoots=[]}={}){
- const bounds=[],reasons=[],stats={meshes:0,instances:0,nativeCandidates:0};if(!active?.root||!projection)return {bounds,complete:false,reasons:['No active screen projection'],stats};
+ const bounds=[],reasons=[],stats={meshes:0,instances:0,nativeCandidates:0,skyInteriorExclusions:0};if(!active?.root||!projection)return {bounds,complete:false,reasons:['No active screen projection'],stats};
  const conePoints=[camera.position.toArray(),...projection.world],cone={min:[0,1,2].map(i=>Math.min(...conePoints.map(p=>p[i]))-.25),max:[0,1,2].map(i=>Math.max(...conePoints.map(p=>p[i]))+.25)},native=active.nativeIsland;
  const ground=nativeMediaGroundProof(active,projection,camera);if(!ground.clear)reasons.push(ground.reason);
  const waterExcluded=mediaScreenSurfaceExcluded(native,projection,camera);
@@ -184,7 +232,7 @@ export function collectMediaScreenOccluders(active,{camera,projection,screenObje
   for(let z=Math.floor((cone.min[2]-maxRadius)/cell);z<=Math.floor((cone.max[2]+maxRadius)/cell);z++)for(let x=Math.floor((cone.min[0]-maxRadius)/cell);x<=Math.floor((cone.max[0]+maxRadius)/cell);x++)for(const i of index.grid.get(x+':'+z)??[]){stats.nativeCandidates++;const entry=index.entries[i];if(boxIntersects(entry,cone))bounds.push(entry);}}
  }
  const visit=(node,own=false)=>{if(node.visible===false)return;own=own||node.userData?.editorObjectId===screenObjectId;if(own||node===vegetation?.group)return;
-  if(node.geometry){
+  if(node.geometry&&!rendererSkyExcluded(native,node,camera,projection,stats,reasons)){
    const key=node.material?.customProgramCacheKey?.()??'',isNativeGround=node===native?.terrain?.mesh||node.userData?.nativeBase||node.userData?.nativeTextures,isNativeWater=node===native?.water?.mesh||/native.*(?:sea|ocean)/i.test(key);
    if((isNativeGround&&native)||(isNativeWater&&native)){/* Proven by installed fine-cell/dry-volume adapters above. */}
    else if(node.geometry.attributes?.iCell){reasons.push('Unknown displaced grass mesh');}
@@ -340,6 +388,7 @@ export class MediaScreen {
   frame.style.transform=current.projection?screenQuadTransform(current.projection.quad):'translate(-2000px,-2000px)';
   frame.style.opacity=current.visible?'1':'0';
   frame.style.maskImage=current.mask??'none';frame.style.webkitMaskImage=current.mask??'none';
+  frame.style.clipPath=current.projection?.clipPath??'none';
   frame.style.pointerEvents=current.visible&&!current.partial&&this.controlsOpen?'auto':'none';
   frame.src=youtubeEmbedURL(this.active.object.mediaScreen,this.win.location.origin,this.status.currentTime??0);
   this.iframe=frame;this.doc.body.append(frame);this.screenVisible=current.visible;this.screenPartial=!!current.partial;
@@ -376,6 +425,7 @@ export class MediaScreen {
   this.screenVisible=current.visible;this.screenPartial=!!current.partial;
   this.iframe.style.opacity=current.visible?'1':'0';
   this.iframe.style.maskImage=current.mask??'none';this.iframe.style.webkitMaskImage=current.mask??'none';
+  this.iframe.style.clipPath=current.projection?.clipPath??'none';
   this.iframe.style.pointerEvents=current.visible&&!current.partial&&this.controlsOpen?'auto':'none';
   if(current.projection)this.iframe.style.transform=screenQuadTransform(current.projection.quad);
  }
