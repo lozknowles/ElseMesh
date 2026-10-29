@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import {parseGLB} from '../src/engine/loaders/GLTF.js';
 import {AVATAR_LOD_RADIUS,validateAvatarGeometryLOD} from '../src/world-runtime/AvatarGeometryLOD.js';
 import {SkinnedModel} from '../src/engine/render/Skinning.js';
 import {StorageBuffer} from '../src/engine/gpu/Texture.js';
 import {SkinBounds} from '../src/engine/render/SkinBounds.js';
 
-const load=name=>parseGLB(readFileSync(new URL(`../public/models/characters/${name}.glb`,import.meta.url)));
+const readAsset=name=>readFileSync(new URL(`../public/models/characters/${name}.glb`,import.meta.url));
 const triangles=source=>source.meshes.flat().reduce((sum,p)=>sum+p.indices.length/3,0);
 function vertex(p,v,matrices){
  const P=p.attributes.POSITION.array,I=p.attributes.JOINTS_0.array,W=p.attributes.WEIGHTS_0.array;
@@ -17,7 +19,32 @@ function vertex(p,v,matrices){
 }
 for(const asset of ['stock-player','stock-female'])for(const [level,ratio]of [['medium',.5],['low',.25]])test(`${asset} ${level}: installed geometry, materials and posed skeleton compatibility`,t=>{
  t.mock.method(StorageBuffer.prototype,'write',()=>{});
- const full=load(asset),lod=load(asset+'-'+level),primitives=validateAvatarGeometryLOD(full,lod);
+ const fullBytes=readAsset(asset),reducedBytes=readAsset(asset+'-'+level);
+ const full=parseGLB(fullBytes),lod=parseGLB(reducedBytes);
+ const durationSnapshot=source=>Object.freeze(Object.fromEntries(source.animations.map(clip=>[clip.name,clip.duration])));
+ const fullDurations=durationSnapshot(full),reducedDurations=durationSnapshot(lod);
+ const primitives=validateAvatarGeometryLOD(full,lod);
+ const durationContext=(name,fullDuration=fullDurations[name],reducedDuration=reducedDurations[name])=>{
+  let commit=process.env.GITHUB_SHA;
+  if(!commit)try{commit=execFileSync('git',['rev-parse','HEAD'],{cwd:new URL('..',import.meta.url),encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim();}catch{commit='unavailable';}
+  const precise=value=>typeof value==='number'?value.toPrecision(17):String(value);
+  const identity=bytes=>({byteLength:bytes.byteLength,sha256:createHash('sha256').update(bytes).digest('hex')});
+  return JSON.stringify({asset,level,clip:name,commit,node:process.version,v8:process.versions.v8,platform:process.platform,arch:process.arch,execArgv:process.execArgv,nodeOptions:process.env.NODE_OPTIONS??'',full:identity(fullBytes),reduced:identity(reducedBytes),fullDuration:precise(fullDuration),reducedDuration:precise(reducedDuration),absoluteDelta:precise(Math.abs(reducedDuration-fullDuration)),parsedFullDuration:precise(fullDurations[name]),parsedReducedDuration:precise(reducedDurations[name])});
+ };
+ const check=(condition,message,name,fullDuration,reducedDuration)=>assert.ok(condition,condition?undefined:message+' '+durationContext(name,fullDuration,reducedDuration));
+ // Check exported metadata before any posing, and retain immutable numeric
+ // snapshots so a later mutation cannot masquerade as an asset discrepancy.
+ for(const clip of full.animations){
+  const reduced=lod.animations.find(a=>a.name===clip.name);
+  check(reduced,'Reduced clip missing',clip.name);
+  check(Number.isFinite(clip.duration)&&Number.isFinite(reduced.duration),'Nonfinite duration',clip.name,clip.duration,reduced.duration);
+  check(Math.abs(reduced.duration-clip.duration)<.00001,'Duration mismatch before posing',clip.name,clip.duration,reduced.duration);
+  check(reduced.channels.length===clip.channels.length,'Channel count mismatch',clip.name);
+  for(const [sourceName,animation]of [['full',clip],['reduced',reduced]])for(const [index,channel]of animation.channels.entries()){
+   check(channel.times.length>0&&channel.times.every(Number.isFinite),`${sourceName} channel ${index} has invalid times`,clip.name);
+   check(channel.values.every(Number.isFinite),`${sourceName} channel ${index} has invalid values`,clip.name);
+  }
+ }
  assert.ok(Math.abs(triangles(lod)/triangles(full)-ratio)<.02);
  assert.deepEqual(lod.animations.map(a=>a.name).sort(),['helm','idle','run','walk']);
  for(const material of full.materials){
@@ -29,8 +56,12 @@ for(const asset of ['stock-player','stock-female'])for(const [level,ratio]of [['
  const bounds=full.meshes[0].map(p=>new SkinBounds(p.attributes.POSITION.array,p.attributes.JOINTS_0.array,p.attributes.WEIGHTS_0.array,full.skins[0].joints.length));
  let worst=0,checked=0,maxFullExtent=0,maxReducedExtent=0;
  for(const clip of full.animations){
-  const reduced=lod.animations.find(a=>a.name===clip.name);assert.ok(Math.abs(reduced.duration-clip.duration)<.00001);assert.equal(reduced.channels.length,clip.channels.length);
-  for(const channel of reduced.channels)assert.ok(channel.values.every(Number.isFinite));
+  const reduced=lod.animations.find(a=>a.name===clip.name);
+  // Keep the original live duration comparison and tolerance; snapshots detect
+  // mutation separately rather than replacing the values under examination.
+  assert.ok(Math.abs(reduced.duration-clip.duration)<.00001,Math.abs(reduced.duration-clip.duration)<.00001?undefined:'Live duration mismatch before clip posing '+durationContext(clip.name,clip.duration,reduced.duration));
+  check(clip.duration===fullDurations[clip.name],'Full duration changed before clip posing',clip.name,clip.duration,reduced.duration);
+  check(reduced.duration===reducedDurations[clip.name],'Reduced duration changed before clip posing',clip.name,clip.duration,reduced.duration);
   for(const fraction of [...Array.from({length:21},(_,i)=>i/20),.99]){
    canonicalPose.layers=[];exportPose.layers=[];
    canonicalPose.play(clip.name,{from:clip.duration*fraction});exportPose.play(clip.name,{from:reduced.duration*fraction});canonicalPose.update(0);exportPose.update(0);
@@ -45,6 +76,11 @@ for(const asset of ['stock-player','stock-female'])for(const [level,ratio]of [['
     const sphere=bounds[index].sphere;assert.ok(Math.hypot(a[0]-sphere.center.x,a[1]-sphere.center.y,a[2]-sphere.center.z)<=sphere.radius,'reduced posed vertex remains within canonical animated bounds');
    }
   }
+ }
+ for(const clip of full.animations){
+  const reduced=lod.animations.find(a=>a.name===clip.name);
+  check(clip.duration===fullDurations[clip.name],'Full duration changed during pose evaluation',clip.name,clip.duration,reduced.duration);
+  check(reduced.duration===reducedDurations[clip.name],'Reduced duration changed during pose evaluation',clip.name,clip.duration,reduced.duration);
  }
  // In model metres, replacing the exported low skeleton with the original
  // skeleton must move every sampled reduced vertex by less than two millimetres.
