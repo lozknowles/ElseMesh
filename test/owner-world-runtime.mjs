@@ -13,6 +13,21 @@ import {pinnedRepository} from '../tools/networking/repository-world-server.mjs'
 import {createWorld,packWorldRepository,loadWorldSource} from '../src/world-runtime/vendor/world-engine-contract.js';
 const git=(root,args)=>execFileSync('git',['-C',root,...args],{encoding:'utf8'}).trim();
 const next=ws=>new Promise((resolve,reject)=>{const error=e=>{ws.off('message',message);reject(e);},message=b=>{ws.off('error',error);resolve(JSON.parse(b));};ws.once('message',message);ws.once('error',error);});
+function assertArrivalPresentation(presence,{requestStarted,responseReceived,receipt,authority,transferId,playerId,sourceWorldId,destinationWorldId,generation,epoch}){
+ const arrival=presence.players.find(p=>p.playerId===playerId);assert.ok(arrival,'committed player is present');
+ const expiresAt=receipt.committedAt+3000;
+ if(responseReceived<expiresAt)assert.ok(arrival.presentation,'a request completed within the lease requires presentation');
+ else if(requestStarted>=expiresAt)assert.equal(arrival.presentation,undefined,'a request started after the lease requires absence');
+ // A request spanning expiry may observe either state; every returned proof must be exact.
+ for(const player of presence.players){if(player.presentation===undefined)continue;const p=player.presentation;
+  assert.equal(verifyObject(p,new Set([authority])),true);
+  assert.equal(p.protocol,'elsemesh.portal-presentation/1');assert.equal(p.type,'portal-arrival');
+  assert.equal(p.transferId,transferId);assert.equal(p.playerId,playerId);assert.equal(p.playerId,player.playerId);
+  assert.equal(p.playerNodeId,player.nodeId);assert.equal(p.sourceWorldId,sourceWorldId);assert.equal(p.destinationWorldId,destinationWorldId);
+  assert.equal(p.destinationGeneration,generation);assert.equal(p.authorityEpoch,epoch);
+  assert.equal(p.committedAt,receipt.committedAt);assert.equal(p.expiresAt,expiresAt);
+ }
+}
 test('local owner immutable bytes, signed VIEW/ENTER, origin, replay and private configuration',{timeout:30000},async()=>{
  const dir=await mkdtemp(join(tmpdir(),'owner-runtime-'));let runtime,ws;
  try{
@@ -112,7 +127,19 @@ test('two native owner facades over encrypted relay recover prepared and committ
   // Discard handoff/commit acknowledgement and restart source. Bootstrap must locate B.
   client.ws.terminate();await A.close();A=await start(0);client=await browser(A);assert.equal(client.welcome.worldId,bid);
   const committed=await client.call('status',{reservationId:second.id,sourceWorldId:aid});assert.equal(committed.state,'committed');assert.equal(committed.generation,1);assert.ok(Math.abs(committed.yaw-(Math.PI-.7))<1e-10);assert.ok(Math.abs(committed.velocity[0]-Math.sin(-.3))<1e-6);assert.ok(Math.abs(committed.velocity[2]-Math.cos(-.3))<1e-6);
-  await client.view(bid,committed.destinationSessionId);const arrivalPresence=await client.call('presence',{worldId:bid});assert.equal(verifyObject(arrivalPresence.players[0].presentation,new Set([identities[1].nodeId])),true);assert.equal(arrivalPresence.players[0].presentation.destinationWorldId,bid);sequence=committed.nextSequence;currentYaw=committed.yaw;await pose(bid,1);
+  await client.view(bid,committed.destinationSessionId);
+  const receipt=B.authority.ledger.snapshot().transfers[second.id].receipt;
+  assert.equal(verifyObject(receipt,new Set([identities[1].nodeId])),true);
+  const presentationContext={receipt,authority:identities[1].nodeId,transferId:second.id,playerId:'player:'+player.nodeId.split(':')[1],sourceWorldId:aid,destinationWorldId:bid,generation:committed.generation,epoch:configs[1].worlds[0].published.descriptor.authority.epoch};
+  const requestStarted=Date.now(),arrivalPresence=await client.call('presence',{worldId:bid}),responseReceived=Date.now();
+  assertArrivalPresentation(arrivalPresence,{...presentationContext,requestStarted,responseReceived});
+  // Exercise both lease branches deterministically against the real signed presence response.
+  const realNow=Date.now;
+  try{for(const offset of [1000,3000]){const at=receipt.committedAt+offset;Date.now=()=>at;
+   const observed=await client.call('presence',{worldId:bid});
+   assertArrivalPresentation(observed,{...presentationContext,requestStarted:at,responseReceived:at});
+  }}finally{Date.now=realNow;}
+  sequence=committed.nextSequence;currentYaw=committed.yaw;await pose(bid,1);
   await client.view(aid,committed.destinationSessionId);
   const back=await prepare(bid,aid,'elsemesh-portal:b',committed.destinationSessionId);await client.call('ready',{reservationId:back.id,sourceWorldId:bid,contentDigest:back.contentDigest,epoch:back.epoch});await client.call('handoff',{reservationId:back.id,sourceWorldId:bid});const returned=await client.call('commit',{reservationId:back.id,sourceWorldId:bid});assert.equal(returned.destinationWorldId,aid);assert.equal(returned.generation,2);assert.ok(Math.abs(returned.yaw)<1e-10);assert.ok(Math.abs(returned.velocity[0]-Math.sin(.4))<1e-6);assert.ok(Math.abs(returned.velocity[2]-Math.cos(.4))<1e-6);
   assert.equal(Object.keys(A.authority.ledger.snapshot().members).length,1);assert.equal(Object.keys(B.authority.ledger.snapshot().members).length,0);

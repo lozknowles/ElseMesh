@@ -62,3 +62,4 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run test:loader-lod-spawn
+      - run: npm run test:owner-integration

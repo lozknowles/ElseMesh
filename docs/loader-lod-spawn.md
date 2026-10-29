@@ -135,7 +135,11 @@ selected by `ELSEMESH_LOD_EVIDENCE`.
 - NO-PROGRESS, timed owner tests: overlapping heavy runs exposed test deadline
   and cleanup pressure. The architect required isolated serial and concurrency-4
   runs without relaxing production leases or guessing that serial success alone
-  proves concurrent acceptance. Results remain part of the validation record.
+  proves concurrent acceptance. The final isolated concurrency-4 run passed all
+  41 tests without cancellation after timing-correct FX assertions and the
+  measured Windows-only recovery-fixture budget correction. No product lease
+  duration changed. Its milestones located fixture preparation at 27.83 s,
+  committed-child readiness at 69.65 s and completed recovery/travel at 85.82 s.
 - NO-PROGRESS, Warehouse startup: two fixture launches requested an unserved
   catalogue digest path. The architect identified catalogue precedence over the
   test's opening bundle override. Corrected only fixture routing for both pinned
@@ -144,5 +148,13 @@ selected by `ELSEMESH_LOD_EVIDENCE`.
   underestimated off-axis bounds and insufficient renderer integration evidence.
   Non-enumerable ownership, the off-axis projection regression, actual native
   GPU and mapped WebGL portal draws, and the pinned Warehouse smoke address these
-  findings. Final owner regression, focused checks and build must pass before
-  merge; independent-device/network and TV streaming remain outside this evidence.
+  findings. Final owner regression (41), focused checks (54), runtime graphics
+  (46), publication checks (8) and production build passed locally. Portal
+  regressions passed all 182 checks. The ordinary test command passed 73 tests
+  with one optional GPU case skipped, plus its existing gameplay/engine smoke
+  checks. Exact-head CI and final architect acceptance remain merge gates;
+  independent-device/network and TV streaming remain outside this evidence.
+
+Final stair/permission regression: 64/64 passed. The stair fixture now proves untrusted requested positions cannot replace the authored spawn, while a trusted unsafe candidate still fails final clearance. Owner-integration CI includes the stair file (43 tests). Architect approved this security coverage; final diff review and exact-head CI remain required before merge.
+
+Final architect diff review passed: no material findings remain. Approval is conditional on expanded 43-test local integration and Linux/Windows CI on the exact final commit; results will be recorded on the pull request before merge.
