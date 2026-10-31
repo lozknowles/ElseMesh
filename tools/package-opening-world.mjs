@@ -62,7 +62,8 @@ for(const name of buildFiles){const target=path.join(output,name);await fs.mkdir
 for(const name of characterFiles){const target=path.join(output,'models/characters',name);await fs.mkdir(path.dirname(target),{recursive:true});await fs.copyFile(path.join(build,'models/characters',name),target);}
 const worldTarget=path.join(output,bundlePath);await fs.mkdir(worldTarget,{recursive:true});
 for(const relative of selected){const target=path.join(worldTarget,relative);await fs.mkdir(path.dirname(target),{recursive:true});await fs.copyFile(path.join(world,relative),target);}
-await fs.copyFile(new URL('../public/opening-credits.html',import.meta.url),path.join(output,'credits.html'));
+const openingCredits=await fs.readFile(new URL('../public/opening-credits.html',import.meta.url),'utf8');
+await fs.writeFile(path.join(output,'credits.html'),openingCredits.replaceAll('worlds/loz-opening/',bundlePath));
 const notices=[['LICENSE','LICENSE'],['src/world-runtime/vendor/THREE-LICENSE.txt','licenses/THREE-LICENSE.txt'],['src/world-runtime/vendor/FONT-LICENSE.txt','licenses/FONT-LICENSE.txt'],['src/world-runtime/vendor/ESBUILD-LICENSE.txt','licenses/ESBUILD-LICENSE.txt'],['src/vendor/basic-m6502/LICENSE','licenses/BASIC-M6502-LICENSE.txt']];
 for(const [from,to] of notices){const target=path.join(output,to);await fs.mkdir(path.dirname(target),{recursive:true});await fs.copyFile(new URL('../'+from,import.meta.url),target);}
 await fs.writeFile(path.join(output,'opening-world.json'),JSON.stringify({...config,schema:'elsemesh.opening-world/2',bundlePath},null,2)+'\n');

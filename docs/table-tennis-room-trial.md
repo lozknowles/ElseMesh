@@ -37,7 +37,11 @@ This is not a surveyed reconstruction or a physical-device qualification.
   Exact prior Git blob matched the new build (5,003 bytes); Windows checkout had
   5,004 bytes. Architect directed exact-byte staging from Git, preserving collision
   checks. No CSS or comparison normalization was introduced as a workaround.
-- COMPLETION: recorded after the packaged browser checks and final review.
+- COMPLETION: architect inspected the final nine-check browser report and the
+  implementation; local runtime acceptance passed with no runtime blockers.
+  Primary decision: hand off the local trial, preserve evidence, correct stale
+  Warehouse credit links in packaging, and verify identical runtime bytes after
+  that HTML-only correction. No production publication is part of this result.
 
 Repeated browser traversal caught a third-entry edge failure: an accepted source
 lane at local x=-0.552 mapped to unsupported x=2.50 in the room. Both doorway widths
@@ -55,5 +59,22 @@ Room load, owner collision admission, pack/load round-trip and tamper tests:
 3 passed. Broader suites: published worlds 101, owner splat 30, runtime graphics
 46, local companion 34, portals 182; all 393 passed. Production build succeeded.
 Packaged browser acceptance and final review are recorded with the trial output.
+
+The final Windows Edge / Intel Arc WebGL run passed nine checks: live previews in
+both directions, keyboard travel, jump/landing, eight reciprocal crossings plus
+the final room entry, stable roots, settled leases, destination readiness before
+activation, graphics-panel interaction and supported boundary stopping. A stale
+Warehouse preparation fingerprint was traced to the weather-shelter shader hook,
+not assumed to be animation; actual destination preparation refreshed it on the
+eighth crossing. Runtime guards were retained. The standalone NVIDIA memory
+monitor was unavailable; no GPU-memory or performance improvement is claimed.
+
+Tested runtime package: engine `1a8870ddbc56f18b36fdcd452b9aed402a915340`,
+world `f1fa7d34c19ad41b99674c4986c2515183c8f40b`, contract
+`7acac33d27c917302622c9b4b745ad20399fe40e`. The later packaging correction changes
+credit links only; its runtime closure is compared byte-for-byte with that tested
+package. The trial handoff retains `Table-Tennis-Room-Checks.json`, the player-view
+image, and readable notes. Source checkout evidence remains under
+`.local-evidence/table-tennis-final/`.
 
 No production publication is implied by source, build or local-browser checks.
