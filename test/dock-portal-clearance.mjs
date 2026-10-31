@@ -11,9 +11,10 @@ import {PublicPortalRuntime} from '../src/world-runtime/PublicPortalRuntime.js';
 import {Player} from '../src/player/Player.js';
 import {Colliders} from '../src/world/Colliders.js';
 import {Vector3} from '../src/engine/index.js';
+import {SHIFT_WAREHOUSE_CONTENT_DIGEST} from '../src/world-runtime/ShiftingWorldProfile.js';
 const warehouseRoot=process.env.ELSEMESH_DOCK_WAREHOUSE_ROOT??fileURLToPath(new URL('../../opening-world/',import.meta.url));
 const dockRoot=process.env.ELSEMESH_DOCK_SOURCE_ROOT??path.join(warehouseRoot,'worlds/dock');
-const pins={warehouse:'9e45eda57c26c7ac1622504b0093be6291e5115bd5e77d3baf299d54e3df3809',dock:'36e60f42dffa422ef20dce60a14a9da238ccce49eb96e248dc5952f6b3429808'};
+const pins={warehouse:SHIFT_WAREHOUSE_CONTENT_DIGEST,dock:'36e60f42dffa422ef20dce60a14a9da238ccce49eb96e248dc5952f6b3429808'};
 async function fixture(directory,pin){
  const root=await fs.realpath(directory),read=async(relative,limit)=>{assert.ok(isRepositoryContentPath(relative));const full=await fs.realpath(path.join(root,relative));assert.ok(full.startsWith(root+path.sep));const info=await fs.lstat(full);assert.ok(info.isFile()&&!info.isSymbolicLink()&&info.size<=limit);return new Uint8Array(await fs.readFile(full));};
  assert.equal(await repositoryDigest(await read('world.json',1024*1024)),pin);

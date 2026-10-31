@@ -5,8 +5,8 @@
   "worlds": [
     {
       "worldId": "elsemesh.world:2842c4f2-93a0-4492-b942-e53e524de319",
-      "contentDigest": "9e45eda57c26c7ac1622504b0093be6291e5115bd5e77d3baf299d54e3df3809",
-      "bundlePath": "worlds/9e45eda57c26c7ac1622504b0093be6291e5115bd5e77d3baf299d54e3df3809/"
+      "contentDigest": "0d7523d63ed10dcd9acbbc0b713c8719ecb28eda18e6bf9cbc607760c8105b08",
+      "bundlePath": "worlds/0d7523d63ed10dcd9acbbc0b713c8719ecb28eda18e6bf9cbc607760c8105b08/"
     },
     {
       "worldId": "elsemesh.world:5c2e6618-a04a-4460-912a-bfc57bc5bbad",
@@ -17,6 +17,11 @@
       "worldId": "elsemesh.world:63121706-d439-4091-95b0-780b7d8563e8",
       "contentDigest": "36e60f42dffa422ef20dce60a14a9da238ccce49eb96e248dc5952f6b3429808",
       "bundlePath": "worlds/36e60f42dffa422ef20dce60a14a9da238ccce49eb96e248dc5952f6b3429808/"
+    },
+    {
+      "worldId": "elsemesh.world:81ae2994-59ba-499b-bb79-ba72927f6720",
+      "contentDigest": "a914aa4ba9a8efe7e0b4afcc5115be414fe00a93728d28b4998ad32929264838",
+      "bundlePath": "worlds/a914aa4ba9a8efe7e0b4afcc5115be414fe00a93728d28b4998ad32929264838/"
     }
   ],
   "routes": [
@@ -43,6 +48,18 @@
       "portalId": "elsemesh-portal:33363276-b643-4ab5-9fb2-8f066aa8ba3b",
       "destinationWorldId": "elsemesh.world:2842c4f2-93a0-4492-b942-e53e524de319",
       "destinationPortalId": "elsemesh-portal:42b50e2b-6845-4c50-abd9-7b8234fbb034"
+    },
+    {
+      "sourceWorldId": "elsemesh.world:2842c4f2-93a0-4492-b942-e53e524de319",
+      "portalId": "elsemesh-portal:e5457f22-d2c9-41af-8ca2-30a5074a0f97",
+      "destinationWorldId": "elsemesh.world:81ae2994-59ba-499b-bb79-ba72927f6720",
+      "destinationPortalId": "elsemesh-portal:fb3eb814-5a1d-4769-89b0-6cb48f5f51f6"
+    },
+    {
+      "sourceWorldId": "elsemesh.world:81ae2994-59ba-499b-bb79-ba72927f6720",
+      "portalId": "elsemesh-portal:fb3eb814-5a1d-4769-89b0-6cb48f5f51f6",
+      "destinationWorldId": "elsemesh.world:2842c4f2-93a0-4492-b942-e53e524de319",
+      "destinationPortalId": "elsemesh-portal:e5457f22-d2c9-41af-8ca2-30a5074a0f97"
     }
   ]
 }

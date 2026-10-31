@@ -27,6 +27,7 @@ export function configureWebGLRepositoryScene(scene,candidate){
  const env=candidate?.project?.environment??candidate?.descriptor?.project?.environment??{};
  scene.background=new T.Color('#9bc4d5');scene.fog=new T.FogExp2('#9bc4d5',Math.min(.004,(env.mistDensity??.004)*.08));
  const sky=new T.HemisphereLight('#d7f4ff','#627853',2.2),sun=new T.DirectionalLight('#ffedcc',2.5);sun.position.set(-180,300,140);scene.add(sky,sun);scene.userData.repositoryLights={sky,sun};
+ candidate?.shiftingWorld?.configureScene(scene);
 }
 export function createWebGLRepositoryPeerLayer(scene,ownNodeId,prepareResources){
  const group=new T.Group();group.name='ElseMesh_animated_repository_peers';scene.add(group);const avatars=new Map(),warms=new Map();let at=0,packet={players:[]},disposed=false;

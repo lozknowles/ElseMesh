@@ -3,6 +3,8 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {DOCK_WORLD_ID,ROOM_WORLD_ID,DOCK_CONTENT_DIGEST,readDockPublication} from './dock-publication.mjs';
+import {SHIFT_WORLD_ID,SHIFT_CONTENT_DIGEST} from '../src/world-runtime/ShiftingWorldProfile.js';
+import {readNeonShiftPublication} from './neon-shift-publication.mjs';
 import {packageOutputSurfaceDerivative} from './output-surface-transform.mjs';
 import {validatePublishedWorldCatalog} from '../src/world-runtime/PublishedWorldCatalog.js';
 import {TABLE_TENNIS_SPLAT_PROFILE,assertQualifiedSplatProfile} from '../src/world-runtime/SplatSceneProfiles.js';
@@ -12,7 +14,8 @@ if(!buildArg||!worldArg||!outputArg||!previousPagesArg)throw Error('Usage: node 
 const build=await fs.realpath(buildArg),world=await fs.realpath(worldArg),previous=await fs.realpath(previousPagesArg),output=path.resolve(outputArg);
 const catalog=validatePublishedWorldCatalog(JSON.parse(await fs.readFile(path.join(build,'published-worlds.json'),'utf8')),{baseURL:'https://publication.invalid/ElseMesh/index.html'});
 const opening=catalog.worlds.find(w=>w.worldId===catalog.openingWorldId),room=catalog.worlds.find(w=>w.worldId===ROOM_WORLD_ID),dock=catalog.worlds.find(w=>w.worldId===DOCK_WORLD_ID);
-if(!room||catalog.worlds.length>3||catalog.worlds.some(w=>![opening.worldId,ROOM_WORLD_ID,DOCK_WORLD_ID].includes(w.worldId))||dock&&dock.contentDigest!==DOCK_CONTENT_DIGEST)throw Error('Unsupported fixed public world inventory');
+const shift=catalog.worlds.find(w=>w.worldId===SHIFT_WORLD_ID);
+if(!room||catalog.worlds.length>4||catalog.worlds.some(w=>![opening.worldId,ROOM_WORLD_ID,DOCK_WORLD_ID,SHIFT_WORLD_ID].includes(w.worldId))||dock&&dock.contentDigest!==DOCK_CONTENT_DIGEST||shift&&shift.contentDigest!==SHIFT_CONTENT_DIGEST)throw Error('Unsupported fixed public world inventory');
 const git=(...args)=>{const r=spawnSync('git',['-C',world,...args],{encoding:'utf8',maxBuffer:1024*1024});if(r.status)throw Error('Pinned public world Git check failed');return r.stdout.trim();};
 if(git('status','--porcelain','--untracked-files=all'))throw Error('World repository must be clean');const commit=git('rev-parse','HEAD');
 const openingConfig=JSON.parse(await fs.readFile(path.join(build,'opening-world.json'),'utf8'));
@@ -58,7 +61,8 @@ const connectionsBytes=new Uint8Array(await fs.readFile(path.join(world,connecti
 if(connectionsBytes.byteLength!==connectionsRef.bytes||await repositoryDigest(connectionsBytes)!==connectionsRef.sha256)throw Error('Warehouse connections integrity');
 const warehousePortals=JSON.parse(new TextDecoder().decode(connectionsBytes)).portals;
 const dockPackage=dock?await readDockPublication(path.join(world,'worlds/dock'),{tracked}):null;
-const projectsByWorld=new Map([[opening.worldId,{portals:warehousePortals}],[ROOM_WORLD_ID,loaded.project],...(dockPackage?[[DOCK_WORLD_ID,dockPackage.loaded.project]]:[])]);
+const shiftPackage=shift?await readNeonShiftPublication(path.join(world,'worlds/neon-shift'),{tracked}):null;
+const projectsByWorld=new Map([[opening.worldId,{portals:warehousePortals}],[ROOM_WORLD_ID,loaded.project],...(dockPackage?[[DOCK_WORLD_ID,dockPackage.loaded.project]]:[]),...(shiftPackage?[[SHIFT_WORLD_ID,shiftPackage.loaded.project]]:[])]);
 for(const route of catalog.routes){const portals=projectsByWorld.get(route.sourceWorldId)?.portals??[];const door=portals.find(p=>p.id===route.portalId);if(!door?.enabled||door.destination.worldId!==route.destinationWorldId||door.destination.portalId!==route.destinationPortalId)throw Error('Catalog route differs from authored world');}
 
 if(await repositoryDigest(new Uint8Array(await fs.readFile(path.join(sourceRoot,'world.json'))))!==room.contentDigest)throw Error('Table Tennis Room manifest pin changed');
@@ -69,6 +73,7 @@ for(const relative of [...needed].sort()){
  const target=path.join(destination,relative);await fs.mkdir(path.dirname(target),{recursive:true});await fs.copyFile(full,target);
 }
 if(dockPackage){const destination=path.join(output,dock.bundlePath);await fs.mkdir(destination,{recursive:false});for(const [relative,bytes]of dockPackage.files){const target=path.join(destination,relative);await fs.mkdir(path.dirname(target),{recursive:true});await fs.writeFile(target,bytes);}}
+if(shiftPackage){const destination=path.join(output,shift.bundlePath);await fs.mkdir(destination,{recursive:false});for(const [relative,bytes]of shiftPackage.files){const target=path.join(destination,relative);await fs.mkdir(path.dirname(target),{recursive:true});await fs.writeFile(target,bytes);}}
 async function inspect(dir){const info=await fs.lstat(dir);if(info.isSymbolicLink())throw Error('Symlink in public editor');if(info.isDirectory())for(const name of await fs.readdir(dir))await inspect(path.join(dir,name));else if(!info.isFile())throw Error('Invalid editor file');}
 // Keep bounded immutable asset names used by tabs opened before this release.
 const priorAssets=path.join(previous,'assets'),outputAssets=path.join(output,'assets');
@@ -98,6 +103,7 @@ if(duckAsset.byteLength!==6929080||await repositoryDigest(duckAsset)!=='f8776b98
 for(const name of ['ATTRIBUTION.md','LICENSE-MODELS.md','LICENSE-APACHE-2.0.txt','manifest.json','collision-proxy.json'])await fs.access(path.join(output,'models/microduck',name));
 credits=await fs.readFile(path.join(output,'credits.html'),'utf8');credits=credits.replace('</html>','<section><h2>Microduck local companion</h2><p>Original robot geometry by Pollen Robotics, adapted to articulated glTF and animated from the official policy. Geometry and adaptations: CC BY-NC-SA 4.0, separate from application MIT code. This is a noncommercial demonstration. <a href="models/microduck/ATTRIBUTION.md">Attribution</a> · <a href="models/microduck/LICENSE-MODELS.md">Model licence</a> · <a href="models/microduck/LICENSE-APACHE-2.0.txt">Description and policy licence</a>.</p><p>The companion runs locally in this browser session and is not a shared or persistent online character.</p></section></html>');await fs.writeFile(path.join(output,'credits.html'),credits);
 // Preserve the already-published editor and optional-world pins, not an older snapshot.
+if(shift){const credits=await fs.readFile(path.join(output,'credits.html'),'utf8');await fs.writeFile(path.join(output,'credits.html'),credits.replace('</html>',`<section><h2>Neon Shift</h2><p>Original procedural city and safe plaza by DRG Software Solutions LLC, MIT. Generated locally by ElseMesh; layouts reshape every minute while the return gate stays fixed. <a href="${shift.bundlePath}ATTRIBUTION.md">Attribution</a> · <a href="${shift.bundlePath}LICENSE">Licence</a>.</p></section></html>`));}
 const priorPublication=JSON.parse(await fs.readFile(path.join(previous,'publication.json'),'utf8'));
 if(priorPublication.schema!=='elsemesh.publication/1')throw Error('Unsupported prior publication provenance');
 const preserved={};
@@ -110,4 +116,5 @@ const sourceContract=await fs.readFile(new URL('../src/world-runtime/vendor/worl
 // Record and preserve the build derivative separately, including final chunks.
 const outputSurfaceDerivative=await packageOutputSurfaceDerivative(build,output);
 await fs.writeFile(path.join(output,'publication.json'),JSON.stringify({schema:'elsemesh.publication/1',outputSurfaceDerivative,...preserved,engineCommit,worldContract:{sourceNormalization:'UTF-8 LF',commit:contractProvenance.commit,bundleSha256:contractProvenance.bundleSha256,baseBundleSha256:contractProvenance.baseBundleSha256??contractProvenance.bundleSha256,downstreamPatches:contractProvenance.downstreamPatches??[]},worldRepositoryCommit:commit,openingWorldId:opening.worldId,worlds:catalog.worlds,routes:catalog.routes,...(dockPackage?{dock:{sourceCommit:'fbc9f7e352b03b18d96ad428742770f844fcfc0d',contentDigest:DOCK_CONTENT_DIGEST,bytes:dockPackage.total,files:dockPackage.files.size}}:{}),scene:{name:TABLE_TENNIS_SPLAT_PROFILE.name,count:TABLE_TENNIS_SPLAT_PROFILE.asset.count,assetSha256:loaded.project.splatScene.asset.sha256,physicsSha256:loaded.project.splatScene.physics.sha256,sourceManifestSha256:provenance.sourceManifestSha256,reviewSha256:provenance.reviewSha256,auditedOriginalBytes:originalBytes},previousPublicEditorPreserved:true},null,2)+'\n');
+if(shiftPackage){const file=path.join(output,'publication.json'),publication=JSON.parse(await fs.readFile(file,'utf8'));publication.neonShift={contentDigest:SHIFT_CONTENT_DIGEST,intervalMs:60000,bytes:shiftPackage.total,files:shiftPackage.files.size,implementation:'engine-owned WebGL procedural visual pool; fixed authored collision and return anchor'};await fs.writeFile(file,JSON.stringify(publication,null,2)+'\n');}
 console.log(JSON.stringify({output,worldRepositoryCommit:commit,roomBytes:total,auditedOriginalBytes:originalBytes,originalSourcesBundled:false,worlds:catalog.worlds}));

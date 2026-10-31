@@ -58,7 +58,7 @@ export function drawWebGLPortal({renderer:r,sourceCamera,camera:cam,source,desti
 }
 /** Detached independent authorized previews, hard recursion depth one. */
 export class WebGLPortalViews{
- constructor({renderer,engine,mainCamera,configureScene,maxLongEdge=512,ordinaryToneMapping}){this.forkOptions={renderer,engine,mainCamera,configureScene,maxLongEdge,ordinaryToneMapping:ordinaryToneMapping??(renderer??engine?.renderer)?.toneMapping};this.maxLongEdge=maxLongEdge;this.renderer=renderer??engine?.renderer;this.mainCamera=mainCamera??engine?.camera;this.configureScene=configureScene;this.entries=new Map();this.active=null;this.ordinaryToneMapping=this.forkOptions.ordinaryToneMapping;}
+ constructor({renderer,engine,mainCamera,configureScene,maxLongEdge=512,maxViews=PORTAL_VIEW_LIMIT,ordinaryToneMapping}){if(![2,3].includes(maxViews))throw Error('Portal views require two or three slots');this.maxViews=maxViews;this.forkOptions={renderer,engine,mainCamera,configureScene,maxLongEdge,maxViews,ordinaryToneMapping:ordinaryToneMapping??(renderer??engine?.renderer)?.toneMapping};this.maxLongEdge=maxLongEdge;this.renderer=renderer??engine?.renderer;this.mainCamera=mainCamera??engine?.camera;this.configureScene=configureScene;this.entries=new Map();this.active=null;this.ordinaryToneMapping=this.forkOptions.ordinaryToneMapping;}
  fork(){return new WebGLPortalViews(this.forkOptions);}
  park(){const entries=this.entries;this.entries=new Map();this.active=null;return entries;}
  restore(active,entries){
@@ -73,7 +73,7 @@ export class WebGLPortalViews{
   if(o.candidate){if(o.authorizedView!==true)throw Error('Portal destination requires explicit authorizedView');if(o.candidate!==this.entries.get(id)?.candidate&&o.candidate.root.parent)throw Error('Portal preview root must be independently built and detached');}
   let e=this.entries.get(id);
   if(!e){
-   if(this.entries.size>=2)this.remove(this.entries.keys().next().value);
+   if(this.entries.size>=this.maxViews)this.remove(this.entries.keys().next().value);
    const target=new T.WebGLRenderTarget(1,1,{depthBuffer:true,type:T.HalfFloatType});
    const material=createWebGLPortalMaterial(target);
    const aperture=new T.Mesh(new T.PlaneGeometry(1,1),material);aperture.userData.portalAperture=true;aperture.userData.portalId=id;

@@ -6,7 +6,7 @@ const digest=v=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v);
 export const PUBLISHED_CATALOG_SCHEMA='elsemesh.published-world-catalog/1';
 /** Public deployment permissions are an explicit bounded local star catalog, not VIEW/ENTER. */
 export function validatePublishedWorldCatalog(value,{baseURL=globalThis.location?.href}={}){
- if(!exact(value,['schema','renderer','openingWorldId','worlds','routes'])||value.schema!==PUBLISHED_CATALOG_SCHEMA||value.renderer!=='webgl2'||!worldId(value.openingWorldId)||!Array.isArray(value.worlds)||![2,3].includes(value.worlds.length)||!Array.isArray(value.routes)||value.routes.length!==2*(value.worlds.length-1))throw Error('Invalid published world catalog');
+ if(!exact(value,['schema','renderer','openingWorldId','worlds','routes'])||value.schema!==PUBLISHED_CATALOG_SCHEMA||value.renderer!=='webgl2'||!worldId(value.openingWorldId)||!Array.isArray(value.worlds)||![2,3,4].includes(value.worlds.length)||!Array.isArray(value.routes)||value.routes.length!==2*(value.worlds.length-1))throw Error('Invalid published world catalog');
  const base=new URL('./',baseURL);if(!['http:','https:'].includes(base.protocol)||base.username||base.password)throw Error('Published worlds require an HTTP deployment');
  const ids=new Set(),paths=new Set();
  for(const entry of value.worlds){

@@ -1,5 +1,7 @@
 import './MobileControls.css';
 import {GraphicsPanel} from './GraphicsPanel.js';
+import {installNeonShiftWorld} from './NeonShiftWorld.js';
+import {advanceNeonShiftClock} from './NeonShiftLayout.js';
 import {WebGLSunsetOutput} from './WebGLSunsetOutput.js';
 import {graphicsSceneEligible} from './GraphicsRuntimeState.js';
 import {OpeningProgress} from './OpeningProgress.js';
@@ -86,10 +88,10 @@ async function init(){
   const {WebGLPortalViews}=await import('./WebGLPortalViews.js');
   configureWebGLRepositoryScene(engine.scene);
   engine.repositoryReadinessSignature=webGLRepositoryReadinessSignature;engine.prepareRepositoryResources=root=>prepareWebGLRepositoryResources({renderer:engine.renderer,camera:engine.camera,root,targetScene:engine.scene});
-  const buildGL=async(descriptor,camera,{loaded}={})=>{const candidate=await buildWebGLRepositoryScene(descriptor,camera,repositorySceneOptions(descriptor.project,loaded,{renderer:engine.renderer,backend:'webgl2'}));try{if(candidate.splatScene){candidate.terrain=withSplatMovementBoundary(candidate.splatScene.physics,{requireOwnerConfirmation:()=>movementPortals?.config?.protocol==='elsemesh.owner-runtime/1',getConfirmedPose:()=>confirmedSplatPose(movementPortals,candidate,{contentDigest:loaded?.identity?.contentDigest})});const warm=camera.clone();warm.position.fromArray(descriptor.project.spawn.position);warm.position.y+=1.62;warm.rotation.set(candidate.splatScene.physics.qualification.spawn.pitch??0,descriptor.project.spawn.yaw,0,'YXZ');warm.updateMatrixWorld(true);await candidate.splatScene.prepareResources(warm);}await publicDuck?.install(candidate);return candidate;}catch(error){disposeWebGLRepositoryScene(candidate);throw error;}};
+  const buildGL=async(descriptor,camera,{loaded}={})=>{const candidate=await buildWebGLRepositoryScene(descriptor,camera,repositorySceneOptions(descriptor.project,loaded,{renderer:engine.renderer,backend:'webgl2'}));try{installNeonShiftWorld(candidate,loaded);if(candidate.splatScene){candidate.terrain=withSplatMovementBoundary(candidate.splatScene.physics,{requireOwnerConfirmation:()=>movementPortals?.config?.protocol==='elsemesh.owner-runtime/1',getConfirmedPose:()=>confirmedSplatPose(movementPortals,candidate,{contentDigest:loaded?.identity?.contentDigest})});const warm=camera.clone();warm.position.fromArray(descriptor.project.spawn.position);warm.position.y+=1.62;warm.rotation.set(candidate.splatScene.physics.qualification.spawn.pitch??0,descriptor.project.spawn.yaw,0,'YXZ');warm.updateMatrixWorld(true);await candidate.splatScene.prepareResources(warm);}await publicDuck?.install(candidate);return candidate;}catch(error){disposeWebGLRepositoryScene(candidate);throw error;}};
   const disposeGL=candidate=>{publicDuck?.releaseCandidate(candidate);disposeWebGLRepositoryScene(candidate);};
   backendHost={buildCandidate:buildGL,disposeCandidate:disposeGL,buildNeon:buildWebGLNeon};
-  backendPortals={buildScene:buildGL,disposeCandidate:disposeGL,createPeerLayer:(scene,id)=>createWebGLRepositoryPeerLayer(scene,id,engine.prepareRepositoryResources),addPortalFrame:addWebGLPortalFrame,views:new WebGLPortalViews({engine,mainCamera:engine.camera,configureScene:configureWebGLRepositoryScene})};
+  backendPortals={buildScene:buildGL,disposeCandidate:disposeGL,createPeerLayer:(scene,id)=>createWebGLRepositoryPeerLayer(scene,id,engine.prepareRepositoryResources),addPortalFrame:addWebGLPortalFrame,views:new WebGLPortalViews({engine,maxViews:installation.kind==='published'?3:2,mainCamera:engine.camera,configureScene:configureWebGLRepositoryScene})};
   renderer=engine.renderer;
  }else{
   atmosphere=new Atmosphere(engine);sky=new Sky(atmosphere);clouds=new SkyProClouds(engine,atmosphere);await clouds.ready;sky.clouds=clouds;backendPortals.background=new RepositoryPortalSky({sky});
@@ -132,6 +134,7 @@ async function init(){
    'Find the gold Table Tennis Room doorway beside the Dock portal in the warehouse. Move around it to see the room, then walk through when its view is ready.',
    'In the Table Tennis Room, walk within the room boundaries and around the table. Return through the same gold doorway.',
    'The Dock doorway leads to Bracken Quay Dock. Walk back through its doorway to return to the warehouse.',
+   'The violet Neon Shift doorway leads to a procedural city that reshapes every minute. Its arrival plaza and Warehouse return gate stay fixed.',
    'Press E near a computer. At the TV, press E, then Play on TV. Return to game keeps it playing; press E again to control or stop it. Using a computer stops the TV.',
    'Microduck is your local companion for this browser session. It explores the warehouse, visits the Table Tennis Room through the gold doorway and returns.',
    'This is a public single-player tour. No owner connection or visitor permission setup is needed.',
@@ -241,6 +244,7 @@ async function init(){
  document.querySelector('#remote').onclick=()=>void(async()=>{const source=await resolveGitHubWorldSource(parseGitHubWorldLocation(document.querySelector('#github').value));await app.load(source);})().catch(error=>report(error.message));
  engine.start((dt,time)=>{
   try{
+   advanceNeonShiftClock(Date.now());
    graphics.beforeFrame(performance.now(),{eligible:graphicsSceneEligible({active:host.active,openingLoading,portals,eyeActive:playerEyes?.controller.status().active})});
    if(!isWebGL){GPU.beginFrame();G.time.value=time;G.dt.value=dt;G.exposure.value=.55;}
    if(!terminal.open&&!retro.active&&!media?.active&&!interactionPending){objectAccess.lease=null;interactionContext=null;activeComputerId=null;}
@@ -287,12 +291,12 @@ async function init(){
   openingProgress.advance('reading-world');
   const config=await readOpeningWorld();if(!config){hideOpeningSplash();return;}if(host.generation!==openingGeneration)return;
   openingLoading=true;openingTargetWorldId=config.worldId;openingTargetDigest=config.contentDigest;openingExpectedGeneration=openingGeneration+1;
-  report(installation.kind==='published'?'Loading Warehouse, Dock and Table Tennis Room single-player tour…':'Loading published opening island…');
+  report(installation.kind==='published'?'Loading Warehouse, Dock, Table Tennis Room and Neon Shift single-player tour…':'Loading published opening island…');
   const active=await loadOpeningWorld(app,config,{publishedCatalog:installation.kind==='published'?installation.catalog:null,onProgress:stage=>{if(openingLoading&&host.generation<=openingExpectedGeneration)openingProgress.advance(stage);}});if(!active)return;
   pendingOpeningReady=active;
   document.querySelector('#repository-tools').hidden=true;document.querySelector('#choose-world').hidden=false;document.querySelector('#coordinator-controls').hidden=true;
   document.querySelector('#panel h1').textContent=active.project.metadata.name;
-  if(installation.kind==='published'){report('Warehouse, Dock and Table Tennis Room · single player');document.querySelector('#portal-status').textContent='Walk through either the Dock or gold Table Tennis Room doorway. Return through the doorway in that world.';}else report('Published island · revision '+(active.identity.resolvedCommit??validateOpeningWorld(config).source.ref).slice(0,12)+' · '+selected.backend);
+  if(installation.kind==='published'){report('Warehouse, Dock, Table Tennis Room and Neon Shift · single player');document.querySelector('#portal-status').textContent='Choose Dock, the gold Table Tennis Room doorway or the violet Neon Shift doorway. Each has a Warehouse return.';}else report('Published island · revision '+(active.identity.resolvedCommit??validateOpeningWorld(config).source.ref).slice(0,12)+' · '+selected.backend);
  })().catch(error=>{openingProgress.fail(error.message);report('Opening world could not load: '+error.message);document.querySelector('#portal-status').textContent='Opening world unavailable. Retry by reloading, or choose a repository.';});
  window.addEventListener('pagehide',()=>{graphics?.dispose();sunsetOutput?.dispose();playerEyes?.dispose();media.dispose();refraction?.dispose();objectAccess.invalidate();worldWelcome.dispose();welcomeView.dispose();controlsHelp.dispose();portals.dispose();portalEffects.dispose();retro.dispose();avatar.dispose();host.dispose();engine.stop();if(isWebGL)engine.dispose();else GPU.device?.destroy();});report('ElseMesh '+selected.backend+' ready. Open a world repository folder or public GitHub source.');
  window.dispatchEvent(new CustomEvent('repository-world-ready',{detail:app}));

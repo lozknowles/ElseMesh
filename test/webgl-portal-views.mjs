@@ -35,12 +35,12 @@ test('near-plane crossings retain the aperture when even one side remains visibl
  assert.equal(portalApertureIntersectsFrustum(f,{...pose([0,0,0],Math.PI/4),width:2,height:2}),true,'crosses eye and near planes');
  assert.equal(portalApertureIntersectsFrustum(f,{...pose([0,0,-2],-Math.PI/4),width:8,height:8}),true,'opposite yaw and enclosing aperture');
 });
-function setup(){
+function setup(options={}){
  const renderer={clippingPlanes:[],localClippingEnabled:false,autoClear:false,target:{main:true},viewport:new T.Vector4(4,5,600,400),scissor:new T.Vector4(6,7,300,200),scissorTest:true,color:new T.Color('red'),alpha:.4,
  getRenderTarget(){return this.target;},getViewport(v){return v.copy(this.viewport);},getScissor(v){return v.copy(this.scissor);},getScissorTest(){return this.scissorTest;},getClearColor(c){return c.copy(this.color);},getClearAlpha(){return this.alpha;},
  setRenderTarget(t){this.target=t;},setViewport(...a){a.length===1?this.viewport.copy(a[0]):this.viewport.set(...a);},setScissor(v){this.scissor.copy(v);},setScissorTest(v){this.scissorTest=v;},setClearColor(c,a){this.color.copy(c);this.alpha=a;},render(){}};
  const mainCamera=new T.PerspectiveCamera(65,1.6,.1,100);mainCamera.position.set(.3,1,3);mainCamera.lookAt(0,1,0);
- const views=new WebGLPortalViews({renderer,mainCamera});return {views,renderer,mainCamera};
+ const views=new WebGLPortalViews({renderer,mainCamera,...options});return {views,renderer,mainCamera};
 }
 test('WebGL portal budgets, explicit authorization and detached ownership',()=>{
  const {views}=setup(),root=new T.Group();
@@ -77,3 +77,22 @@ test('return-trip restoration requires fresh VIEW and denied subscription cannot
 });
 
 test('ordinary portal targets use physical dimensions divided by pixel ratio and restore live state',()=>{const {views,renderer:r}=setup();r.getPixelRatio=()=>2;const before=r.viewport.clone();views.setDestination('dpr2',{candidate:{root:new T.Group()},authorizedView:true,source:pose(),destination:pose([10,0,0]),state:'live'});let viewport; r.render=()=>{viewport=r.viewport.clone();};views.render({width:1600,height:900});assert.deepEqual(viewport.toArray(),[0,0,256,144]);assert.deepEqual(r.viewport,before);views.dispose();});
+
+test('published opt-in keeps three independent preview apertures and preserves its cap in forks',()=>{
+ const {views,renderer}=setup({maxViews:3});let draws=0;renderer.render=()=>draws++;const resources=[];
+ for(let i=0;i<3;i++){
+  views.setDestination('public-'+i,{candidate:{root:new T.Group()},ownsCandidate:false,authorizedView:true,source:pose(),destination:pose([10+i*10,0,0]),state:'live'});
+  const entry=views.entries.get('public-'+i);for(const resource of [entry.target,entry.material,entry.aperture.geometry]){const record={resource,disposed:0};resource.addEventListener('dispose',()=>record.disposed++);resources.push(record);}
+ }
+ assert.equal(views.maxViews,3);assert.equal(views.entries.size,3);views.render();assert.equal(draws,3);for(let i=0;i<3;i++)assert.equal(views.getAperture('public-'+i).userData.portalViewState,'live');
+ assert.equal(new Set([...views.entries.values()].map(e=>e.target)).size,3);assert.ok(resources.every(r=>r.disposed===0));
+ const fork=views.fork();assert.equal(fork.maxViews,3);for(let i=0;i<3;i++)fork.setDestination('parked-'+i,{source:pose()});assert.equal(fork.entries.size,3);assert.ok(fork.getAperture('parked-0'));
+ const parked=fork.park();fork.restore({identity:{worldId:'public-world'}},parked);assert.equal(fork.entries.size,3);fork.dispose();
+ views.setDestination('public-3',{source:pose()});assert.equal(views.entries.size,3);assert.equal(views.getAperture('public-0'),null);assert.ok(resources.slice(0,3).every(r=>r.disposed===1));assert.ok(resources.slice(3).every(r=>r.disposed===0));
+ views.dispose();views.dispose();assert.ok(resources.every(r=>r.disposed===1));
+});
+
+test('ordinary portal views and their forks keep two slots, invalid cap overrides fail closed',()=>{
+ const {views}=setup();assert.equal(views.maxViews,2);const fork=views.fork();assert.equal(fork.maxViews,2);for(let i=0;i<3;i++)fork.setDestination('owner-'+i,{source:pose()});assert.equal(fork.entries.size,2);assert.equal(fork.getAperture('owner-0'),null);views.dispose();fork.dispose();
+ for(const maxViews of [0,1,4,3.5,Infinity,'3',null])assert.throws(()=>setup({maxViews}),/slots/);
+});
