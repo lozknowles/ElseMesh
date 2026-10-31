@@ -1,0 +1,87 @@
+{
+  "schema": "elsemesh.world-repository/3",
+  "version": 3,
+  "projectSchema": "elsemesh.worlds.project/2",
+  "engine": {
+    "commit": "95719848d5ffa4428b57c75c272483e1c2113a72",
+    "contract": "elsemesh.worlds.runtime/1",
+    "requires": [
+      "object-access/1",
+      "objects",
+      "portal/1",
+      "project/2",
+      "terrain",
+      "weather"
+    ]
+  },
+  "snapshot": "4e579ac6872afd436748eb1abbd809d18851ed1cde4c7567b4f21a31c3243ec4",
+  "components": {
+    "metadata": {
+      "path": "snapshots/4e579ac6872afd436748eb1abbd809d18851ed1cde4c7567b4f21a31c3243ec4/metadata.json",
+      "sha256": "39adbc63815f29b5e37f7c1ce2cff73ba85700484bc13d5d83fd8d3bc78eab63",
+      "bytes": 299
+    },
+    "terrain": {
+      "path": "snapshots/4e579ac6872afd436748eb1abbd809d18851ed1cde4c7567b4f21a31c3243ec4/terrain.json",
+      "sha256": "ebde5fd57e14bdc64ae7a2699ad7f9881497b89eccc3d54480b7e9ad1694d304",
+      "bytes": 59265
+    },
+    "objects": {
+      "path": "snapshots/4e579ac6872afd436748eb1abbd809d18851ed1cde4c7567b4f21a31c3243ec4/objects.json",
+      "sha256": "0434db62650de36f4e648341f58fc9af483493493a1a66ec68c4cc7b80e4ff87",
+      "bytes": 1643
+    },
+    "features": {
+      "path": "snapshots/4e579ac6872afd436748eb1abbd809d18851ed1cde4c7567b4f21a31c3243ec4/features.json",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "bytes": 3
+    },
+    "environment": {
+      "path": "snapshots/4e579ac6872afd436748eb1abbd809d18851ed1cde4c7567b4f21a31c3243ec4/environment.json",
+      "sha256": "81fe6d23790e52b24deb3c200659d45218e47746ac4160e1986edf0c47c8a0fb",
+      "bytes": 177
+    },
+    "spawn": {
+      "path": "snapshots/4e579ac6872afd436748eb1abbd809d18851ed1cde4c7567b4f21a31c3243ec4/spawn.json",
+      "sha256": "effa60a17ed427f455211f3d1f9a732027e17a0ec82c60f37a4548f75a9c32d5",
+      "bytes": 87
+    },
+    "geography": {
+      "path": "snapshots/4e579ac6872afd436748eb1abbd809d18851ed1cde4c7567b4f21a31c3243ec4/geography.json",
+      "sha256": "f1458c60dfd49fdb5f41ed852e5627e02445867a5a505e5863982b37ac6d7902",
+      "bytes": 50
+    },
+    "assets": {
+      "path": "snapshots/4e579ac6872afd436748eb1abbd809d18851ed1cde4c7567b4f21a31c3243ec4/assets.json",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "bytes": 3
+    },
+    "connections": {
+      "path": "snapshots/4e579ac6872afd436748eb1abbd809d18851ed1cde4c7567b4f21a31c3243ec4/connections.json",
+      "sha256": "1c0e6dbc3744b2ba400c94c0e053734824a20682c40d3e9eed0d366174027db1",
+      "bytes": 812
+    }
+  },
+  "world": {
+    "name": "Neon Shift",
+    "description": "Original cyberpunk arcade plaza with a stable fenced walking area and a changing visual city beyond its boundary.",
+    "worldId": "elsemesh.world:81ae2994-59ba-499b-bb79-ba72927f6720",
+    "regionId": "elsemesh.region:4ad8d3ee-6eb6-494c-98b0-61b969e08316"
+  },
+  "regions": [
+    {
+      "regionId": "elsemesh.region:4ad8d3ee-6eb6-494c-98b0-61b969e08316",
+      "name": "Neon Shift",
+      "scene": {
+        "snapshot": "4e579ac6872afd436748eb1abbd809d18851ed1cde4c7567b4f21a31c3243ec4"
+      }
+    }
+  ],
+  "attribution": {
+    "authors": [
+      "DRG Software Solutions LLC"
+    ],
+    "license": "MIT",
+    "source": "Original ElseMesh Neon Shift scene, 2026"
+  }
+}

@@ -42791,6 +42791,36 @@
         "frameColor": "#ffbf75",
         "unavailableColor": "#334455"
       }
+    },
+    {
+      "id": "elsemesh-portal:e5457f22-d2c9-41af-8ca2-30a5074a0f97",
+      "name": "Neon Shift",
+      "position": [
+        1.4,
+        4.8,
+        -81
+      ],
+      "yaw": 0,
+      "width": 2,
+      "height": 3.6,
+      "destination": {
+        "worldId": "elsemesh.world:81ae2994-59ba-499b-bb79-ba72927f6720",
+        "regionId": "elsemesh.region:4ad8d3ee-6eb6-494c-98b0-61b969e08316",
+        "portalId": "elsemesh-portal:fb3eb814-5a1d-4769-89b0-6cb48f5f51f6"
+      },
+      "enabled": true,
+      "view": {
+        "enabled": true,
+        "maxDistance": 60
+      },
+      "traversal": {
+        "enabled": true
+      },
+      "policyRef": "public-world-tour",
+      "visual": {
+        "frameColor": "#41fff4",
+        "unavailableColor": "#382145"
+      }
     }
   ],
   "water": {

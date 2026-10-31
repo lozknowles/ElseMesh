@@ -45,3 +45,7 @@ The dining table, six chairs, two nesting tables, ground-floor side table and me
 The gold doorway at [-1.5, 4.45, -78.5] now leads to Table Tennis Room by ethan3111 (CC BY 4.0), with a reciprocal Warehouse return. The blue Dock doorway connects to the curated Bracken Quay Dock in `worlds/dock/`, including its required licences and modification sources. The Sunset scan, collision files and obsolete destination snapshot have been removed from the current repository tree. The former scene remains recoverable through Git history.
 
 Room source, original downloaded files, hash inventory, attribution and local collision review are in `worlds/table-tennis-room/`. Gameplay scale is assumed. Floor/table/safety proxies are conservative authored geometry; adjacent gym, outdoor access and stairs are outside the walkable crop. Requires an engine with the published-SOG source-manifest provenance variant and the exact Room profile.
+
+## Neon Shift doorway
+
+The cyan doorway at [1.4, 4.8, -81] leads to the original Neon Shift arcade plaza, with a reciprocal Warehouse return. Its flat safe walking plaza, perimeter barriers and doorway stay fixed; the game changes the visual city outside the barriers every minute. Source and MIT attribution are in `worlds/neon-shift/`. Prior immutable Warehouse snapshots are retained for recovery. CPU clearance does not establish browser or physical-device acceptance.

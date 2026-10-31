@@ -1,0 +1,117 @@
+[
+  {
+    "id": "neon-plaza-floor",
+    "kind": "box",
+    "name": "neon-plaza-floor",
+    "position": [
+      0,
+      -0.1,
+      0
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      30,
+      0.125,
+      30
+    ],
+    "collision": "walkable",
+    "color": "#090d21",
+    "visible": true
+  },
+  {
+    "id": "neon-boundary-east",
+    "kind": "box",
+    "name": "neon-boundary-east",
+    "position": [
+      24.5,
+      5,
+      0
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      0.625,
+      6.25,
+      31.25
+    ],
+    "collision": "solid",
+    "color": "#122239",
+    "visible": true
+  },
+  {
+    "id": "neon-boundary-west",
+    "kind": "box",
+    "name": "neon-boundary-west",
+    "position": [
+      -24.5,
+      5,
+      0
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      0.625,
+      6.25,
+      31.25
+    ],
+    "collision": "solid",
+    "color": "#122239",
+    "visible": true
+  },
+  {
+    "id": "neon-boundary-north",
+    "kind": "box",
+    "name": "neon-boundary-north",
+    "position": [
+      0,
+      5,
+      24.5
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      31.25,
+      6.25,
+      0.625
+    ],
+    "collision": "solid",
+    "color": "#172039",
+    "visible": true
+  },
+  {
+    "id": "neon-boundary-south",
+    "kind": "box",
+    "name": "neon-boundary-south",
+    "position": [
+      0,
+      5,
+      -24.5
+    ],
+    "rotation": [
+      0,
+      0,
+      0
+    ],
+    "scale": [
+      31.25,
+      6.25,
+      0.625
+    ],
+    "collision": "solid",
+    "color": "#172039",
+    "visible": true
+  }
+]
