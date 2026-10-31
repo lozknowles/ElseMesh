@@ -32,8 +32,8 @@ test('generated publication contains every manifest, native and lazy SOG/physics
  for(const route of catalog.routes){const p=projects.find(p=>p.world.worldId===route.sourceWorldId).connections.portals.find(p=>p.id===route.portalId);assert.ok(p.enabled);assert.equal(p.destination.worldId,route.destinationWorldId);assert.equal(p.destination.portalId,route.destinationPortalId);}
 });
 test('publication preserves editor, notices, immutable opening pin and excludes lab/source evidence artifacts',async()=>{
- const credits=await fs.readFile(path.join(root,'credits.html'),'utf8'),openingEntry=catalog.worlds.find(w=>w.worldId===catalog.openingWorldId);
- for(const name of ['ATTRIBUTION.md','LICENSE','NATIVE-VEGETATION-CREDITS.md']){assert.ok(credits.includes(openingEntry.bundlePath+name));await fs.access(path.join(root,openingEntry.bundlePath,name));}
+ const openingCredits=await fs.readFile(path.join(root,'credits.html'),'utf8'),openingEntry=catalog.worlds.find(w=>w.worldId===catalog.openingWorldId);
+ for(const name of ['ATTRIBUTION.md','LICENSE','NATIVE-VEGETATION-CREDITS.md']){assert.ok(openingCredits.includes(openingEntry.bundlePath+name));await fs.access(path.join(root,openingEntry.bundlePath,name));}
  const config=JSON.parse(await fs.readFile(path.join(root,'opening-world.json'),'utf8')),opening=catalog.worlds.find(w=>w.worldId===catalog.openingWorldId);assert.equal(config.bundlePath,opening.bundlePath);assert.equal(config.contentDigest,opening.contentDigest);await fs.access(path.join(root,'editor/index.html'));await fs.access(path.join(root,'licenses/SPARK-LICENSE.txt'));
  const denied=/^sources$|\.(?:mp4|ply|sqlite|pem|pyc)$|client-identities|owner-trace|sensor\.jsonl|\.local-evidence/i;
  async function visit(dir){for(const name of await fs.readdir(dir)){assert.ok(!denied.test(name),name);const full=path.join(dir,name),info=await fs.lstat(full);assert.ok(!info.isSymbolicLink());if(info.isDirectory())await visit(full);}}
@@ -82,3 +82,4 @@ test('generated publication preserves separately hashed output-surface derivativ
  const chunks=Object.entries(manifest.finalChunks);assert.ok(chunks.length>0&&chunks.length<=256);assert.equal(manifest.transformedModule.chunks.length,1);assert.ok(Object.hasOwn(manifest.finalChunks,manifest.transformedModule.chunks[0]));
  for(const [name,digest]of chunks){assert.match(name,/^assets\/[A-Za-z0-9_-][A-Za-z0-9_.-]*\.js$/);assert.ok(!name.includes('..'));assert.match(digest,/^[a-f0-9]{64}$/);const chunk=path.join(root,name),stat=await fs.lstat(chunk);assert.ok(stat.isFile()&&!stat.isSymbolicLink());assert.equal(sha(await fs.readFile(chunk)),digest,name);}
 });
+
