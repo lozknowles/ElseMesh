@@ -2,24 +2,24 @@
   "schema": "elsemesh.publication/1",
   "outputSurfaceDerivative": {
     "manifest": "output-surface-derivative.json",
-    "sha256": "052b0eab7930e0d07b75258f2fcf40d87220dc86377c22525da6b9a21f55dc69",
+    "sha256": "8440bffcd98c038344835266cb4fa5d9bc2c78589d414fad0f4b597b464f01c9",
     "version": "1.0.0",
-    "upstreamSourceSha256": "98bcd32c879ccdd4ba4ad0e04039c98aa9958ad4b4e0a741a5562ea915a12a5f",
-    "transformSha256": "8659c73ce5321097747b95e06de327eb9af36cd5293bc8cb8e821f6a3d059ef5",
-    "transformedModuleSha256": "eb69d23b89eb41d22cd9e92d0ea0a06de48bbe6c517c2ad51e1762dd0e67190b",
+    "upstreamSourceSha256": "633a828536b774c71c2f0feae31f262fef387233afad1c2fa2e90b624288d42a",
+    "transformSha256": "2dccb420c87deab0ed7508cbd4989a20112b2e0f558c9790ef9d6160eaf93ab9",
+    "transformedModuleSha256": "037f6dea42d7d076530362fed49dc96d222793e04e97c22c5cff176a3b8d0fd7",
     "finalChunks": {
       "assets/Colliders-u7qqebLy.js": "5c513d01330b57d2db44907fc7eb26434573d8b93f92099ca5ed9b826c9c44ab",
-      "assets/main-B8tqqYJb.js": "cd55a8a67bc34c11e9a50501a14055371712b424a66e4d11e99c0618ac89aa4d",
+      "assets/main-CywUcfUP.js": "a3826bce447dec487372e8433d42783970377942451270727e77888e45d6a353",
       "assets/PlayerEyeControls-CWnrbWq1.js": "007010d9cec58fd310bd4fd5a32849792307e716175d03ccc919cdab944d65d2",
       "assets/PlayerEyePanel-DRdLArCK.js": "0f23f6d155c6c9a507ca0730fcd27add967a3c44b71f16b5fd4a8a59182dadc6",
       "assets/PlayerEyeView-DvEGwbv3.js": "efe7fae17e59db0b69d6a8d20e467f15793160cfc815e02fdbcfd0dcd4cd9d18",
       "assets/RepositoryPlayerEyes-BXZVQ6pq.js": "4986d0f5b08c8ed55a033dd86eecad1ab598c2222ecf19d63f171fbd7fe8401a",
-      "assets/spark.module-DBG10yRQ.js": "c5bf3b37b0855f0dcd7b8ac2bd35c2ff96db0683e85131463f43ca6cbc475eab",
-      "assets/SplatScenePhysics-kuUY3y1B.js": "85bda9e630d68c1deb50cf731e9c44fa0b97e63dc11ce6e111d0122950f7c97c",
-      "assets/WebGLPlayerEyeRenderer-CcdnU0wM.js": "5e5c0fe43a72f0899b788a3c6f64aaafd5daf2b8c7628cb1b1ddc710e71043b5",
-      "assets/WebGLPortalViews-z72fyODp.js": "9ef00b8955b6b52fcdd61df6de73af3c9230e849c28ccc27b1333171617bbead",
-      "assets/WebGLRepositoryScene-BoJnwezO.js": "c3ebf0035fbe5cad695f8ff747f938b4d770ca554e37d8acd3e4697109cb497c",
-      "assets/world-engine-contract-DH5HBdQJ.js": "98ab2fcf6067fdd72e81b3b9a2bd04c6bd0104ccc8dce7488bff7c9b17bf069b"
+      "assets/spark.module-C6xmu7Sr.js": "e7703b7f7cf4b376e44d3e94a36eaddda805609f2533e269f978b52c40c1df0a",
+      "assets/SplatScenePhysics-BszIUdlc.js": "58482c966b875f63327a41178b35bb15352d0b2662cbafe0cb651fc37a217bcf",
+      "assets/WebGLPlayerEyeRenderer-DLCul3GS.js": "8a90858d95b3194c63da8cdf7f6aea42fe2202a09af0f8078d82c5660211c8ca",
+      "assets/WebGLPortalViews-0qkARXON.js": "527783e430439aaaf438e27aaf78eb937c09db7efa6af815bc0631843ab584ee",
+      "assets/WebGLRepositoryScene-Xk3kVH5z.js": "21a346fd31a48ac367d4a1253f0ebe6b21b1677d5ca26bdb161d605ae2e38484",
+      "assets/world-engine-contract-CVcMZ1Us.js": "b0089ce1cba2470f57b54b86c49317b4b031d29dc9dda4164dd37ffda01ca8a1"
     }
   },
   "editorCommit": "660da0ce7c4c1b42fb86133b0cfbb7e3af5463a6",
@@ -32,46 +32,50 @@
       "bundledWithOpening": false
     }
   ],
-  "engineCommit": "5a718154a59730b90137e1b4230458c0ee8b283d",
+  "engineCommit": "2d9635be66689ed17f5c7187bca56470f9bab924",
   "worldContract": {
     "sourceNormalization": "UTF-8 LF",
-    "commit": "6c4d4a7e0781974dcc167ff1ce669e4e5909f603",
-    "bundleSha256": "98bcd32c879ccdd4ba4ad0e04039c98aa9958ad4b4e0a741a5562ea915a12a5f",
-    "baseBundleSha256": "98bcd32c879ccdd4ba4ad0e04039c98aa9958ad4b4e0a741a5562ea915a12a5f",
+    "commit": "7acac33d27c917302622c9b4b745ad20399fe40e",
+    "bundleSha256": "633a828536b774c71c2f0feae31f262fef387233afad1c2fa2e90b624288d42a",
+    "baseBundleSha256": "633a828536b774c71c2f0feae31f262fef387233afad1c2fa2e90b624288d42a",
     "downstreamPatches": []
   },
-  "worldRepositoryCommit": "9a292002611928ef8a867ed939c8aa20c56a5283",
+  "worldRepositoryCommit": "4e3760cc4ea3d12bae94c64682222abf8b44806f",
   "openingWorldId": "elsemesh.world:2842c4f2-93a0-4492-b942-e53e524de319",
   "worlds": [
     {
       "worldId": "elsemesh.world:2842c4f2-93a0-4492-b942-e53e524de319",
-      "contentDigest": "fcba18b28ac9b8bf7ef52a1fc8ba0d3dc489d0bd4c94c651cdc559a7617a0e5d",
-      "bundlePath": "worlds/fcba18b28ac9b8bf7ef52a1fc8ba0d3dc489d0bd4c94c651cdc559a7617a0e5d/"
+      "contentDigest": "9e45eda57c26c7ac1622504b0093be6291e5115bd5e77d3baf299d54e3df3809",
+      "bundlePath": "worlds/9e45eda57c26c7ac1622504b0093be6291e5115bd5e77d3baf299d54e3df3809/"
     },
     {
-      "worldId": "elsemesh.world:0934ce76-df15-406f-914e-74209d48accf",
-      "contentDigest": "3d904b583d30a198311e0b64248b93c689cf6c2442259964f822794346778992",
-      "bundlePath": "worlds/3d904b583d30a198311e0b64248b93c689cf6c2442259964f822794346778992/"
+      "worldId": "elsemesh.world:5c2e6618-a04a-4460-912a-bfc57bc5bbad",
+      "contentDigest": "f231b6e2e49f3dfebd19f7217895d00479bac27bf73e2eeb3295f244e8dec547",
+      "bundlePath": "worlds/f231b6e2e49f3dfebd19f7217895d00479bac27bf73e2eeb3295f244e8dec547/"
     }
   ],
   "routes": [
     {
       "sourceWorldId": "elsemesh.world:2842c4f2-93a0-4492-b942-e53e524de319",
       "portalId": "elsemesh-portal:3b1b0e2d-bb73-4660-b916-2edf7678699a",
-      "destinationWorldId": "elsemesh.world:0934ce76-df15-406f-914e-74209d48accf",
-      "destinationPortalId": "elsemesh-portal:972286d8-9a0b-41c1-b100-1fe35fdf935d"
+      "destinationWorldId": "elsemesh.world:5c2e6618-a04a-4460-912a-bfc57bc5bbad",
+      "destinationPortalId": "elsemesh-portal:e65ee4f4-6357-4e80-bfe4-341a07965c0c"
     },
     {
-      "sourceWorldId": "elsemesh.world:0934ce76-df15-406f-914e-74209d48accf",
-      "portalId": "elsemesh-portal:972286d8-9a0b-41c1-b100-1fe35fdf935d",
+      "sourceWorldId": "elsemesh.world:5c2e6618-a04a-4460-912a-bfc57bc5bbad",
+      "portalId": "elsemesh-portal:e65ee4f4-6357-4e80-bfe4-341a07965c0c",
       "destinationWorldId": "elsemesh.world:2842c4f2-93a0-4492-b942-e53e524de319",
       "destinationPortalId": "elsemesh-portal:3b1b0e2d-bb73-4660-b916-2edf7678699a"
     }
   ],
   "scene": {
+    "name": "Table Tennis Room",
     "count": 719538,
-    "assetSha256": "66334b9bcea5abb6b2a310c44c584fd7fdc8fb999db9c718c785473c41019298",
-    "physicsSha256": "eedaeb18bfa8eacbee42c10d105b67d519f9351fb75879f4306645cf1d3a3757"
+    "assetSha256": "9af82f32ac8644b8b501fb88b613f076e119fc133c1777766c90ff3e01566c92",
+    "physicsSha256": "8319d31ebd3d3887300c27bec2c53dfd02f541ec83c0f00ae12bff3a94cba240",
+    "sourceManifestSha256": "56030775a2ccd74a46c7ab4c9a9de0853327e06cecfa7dfc2465c7492cc4edd8",
+    "reviewSha256": "519d3e87d62ed3d172ee3caab080ddd3af2d2882915064ced7815e28256c868c",
+    "auditedOriginalBytes": 14955138
   },
   "previousPublicEditorPreserved": true
 }

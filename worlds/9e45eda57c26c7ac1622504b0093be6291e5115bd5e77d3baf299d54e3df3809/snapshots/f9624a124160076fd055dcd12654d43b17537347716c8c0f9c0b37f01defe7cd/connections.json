@@ -42764,19 +42764,19 @@
     },
     {
       "id": "elsemesh-portal:3b1b0e2d-bb73-4660-b916-2edf7678699a",
-      "name": "Sunset Courtyard",
+      "name": "Table Tennis Room",
       "position": [
         -1.5,
         4.45,
         -78.5
       ],
       "yaw": 0,
-      "width": 2.06,
+      "width": 1.4,
       "height": 2.9,
       "destination": {
-        "worldId": "elsemesh.world:0934ce76-df15-406f-914e-74209d48accf",
-        "regionId": "elsemesh.region:36223aca-24ea-459b-8c9e-68f943bb0e27",
-        "portalId": "elsemesh-portal:972286d8-9a0b-41c1-b100-1fe35fdf935d"
+        "worldId": "elsemesh.world:5c2e6618-a04a-4460-912a-bfc57bc5bbad",
+        "regionId": "elsemesh.region:d963f2f2-835c-4a4b-9296-9542c9d79a01",
+        "portalId": "elsemesh-portal:e65ee4f4-6357-4e80-bfe4-341a07965c0c"
       },
       "enabled": true,
       "view": {
