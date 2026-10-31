@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {loadWorldSource,packWorldRepository,validateSplatScene,repositoryDigest} from '../src/world-runtime/vendor/world-engine-contract.js';
+import {loadWorldSource,packWorldRepository,validateSplatScene,repositoryDigest,mapPortalPoint,portalWorldPoint,sweepPortalCapsule} from '../src/world-runtime/vendor/world-engine-contract.js';
 import {TABLE_TENNIS_SPLAT_PROFILE,assertQualifiedSplatProfile} from '../src/world-runtime/SplatSceneProfiles.js';
 import {compileSplatScenePhysics} from '../src/world-runtime/SplatScenePhysics.js';
 import {loadVerifiedPhysicsBytes} from '../src/world-runtime/SplatSceneSource.js';
@@ -37,4 +37,29 @@ test('actual Room provenance variants, pins and payload corruption fail closed',
  }
  for(const provenance of [{...loaded.project.splatScene.provenance,videoSha256:'a'.repeat(64)},{...loaded.project.splatScene.provenance,sourceFormat:'ply'},{...loaded.project.splatScene.provenance,sourceManifestSha256:'bad'}])assert.ok(validateSplatScene({...loaded.project.splatScene,provenance}).length);
  for(const ref of [loaded.project.splatScene.asset,loaded.project.splatScene.physics])await assert.rejects(prepareSplatWorldPhysics(loaded.project,async(relative,limit)=>{const bytes=await read(relative,limit);if(relative===ref.path){const corrupt=bytes.slice();corrupt[0]^=1;return corrupt;}return bytes;}),/hash|integrity|SHA/i);
+});
+test('actual reciprocal doorway supports the full usable entrance lane and slightly angled egress',{skip:!sourceRoot},async()=>{
+ const {root,read,loaded}=await fixture(),warehouseRoot=await fs.realpath(path.join(root,'../..'));
+ const warehouse=await loadWorldSource({kind:'local',read:async(relative,limit)=>{assert.ok(isRepositoryContentPath(relative));const full=await fs.realpath(path.join(warehouseRoot,relative));assert.ok(full.startsWith(warehouseRoot+path.sep));const info=await fs.lstat(full);assert.ok(info.isFile()&&info.size<=limit);return new Uint8Array(await fs.readFile(full));}});
+ const source=warehouse.project.portals.find(p=>p.destination.worldId===loaded.project.metadata.worldId),destination=loaded.project.portals.find(p=>p.id===source.destination.portalId),physics=await compileSplatScenePhysics(loaded.project,await loadVerifiedPhysicsBytes(loaded.project,read));
+ assert.equal(source.width,destination.width);assert.equal(destination.width,1.4);assert.equal(destination.position[0],1.8);
+ const radius=.3,margin=.1,usable=Math.min(source.width,destination.width)/2-radius-margin;
+ assert.ok(Math.abs(usable-.3)<1e-12);let samples=0;
+ // Include both exact lane endpoints, every 5 mm between them, and small
+ // outward headings in each direction. The real mapping supplies foot height.
+ for(let lane=0;lane<=120;lane++){
+  const lateral=-usable+2*usable*lane/120,previous=portalWorldPoint(source,[lateral,-source.height/2,.005]),crossed=portalWorldPoint(source,[lateral,-source.height/2,-.005]);
+  assert.ok(sweepPortalCapsule({portal:source,previousFeet:previous,nextFeet:crossed,radius,bodyHeight:1.8}));
+  const incoming=mapPortalPoint(source,destination,crossed);assert.ok(physics.clearance(incoming),JSON.stringify({lateral,incoming}));
+  for(const heading of [-.1,0,.1])for(let step=1;step<=21;step++){
+   const distance=step*.05,localLateral=-lateral+Math.tan(heading)*(distance-.005),egress=portalWorldPoint(destination,[localLateral,-destination.height/2,distance]);
+   const segment=physics.segment(incoming,egress);assert.ok(segment.valid,JSON.stringify({lateral,heading,distance,incoming,egress,reason:segment.reason}));samples++;
+  }
+ }
+ assert.equal(samples,7623);
+ // Captured failure: the former wide aperture admitted local X -0.552,
+ // mapping to Room X 2.502 beyond its supported whole-footprint boundary.
+ const oldSource={...source,width:2.06},oldDestination={...destination,width:2.06,position:[1.95,...destination.position.slice(1)]},oldBefore=portalWorldPoint(oldSource,[-.552,-source.height/2,.005]),oldAfter=portalWorldPoint(oldSource,[-.552,-source.height/2,-.005]),badArrival=mapPortalPoint(oldSource,oldDestination,oldAfter);
+ assert.ok(sweepPortalCapsule({portal:oldSource,previousFeet:oldBefore,nextFeet:oldAfter,radius,bodyHeight:1.8}));assert.ok(Math.abs(badArrival[0]-2.502)<1e-10);assert.equal(physics.clearance(badArrival),false);assert.equal(physics.segment(badArrival,portalWorldPoint(oldDestination,[.552,-destination.height/2,1.05])).valid,false);
+ assert.equal(sweepPortalCapsule({portal:source,previousFeet:oldBefore,nextFeet:oldAfter,radius,bodyHeight:1.8}),null);
 });
