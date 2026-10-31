@@ -39,6 +39,14 @@ This is not a surveyed reconstruction or a physical-device qualification.
   checks. No CSS or comparison normalization was introduced as a workaround.
 - COMPLETION: recorded after the packaged browser checks and final review.
 
+Repeated browser traversal caught a third-entry edge failure: an accepted source
+lane at local x=-0.552 mapped to unsupported x=2.50 in the room. Both doorway widths
+are now 1.4 m, with the room doorway centred at x=1.8. This corrects authored data
+rather than weakening destination clearance. Full entrance/egress-band regression
+checks accompany the narrower doorway. The room manifest identifies a compatible
+trial engine commit; the Warehouse's historical export commit does not set the
+minimum version for this new room.
+
 ## Validation
 
 Focused contract tests: 9 passed. Profile/readiness/source/physics/owner tests:

@@ -5,13 +5,13 @@
   "worlds": [
     {
       "worldId": "elsemesh.world:2842c4f2-93a0-4492-b942-e53e524de319",
-      "contentDigest": "bd14b0bcebcfcf1d0ae50bb34729c284a7c81f78a0cc366d8f3e29203d38f2e8",
-      "bundlePath": "worlds/bd14b0bcebcfcf1d0ae50bb34729c284a7c81f78a0cc366d8f3e29203d38f2e8/"
+      "contentDigest": "9e45eda57c26c7ac1622504b0093be6291e5115bd5e77d3baf299d54e3df3809",
+      "bundlePath": "worlds/9e45eda57c26c7ac1622504b0093be6291e5115bd5e77d3baf299d54e3df3809/"
     },
     {
       "worldId": "elsemesh.world:5c2e6618-a04a-4460-912a-bfc57bc5bbad",
-      "contentDigest": "2a76c5f432ce18ba87f92c7a0134b24cfe3182798d6a6faa0786d46b42597bbc",
-      "bundlePath": "worlds/2a76c5f432ce18ba87f92c7a0134b24cfe3182798d6a6faa0786d46b42597bbc/"
+      "contentDigest": "04da297abb7952c8265640fdf359925f7afc7ff542c8605ab9c2c3782723ca22",
+      "bundlePath": "worlds/04da297abb7952c8265640fdf359925f7afc7ff542c8605ab9c2c3782723ca22/"
     }
   ],
   "routes": [
