@@ -78,3 +78,30 @@ image, and readable notes. Source checkout evidence remains under
 `.local-evidence/table-tennis-final/`.
 
 No production publication is implied by source, build or local-browser checks.
+
+## Retirement gate
+
+The requested source retirement removes `worlds/sunset/` and the obsolete
+Warehouse snapshot beginning `11269` from the current world repository tree.
+Git history and generic legacy qualification fixtures remain available. Current
+CI qualifies the actual Table Tennis Room rather than loading retired Sunset
+files. Retirement checks cover the tracked source tree, active catalog routes,
+and packaged world identities and SOG/physics payloads; retained compatibility
+application chunks are preserved. Source removal and local checks alone do not
+establish remote push or deployment completion.
+
+The retirement PLAN gate approved removing the obsolete complete snapshot rather
+than modifying content-addressed files, retaining synthetic compatibility tests,
+and checking operational helpers separately from historical experiments. The
+COMPLETION review found no material blocker after the clean build/package and
+runtime-closure comparison. Primary decision: advance the immutable contract,
+world and engine revisions in order with ancestry checks and no force pushes.
+
+Published source inputs: contract `7acac33d27c917302622c9b4b745ad20399fe40e`
+and retired-world source `4e3760cc4ea3d12bae94c64682222abf8b44806f`.
+The contract's remote CI run 41169849552 failed its dependency audit on twelve
+moderate advisories (minimatch GHSA-g3hv-75wg-m249); subsequent CI lint/build/tests
+were skipped. Its package and lock files are unchanged from prior main
+`660da0ce7c4c1b42fb86133b0cfbb7e3af5463a6`. The independent local TypeScript/Vite
+build and focused tests passed. This is an unmet green-CI criterion, not a claimed
+passing workflow or a dependency change introduced by the Room work.

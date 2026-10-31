@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {execFileSync} from 'node:child_process';
 import {loadWorldSource,packWorldRepository,validateSplatScene,repositoryDigest,mapPortalPoint,portalWorldPoint,sweepPortalCapsule} from '../src/world-runtime/vendor/world-engine-contract.js';
 import {TABLE_TENNIS_SPLAT_PROFILE,assertQualifiedSplatProfile} from '../src/world-runtime/SplatSceneProfiles.js';
 import {compileSplatScenePhysics} from '../src/world-runtime/SplatScenePhysics.js';
@@ -62,4 +63,12 @@ test('actual reciprocal doorway supports the full usable entrance lane and sligh
  const oldSource={...source,width:2.06},oldDestination={...destination,width:2.06,position:[1.95,...destination.position.slice(1)]},oldBefore=portalWorldPoint(oldSource,[-.552,-source.height/2,.005]),oldAfter=portalWorldPoint(oldSource,[-.552,-source.height/2,-.005]),badArrival=mapPortalPoint(oldSource,oldDestination,oldAfter);
  assert.ok(sweepPortalCapsule({portal:oldSource,previousFeet:oldBefore,nextFeet:oldAfter,radius,bodyHeight:1.8}));assert.ok(Math.abs(badArrival[0]-2.502)<1e-10);assert.equal(physics.clearance(badArrival),false);assert.equal(physics.segment(badArrival,portalWorldPoint(oldDestination,[.552,-destination.height/2,1.05])).valid,false);
  assert.equal(sweepPortalCapsule({portal:source,previousFeet:oldBefore,nextFeet:oldAfter,radius,bodyHeight:1.8}),null);
+});
+test('retired Sunset source is absent from the tracked world tree and active tour routes',{skip:!sourceRoot},async()=>{
+ const {root,loaded}=await fixture(),warehouseRoot=await fs.realpath(path.join(root,'../..')),tracked=execFileSync('git',['-C',warehouseRoot,'ls-files','-z'],{encoding:'utf8'}).split('\0').filter(Boolean),retiredWorld='elsemesh.world:0934ce76-df15-406f-914e-74209d48accf';
+ assert.ok(tracked.length>0);assert.ok(!tracked.some(name=>name==='worlds/sunset'||name.startsWith('worlds/sunset/')),'Git tracked index excludes retired world files');assert.ok(!tracked.some(name=>/^snapshots\/11269/.test(name)),'Git tracked index excludes obsolete Warehouse snapshot');
+ await assert.rejects(fs.access(path.join(warehouseRoot,'worlds/sunset')),{code:'ENOENT'});
+ const catalog=JSON.parse(await fs.readFile(new URL('../public/published-worlds.json',import.meta.url),'utf8'));assert.ok(!JSON.stringify(catalog).includes(retiredWorld));assert.equal(catalog.worlds.length,2);assert.ok(catalog.worlds.some(world=>world.worldId===loaded.project.metadata.worldId));
+ assert.ok(!JSON.stringify(loaded.project.portals).includes(retiredWorld));
+ const manifest=JSON.parse(await fs.readFile(path.join(warehouseRoot,'world.json'),'utf8')),connections=await fs.readFile(path.join(warehouseRoot,manifest.components.connections.path),'utf8');assert.ok(!connections.includes(retiredWorld));assert.ok(connections.includes(loaded.project.metadata.worldId));
 });

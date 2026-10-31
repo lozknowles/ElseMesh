@@ -7,8 +7,9 @@ import {execFileSync} from 'node:child_process';
 import {chromium} from 'playwright';
 import {shortestAngle,coarseTurnKey,yawTowardsXZ,predictPortalApproach,acceptValidatedApproach} from './public-sunset-navigation.mjs';
 const requested=process.env.PUBLIC_MICRODUCK_PACKAGE??process.argv[2];
-if(!requested)throw Error('Usage: PUBLIC_MICRODUCK_PACKAGE=packaged-directory PUBLIC_MICRODUCK_EVIDENCE=evidence-directory node test/public-sunset-browser.mjs');
+if(!requested)throw Error('Usage: PUBLIC_MICRODUCK_PACKAGE=packaged-directory PUBLIC_MICRODUCK_EVIDENCE=evidence-directory node test/public-microduck-browser.mjs');
 const root=await realpath(resolve(requested)),out=resolve(process.env.PUBLIC_MICRODUCK_EVIDENCE??'.local-evidence/public-microduck-browser'),mode=process.env.PUBLIC_MICRODUCK_TEST_MODE??'tour';
+const catalog=JSON.parse(await readFile(join(root,'published-worlds.json'),'utf8')),openingRoute=catalog.routes.find(r=>r.sourceWorldId===catalog.openingWorldId);assert.ok(openingRoute);
 await mkdir(out,{recursive:true,mode:0o700});
 const budget=Number(process.env.PUBLIC_MICRODUCK_GPU_BUDGET??768);assert.ok(Number.isFinite(budget)&&budget>0&&budget<=768);
 const gpuRead=()=>{const [used,free,total]=execFileSync('nvidia-smi',['--query-gpu=memory.used,memory.free,memory.total','--format=csv,noheader,nounits'],{encoding:'utf8'}).trim().split(',').map(Number);assert.ok([used,free,total].every(Number.isFinite));return {at:Date.now(),used,free,total};};
@@ -36,7 +37,7 @@ try{
  await page.goto(origin+'/',{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__repositoryWorldApp?.host.active&&window.__repositoryWorldApp.portals.mode==='published'&&window.__repositoryWorldApp.portals.enabled,null,{timeout:120000});
  const dismiss=page.getByRole('button',{name:'Dismiss',exact:true});if(await dismiss.isVisible())await dismiss.click();if(await page.locator('#panel-toggle').isVisible())await page.locator('#panel-toggle').click();await page.locator('canvas').focus();
- const door=await page.evaluate(()=>window.__repositoryWorldApp.host.active.project.portals.find(p=>/sunset/i.test(p.name)));assert.ok(door);await aimDoor(door);
+ const door=await page.evaluate(route=>window.__repositoryWorldApp.host.active.project.portals.find(p=>p.id===route.portalId&&p.destination.worldId===route.destinationWorldId),openingRoute);assert.ok(door);await aimDoor(door);
  const playerStart=await page.evaluate(()=>({world:window.__repositoryWorldApp.host.active.identity.worldId,position:window.__repositoryWorldApp.host.active.player.position.toArray()}));
  if(mode==='touch'){
  await page.waitForFunction(()=>window.__repositoryWorldApp.publicDuck.diagnostics().actor,null,{timeout:90000});
@@ -60,14 +61,14 @@ try{
   const start=await observe(),roots=start.visuals.map(v=>v.root).sort(),visualIds=start.visuals.map(v=>v.visual).sort();assert.equal(start.duck.visualCount,2);assert.equal(start.duck.actor.worldId,playerStart.world);samples.push(start);await page.screenshot({path:join(out,'warehouse-duck-start.png')});
   let inactiveCapture=false,returned=false;const until=Date.now()+170000;
   while(Date.now()<until){await page.waitForTimeout(500);const s=await observe(),actor=s.duck.actor;samples.push(s);assert.ok(actor,'actor remains active');assert.equal(s.duck.error,null);assert.equal(s.error,null);assert.equal(s.playerWorld,playerStart.world);assert.ok(Math.hypot(...s.player.map((v,i)=>v-playerStart.position[i]))<.001,'player stays fixed');assert.equal(s.duck.visualCount,2);assert.ok(s.duck.worlds.every(w=>w.bound));assert.equal(s.visuals.filter(v=>v.visible).length,1);assert.equal(s.visuals.find(v=>v.visible).worldId,actor.worldId);assert.deepEqual(s.visuals.map(v=>v.root).sort(),roots);assert.deepEqual(s.visuals.map(v=>v.visual).sort(),visualIds);assert.ok(s.cache.length<=2&&s.cache.every(c=>!c.disposed));assert.deepEqual(s.runtime.errors,[]);
-   if(actor.worldId!==playerStart.world&&!inactiveCapture&&s.portals.some(p=>p.id===door.id&&p.materialState===3&&p.hasImage)){await page.screenshot({path:join(out,'inactive-sunset-duck-through-portal.png')});inactiveCapture=true;}
+   if(actor.worldId!==playerStart.world&&!inactiveCapture&&s.portals.some(p=>p.id===door.id&&p.materialState===3&&p.hasImage)){await page.screenshot({path:join(out,'inactive-room-duck-through-portal.png')});inactiveCapture=true;}
    if(samples.length%10===0)await save();
    if(actor.traversalCount>=2&&actor.worldId===playerStart.world&&!actor.egressPending){returned=true;await page.screenshot({path:join(out,'warehouse-duck-return.png')});break;}
   }
   assert.equal(returned,true,'autonomous real-time roundtrip completes');assert.equal(inactiveCapture,true);
   const first=samples[0].duck.actor,last=samples.at(-1).duck.actor,wall=(samples.at(-1).clock-samples[0].clock)/1000;assert.ok(last.elapsed-first.elapsed>10);assert.ok(last.elapsed-first.elapsed<=wall+1,'simulation clock is not accelerated');
   assert.ok(samples.some(s=>s.duck.actor.clip==='Walk'));assert.ok(new Set(samples.map(s=>JSON.stringify(s.visuals.find(v=>v.visible).nodes))).size>5,'articulated animation changes');
-  await check('autonomous Warehouse to Sunset to Warehouse while player stays put',async()=>({first,last,wallSeconds:wall,samples:samples.length,roots,visualIds,inactiveCapture}));
+  await check('autonomous Warehouse to Table Tennis Room to Warehouse while player stays put',async()=>({first,last,wallSeconds:wall,samples:samples.length,roots,visualIds,inactiveCapture}));
  }
  await check('public default uses same-origin resources without identity or socket',async()=>{assert.equal(new URL(page.url()).search,'');assert.equal(await page.evaluate(()=>window.__repositoryWorldApp.backend),'webgl2');assert.deepEqual(sockets,[]);assert.ok(network.every(r=>r.url.startsWith(origin+'/')||r.url.startsWith('blob:')||r.url.startsWith('data:')));const config=requests.filter(r=>r.path==='/runtime-config');assert.equal(config.length,1);assert.equal(config[0].status,404);const dbs=await page.evaluate(()=>indexedDB.databases());assert.deepEqual(dbs,[]);assert.deepEqual(errors,[]);return {requests,network,sockets,databases:dbs};});
  await save();await writeFile(join(out,'report.json'),JSON.stringify({passed:true,mode,package:root,checks,errors,untested:['physical mobile','six-crossing player stress','pixel occlusion pending screenshot review']},null,2));console.log(JSON.stringify({passed:true,mode,out,checks:checks.length}));

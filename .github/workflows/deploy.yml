@@ -64,14 +64,12 @@ jobs:
             /editor/
             /assets/
             /publication.json
-      - name: Verify owner Sunset physics against pinned public data
-        run: ELSEMESH_PUBLIC_SUNSET_SOURCE_ROOT="$GITHUB_WORKSPACE/pinned-public-world" npm run test:owner-splat:actual
       - name: Verify Table Tennis Room profile and actual published physics
         run: ELSEMESH_PUBLIC_ROOM_SOURCE_ROOT="$GITHUB_WORKSPACE/pinned-public-world/worlds/table-tennis-room" npm run test:table-tennis-room
       - name: Package pinned public worlds and preserve editor
         run: |
           node tools/package-published-worlds.mjs dist pinned-public-world public-dist previous-pages
-          PUBLIC_SUNSET_PACKAGE=public-dist node --test test/published-world-package.mjs
+          PUBLIC_ROOM_PACKAGE=public-dist node --test test/published-world-package.mjs
       - uses: actions/configure-pages@v5
         if: steps.pages-mode.outputs.type == 'workflow'
       - uses: actions/upload-pages-artifact@v3

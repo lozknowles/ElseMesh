@@ -39,6 +39,16 @@ test('publication preserves editor, notices, immutable opening pin and excludes 
  async function visit(dir){for(const name of await fs.readdir(dir)){assert.ok(!denied.test(name),name);const full=path.join(dir,name),info=await fs.lstat(full);assert.ok(!info.isSymbolicLink());if(info.isDirectory())await visit(full);}}
  await visit(root);const credits=await fs.readFile(path.join(root,'credits.html'),'utf8');for(const text of ['Table Tennis Room','ethan3111','https://superspl.at/scene/0d9e613b','https://creativecommons.org/licenses/by/4.0/','decimation','orientation','gameplay-scale','authored collision'])assert.ok(credits.includes(text),text);
 });
+test('active publication closure excludes retired Sunset identities and payloads',async()=>{
+ const retiredWorld='elsemesh.world:0934ce76-df15-406f-914e-74209d48accf',retiredSog='66334b9bcea5abb6b2a310c44c584fd7fdc8fb999db9c718c785473c41019298.sog',retiredPhysics='eedaeb18bfa8eacbee42c10d105b67d519f9351fb75879f4306645cf1d3a3757.json';
+ assert.ok(!JSON.stringify(catalog).includes(retiredWorld));
+ const publishedWorlds=path.join(root,'worlds');assert.deepEqual((await fs.readdir(publishedWorlds)).sort(),catalog.worlds.map(world=>world.contentDigest).sort());
+ let inspected=0;async function inspect(directory){for(const item of await fs.readdir(directory,{withFileTypes:true})){assert.ok(!item.isSymbolicLink());assert.ok(![retiredSog,retiredPhysics,'sunset'].includes(item.name),item.name);const full=path.join(directory,item.name);if(item.isDirectory())await inspect(full);else if(item.name.endsWith('.json')){assert.ok(!(await fs.readFile(full,'utf8')).includes(retiredWorld),full);inspected++;}}}
+ await inspect(publishedWorlds);assert.ok(inspected>20);
+ const publication=await fs.readFile(path.join(root,'publication.json'),'utf8');assert.ok(!publication.includes(retiredWorld));
+ // Retained compatibility application chunks and historical documentation are
+ // deliberately outside this active-world payload/route closure assertion.
+});
 
 test('publication retains module closure used by an already-open warehouse tab',async()=>{
  const expected={
