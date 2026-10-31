@@ -8,7 +8,7 @@ import {inputSha256,patchOutputSurface,applyOutputSurfaceAnchors,createOutputSur
 
 const root=fileURLToPath(new URL('..',import.meta.url)),vendor=path.join(root,'src/world-runtime/vendor/world-engine-contract.js');
 const original=await fs.readFile(vendor,'utf8'),sha=bytes=>createHash('sha256').update(bytes).digest('hex');
-const qualifiedModuleSha='eb69d23b89eb41d22cd9e92d0ea0a06de48bbe6c517c2ad51e1762dd0e67190b';
+const qualifiedModuleSha='037f6dea42d7d076530362fed49dc96d222793e04e97c22c5cff176a3b8d0fd7';
 const anchors=[
  ['renderer-owned registration','    this.isWebGLRenderer = true;'],
  ['unlit colors','function getUnlitUniformColorSpace(renderer) {\n  const currentRenderTarget = renderer.getRenderTarget();'],

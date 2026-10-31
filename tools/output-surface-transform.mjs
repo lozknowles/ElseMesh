@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 
 // Guarded build/dev derivative. Tracked vendor bytes and their upstream
 // provenance remain untouched; emitted provenance identifies this transform separately.
-export const inputSha256='98bcd32c879ccdd4ba4ad0e04039c98aa9958ad4b4e0a741a5562ea915a12a5f';
+export const inputSha256='633a828536b774c71c2f0feae31f262fef387233afad1c2fa2e90b624288d42a';
 const sha=text=>createHash('sha256').update(text).digest('hex');
 export function patchOutputSurface(input){
  const original=input.replaceAll('\r\n','\n');

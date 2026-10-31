@@ -1,18 +1,15 @@
 import {registerPinnedSparkReadiness} from './SplatReadinessContract.js';
 import {T,validateSplatScene} from './vendor/world-engine-contract.js';
-import {loadVerifiedSog,loadVerifiedPhysicsBytes,assertPinnedSunsetPhysics} from './SplatSceneSource.js';
+import {loadVerifiedSog,loadVerifiedPhysicsBytes} from './SplatSceneSource.js';
+import {SUNSET_SPLAT_PROFILE,assertQualifiedSplatProfile} from './SplatSceneProfiles.js';
 
-export const PINNED_SUNSET_SOG=Object.freeze({sha256:'66334b9bcea5abb6b2a310c44c584fd7fdc8fb999db9c718c785473c41019298',bytes:12690032,count:719538});
-export const PINNED_SUNSET_TRANSFORM=Object.freeze({position:Object.freeze([1.585657106720535,1.235958392161293,-1.757775309929035]),rotation:Object.freeze([-Math.PI/2,0,0]),scale:11.2307273607188});
-export const PINNED_SUNSET_REVIEW_SHA256='f2c78d4f576dd04e112b824b948e00ec4843816370bad0cd836e740a0ef882ac';
+export const PINNED_SUNSET_SOG=SUNSET_SPLAT_PROFILE.asset;
+export const PINNED_SUNSET_TRANSFORM=SUNSET_SPLAT_PROFILE.transform;
+export const PINNED_SUNSET_REVIEW_SHA256=SUNSET_SPLAT_PROFILE.reviewSha256;
 /** Generic authored descriptors do not grant this experimental renderer a decode capability. */
 export function assertSupportedSplatScene(project){
  const errors=validateSplatScene(project?.splatScene);if(errors.length||!project?.splatScene)throw Error(errors[0]??'World has no splat scene.');
- assertPinnedSunsetPhysics(project);
- const asset=project.splatScene.asset;
- if(project.nativeIsland||asset.sha256!==PINNED_SUNSET_SOG.sha256||asset.bytes!==PINNED_SUNSET_SOG.bytes||asset.count!==PINNED_SUNSET_SOG.count||asset.count>1_000_000)throw Error('Experimental splat renderer accepts only the pinned qualified Sunset SOG.');
- const {transform,provenance}=project.splatScene;
- if(transform.scale!==PINNED_SUNSET_TRANSFORM.scale||!transform.position.every((value,i)=>value===PINNED_SUNSET_TRANSFORM.position[i])||!transform.rotation.every((value,i)=>value===PINNED_SUNSET_TRANSFORM.rotation[i])||provenance.reviewSha256!==PINNED_SUNSET_REVIEW_SHA256)throw Error('Experimental splat renderer requires the exact pinned Sunset game transform and reviewed source provenance.');
+ assertQualifiedSplatProfile(project);
  return structuredClone(project.splatScene);
 }
 export function applySplatSceneTransform(mesh,transform){mesh.position.fromArray(transform.position);mesh.rotation.fromArray(transform.rotation);mesh.scale.setScalar(transform.scale);mesh.updateMatrixWorld(true);return mesh;}
@@ -71,7 +68,7 @@ export async function warmupSplatResources({root,spark,renderer,camera,isDispose
 }
 /** No world activation. read must be the caller's verified bounded world-source capability. */
 export async function createSplatSceneAdapter(project,{read,renderer,camera}={}){
- const scene=assertSupportedSplatScene(project);project=structuredClone(project);
+ const scene=assertSupportedSplatScene(project);project=structuredClone(project);const profile=assertQualifiedSplatProfile(project);
  if(!renderer?.isWebGLRenderer||!camera?.isCamera)throw Error('Splat scene requires the installed WebGL renderer and camera.');
  const root=new T.Group();root.name='repository-splat-scene';root.userData.splatScene=true;
  const state={status:'loading',disposed:false,warmed:false,numSplats:0};let splat,spark,physics,preparing=null,released=false,readinessContract=null;
@@ -83,12 +80,13 @@ export async function createSplatSceneAdapter(project,{read,renderer,camera}={})
   if(!physics?.terrain?.heightAt||!physics.colliders?.resolveCapsule||typeof physics.clearance!=='function')throw Error('Splat physics compiler did not return admitted terrain and colliders.');
   const bytes=await loadVerifiedSog(project,read);
   const {SparkRenderer,SplatMesh,SplatAccumulator}=await import('@sparkjsdev/spark');
-  splat=new SplatMesh({fileBytes:bytes.slice(),fileName:'sunset-scene.sog',maxSplats:PINNED_SUNSET_SOG.count,lod:false});await splat.initialized;
-  if(splat.numSplats!==PINNED_SUNSET_SOG.count||splat.numSplats!==scene.asset.count||splat.numSplats>1_000_000)throw Error('Decoded Sunset splat count mismatch.');
+  // Both admitted profiles retain the exact legacy packed allocation count.
+  splat=new SplatMesh({fileBytes:bytes.slice(),fileName:'qualified-scene.sog',maxSplats:PINNED_SUNSET_SOG.count,lod:false});await splat.initialized;
+  if(splat.numSplats!==profile.asset.count||splat.numSplats!==scene.asset.count||splat.numSplats>1_000_000)throw Error('Decoded pinned splat count mismatch.');
   applySplatSceneTransform(splat,scene.transform);root.add(splat);spark=new SparkRenderer({renderer,autoUpdate:true,maxPixelRadius:96});root.add(spark);state.numSplats=splat.numSplats;state.status='decoded-awaiting-warmup';
   const adapter={root,spark,splat,state,terrain:physics.terrain,colliders:physics.colliders,clearance:physics.clearance,physics,
    expectedToneMapping:T.NoToneMapping,
-   prepareResources(warmCamera=camera){if(state.disposed)return Promise.reject(Error('Splat scene is disposed.'));if(state.warmed)return Promise.resolve();if(preparing)return preparing;try{state.initialPoolPreparation=preparePinnedAccumulatorTargets({spark,renderer,SplatAccumulator});}catch(error){state.preparationFailure={reason:'initial-pool-preparation',message:error.message};dispose();return Promise.reject(error);}preparing=warmupSplatResources({root,spark,renderer,camera:warmCamera,isDisposed:()=>state.disposed}).then(()=>{if(state.disposed)throw Error('Splat scene disposed during preparation.');state.warmed=true;state.status='ready';try{readinessContract=registerPinnedSparkReadiness(adapter,{asset:scene.asset});}catch(error){state.preparationFailure={reason:error.reason??'registration.error',details:error.details??null};error.message+=' '+JSON.stringify(state.preparationFailure).slice(0,3000);dispose();throw error;}},error=>{dispose();throw error;});return preparing;},
+   prepareResources(warmCamera=camera){if(state.disposed)return Promise.reject(Error('Splat scene is disposed.'));if(state.warmed)return Promise.resolve();if(preparing)return preparing;try{state.initialPoolPreparation=preparePinnedAccumulatorTargets({spark,renderer,SplatAccumulator});}catch(error){state.preparationFailure={reason:'initial-pool-preparation',message:error.message};dispose();return Promise.reject(error);}preparing=warmupSplatResources({root,spark,renderer,camera:warmCamera,isDisposed:()=>state.disposed}).then(()=>{if(state.disposed)throw Error('Splat scene disposed during preparation.');state.warmed=true;state.status='ready';try{readinessContract=registerPinnedSparkReadiness(adapter,{asset:scene.asset,project});}catch(error){state.preparationFailure={reason:error.reason??'registration.error',details:error.details??null};error.message+=' '+JSON.stringify(state.preparationFailure).slice(0,3000);dispose();throw error;}},error=>{dispose();throw error;});return preparing;},
    dispose,diagnostics:()=>({...state,readinessContract:readinessContract?.diagnostics()??null,assetSha256:scene.asset.sha256,assetBytes:scene.asset.bytes,declaredCount:scene.asset.count,backend:'Spark 2.4.0 / WebGL',toneMappingMatchesSource:renderer.toneMapping===T.NoToneMapping,scaleStatus:scene.scaleStatus})};return adapter;
  }catch(error){dispose();throw error;}
 }

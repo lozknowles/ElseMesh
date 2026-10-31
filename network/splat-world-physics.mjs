@@ -1,14 +1,13 @@
-import {loadVerifiedPhysicsBytes,loadVerifiedSog,assertPinnedSunsetPhysics} from '../src/world-runtime/SplatSceneSource.js';
+import {loadVerifiedPhysicsBytes,loadVerifiedSog} from '../src/world-runtime/SplatSceneSource.js';
 import {compileSplatScenePhysics} from '../src/world-runtime/SplatScenePhysics.js';
 import {describeRuntimeWorld,validateSplatScene} from '../src/world-runtime/vendor/world-engine-contract.js';
 import {Vector3} from '../src/engine/math/Vector3.js';
-const SOG=Object.freeze({sha256:'66334b9bcea5abb6b2a310c44c584fd7fdc8fb999db9c718c785473c41019298',bytes:12690032,count:719538});
+import {assertQualifiedSplatProfile} from '../src/world-runtime/SplatSceneProfiles.js';
 /** CPU-only owner admission. An authored Splat field never falls back to terrain. */
 export async function prepareSplatWorldPhysics(project,read){
  if(!Object.hasOwn(project,'splatScene'))return null;
  const errors=validateSplatScene(project.splatScene);if(errors.length)throw Error('Invalid owner splat scene: '+errors[0]);
- assertPinnedSunsetPhysics(project);const asset=project.splatScene.asset;
- if(project.nativeIsland||asset.sha256!==SOG.sha256||asset.bytes!==SOG.bytes||asset.count!==SOG.count)throw Error('Owner splat physics accepts only the exact qualified Sunset scene.');
+ assertQualifiedSplatProfile(project);
  // Verify both immutable resources; the owner does not decode or render SOG.
  await loadVerifiedSog(project,read);
  const physics=await compileSplatScenePhysics(project,await loadVerifiedPhysicsBytes(project,read));

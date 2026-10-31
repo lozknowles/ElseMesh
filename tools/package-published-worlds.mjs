@@ -4,26 +4,50 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {packageOutputSurfaceDerivative} from './output-surface-transform.mjs';
 import {validatePublishedWorldCatalog} from '../src/world-runtime/PublishedWorldCatalog.js';
+import {TABLE_TENNIS_SPLAT_PROFILE,assertQualifiedSplatProfile} from '../src/world-runtime/SplatSceneProfiles.js';
 import {loadWorldSource,repositoryDigest} from '../src/world-runtime/vendor/world-engine-contract.js';
 const [buildArg,worldArg,outputArg,previousPagesArg]=process.argv.slice(2);
 if(!buildArg||!worldArg||!outputArg||!previousPagesArg)throw Error('Usage: node tools/package-published-worlds.mjs BUILD PINNED_WORLD_REPOSITORY NEW_OUTPUT PREVIOUS_PUBLIC_PAGES');
 const build=await fs.realpath(buildArg),world=await fs.realpath(worldArg),previous=await fs.realpath(previousPagesArg),output=path.resolve(outputArg);
 const catalog=validatePublishedWorldCatalog(JSON.parse(await fs.readFile(path.join(build,'published-worlds.json'),'utf8')),{baseURL:'https://publication.invalid/ElseMesh/index.html'});
-const opening=catalog.worlds.find(w=>w.worldId===catalog.openingWorldId),sunset=catalog.worlds.find(w=>w.worldId!==catalog.openingWorldId);
+const opening=catalog.worlds.find(w=>w.worldId===catalog.openingWorldId),room=catalog.worlds.find(w=>w.worldId!==catalog.openingWorldId);
 const git=(...args)=>{const r=spawnSync('git',['-C',world,...args],{encoding:'utf8',maxBuffer:1024*1024});if(r.status)throw Error('Pinned public world Git check failed');return r.stdout.trim();};
 if(git('status','--porcelain','--untracked-files=all'))throw Error('World repository must be clean');const commit=git('rev-parse','HEAD');
 const openingConfig=JSON.parse(await fs.readFile(path.join(build,'opening-world.json'),'utf8'));
 if(openingConfig.worldId!==opening.worldId||openingConfig.contentDigest!==opening.contentDigest||!openingConfig.repository.endsWith('/tree/'+commit))throw Error('Opening configuration differs from catalog/source pin');
 const tool=fileURLToPath(new URL('./package-opening-world.mjs',import.meta.url));
 const base=spawnSync(process.execPath,[tool,build,world,output,opening.bundlePath],{stdio:'inherit'});if(base.status)throw Error('Opening package failed');
-const sourceRoot=await fs.realpath(path.join(world,'worlds/sunset')),needed=new Set(['world.json','README.md','ATTRIBUTION.md','LICENSE']);
+const sourceRoot=await fs.realpath(path.join(world,'worlds/table-tennis-room')),needed=new Set(['world.json','README.md','ATTRIBUTION.md','LICENSE']);
 const tracked=new Set(spawnSync('git',['-C',world,'ls-files','-z'],{encoding:'utf8',maxBuffer:1024*1024}).stdout.split('\0').filter(Boolean));
-const source={kind:'local',label:'public Sunset source',read:async(relative,limit)=>{needed.add(relative);if(!/^(?:world\.json|snapshots\/[a-f0-9]{64}\/[a-z-]+\.json|splat-scenes\/[a-f0-9]{64}\.(?:sog|json))$/.test(relative))throw Error('Unsupported Sunset source path');const full=await fs.realpath(path.join(sourceRoot,relative));if(!full.startsWith(sourceRoot+path.sep))throw Error('Sunset source escaped');const info=await fs.lstat(full);if(!info.isFile()||info.isSymbolicLink()||info.size>limit)throw Error('Invalid Sunset source file');return new Uint8Array(await fs.readFile(full));}};
-const loaded=await loadWorldSource(source,{expectedWorldId:sunset.worldId,expectedContentDigest:sunset.contentDigest});
-if(loaded.identity.worldId!==sunset.worldId||loaded.identity.contentDigest!==sunset.contentDigest||loaded.project.splatScene?.asset.count!==719538||loaded.project.objects.length)throw Error('Unexpected public Sunset content');
+const source={kind:'local',label:'public Table Tennis Room source',read:async(relative,limit)=>{needed.add(relative);if(!/^(?:world\.json|snapshots\/[a-f0-9]{64}\/[a-z-]+\.json|splat-scenes\/[a-f0-9]{64}\.(?:sog|json))$/.test(relative))throw Error('Unsupported Table Tennis Room source path');const full=await fs.realpath(path.join(sourceRoot,relative));if(!full.startsWith(sourceRoot+path.sep))throw Error('Table Tennis Room source escaped');const info=await fs.lstat(full);if(!info.isFile()||info.isSymbolicLink()||info.size>limit)throw Error('Invalid Table Tennis Room source file');return new Uint8Array(await fs.readFile(full));}};
+const loaded=await loadWorldSource(source,{expectedWorldId:room.worldId,expectedContentDigest:room.contentDigest});
+if(loaded.identity.worldId!==room.worldId||loaded.identity.contentDigest!==room.contentDigest||assertQualifiedSplatProfile(loaded.project)!==TABLE_TENNIS_SPLAT_PROFILE||loaded.project.objects.length)throw Error('Unexpected public Table Tennis Room content');
 // SOG/physics are lazy runtime resources: loadWorldSource reads their descriptor,
 // so publication must explicitly verify and include both immutable byte payloads.
-for(const [key,limit]of [['asset',16*1024*1024],['physics',8*1024*1024]]){const ref=loaded.project.splatScene[key];if(!/^splat-scenes\/[a-f0-9]{64}\.(sog|json)$/.test(ref.path)||!ref.path.includes(ref.sha256))throw Error('Invalid Sunset payload reference');const bytes=await source.read(ref.path,limit);if(bytes.byteLength!==ref.bytes||await repositoryDigest(bytes)!==ref.sha256)throw Error('Sunset payload integrity');}
+for(const [key,limit]of [['asset',16*1024*1024],['physics',8*1024*1024]]){const ref=loaded.project.splatScene[key];if(!/^splat-scenes\/[a-f0-9]{64}\.(sog|json)$/.test(ref.path)||!ref.path.includes(ref.sha256))throw Error('Invalid Table Tennis Room payload reference');const bytes=await source.read(ref.path,limit);if(bytes.byteLength!==ref.bytes||await repositoryDigest(bytes)!==ref.sha256)throw Error('Table Tennis Room payload integrity');}
+
+// Publish readable provenance records, while independently checking the tracked
+// source inventory. Original reconstruction inputs remain outside the package.
+const provenance=loaded.project.splatScene.provenance;
+const hash=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
+const exact=(value,keys)=>value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
+const readAudit=async sha256=>{if(!hash(sha256))throw Error('Invalid Room audit pin');const bytes=await source.read('splat-scenes/'+sha256+'.json',64*1024);if(await repositoryDigest(bytes)!==sha256)throw Error('Room audit record integrity');return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));};
+if(provenance.sourceFormat!=='sog'||!hash(provenance.sourceManifestSha256))throw Error('Room requires SOG source-manifest provenance');
+const review=await readAudit(provenance.reviewSha256);
+if(review.schema!=='elsemesh.table-tennis-review/1'||review.sourceManifestSha256!==provenance.sourceManifestSha256||!exact(review.asset,['sha256','bytes','count'])||review.asset.sha256!==TABLE_TENNIS_SPLAT_PROFILE.asset.sha256||review.asset.bytes!==TABLE_TENNIS_SPLAT_PROFILE.asset.bytes||review.asset.count!==TABLE_TENNIS_SPLAT_PROFILE.asset.count||JSON.stringify(review.transform)!==JSON.stringify(TABLE_TENNIS_SPLAT_PROFILE.transform))throw Error('Room review binding mismatch');
+const inventory=await readAudit(provenance.sourceManifestSha256);
+if(!exact(inventory,['schema','title','author','source','license','licenseURL','downloadBase','files','conversion','notes'])||inventory.schema!=='elsemesh.splat-source-manifest/1'||inventory.title!=='Table Tennis Room'||inventory.author!=='ethan3111'||inventory.source!=='https://superspl.at/scene/0d9e613b'||inventory.license!=='CC BY 4.0'||inventory.licenseURL!=='https://creativecommons.org/licenses/by/4.0/'||inventory.downloadBase!=='https://d28zzqy0iyovbz.cloudfront.net/0d9e613b/v1/'||typeof inventory.notes!=='string'||inventory.notes.length>12000||!Array.isArray(inventory.files)||inventory.files.length!==6)throw Error('Invalid Room source inventory');
+const conversion=inventory.conversion;
+if(!exact(conversion,['tool','version','command','sourceCount','outputCount'])||conversion.tool!=='@playcanvas/splat-transform'||conversion.version!=='2.3.2'||conversion.command!=='splat-transform --gpu cpu meta.json --decimate 719538 table-tennis.sog'||conversion.sourceCount!==1244410||conversion.outputCount!==TABLE_TENNIS_SPLAT_PROFILE.asset.count)throw Error('Room conversion inventory mismatch');
+const originals=new Set(['meta.json','means_l.webp','means_u.webp','scales.webp','quats.webp','sh0.webp'].map(name=>'sources/table-tennis/'+name));let originalBytes=0;
+for(const file of inventory.files){
+ if(!exact(file,['path','sha256','bytes'])||!originals.delete(file.path)||!hash(file.sha256)||!Number.isSafeInteger(file.bytes)||file.bytes<1||file.bytes>(file.path.endsWith('/meta.json')?64*1024:16*1024*1024)||!tracked.has('worlds/table-tennis-room/'+file.path))throw Error('Invalid or untracked Room source inventory entry');
+ originalBytes+=file.bytes;if(originalBytes>32*1024*1024)throw Error('Room original-source audit budget');
+ const unresolved=path.join(sourceRoot,file.path),info=await fs.lstat(unresolved),full=await fs.realpath(unresolved);
+ if(!full.startsWith(sourceRoot+path.sep)||!info.isFile()||info.isSymbolicLink()||info.size!==file.bytes)throw Error('Room original-source confinement or size mismatch');
+ const bytes=new Uint8Array(await fs.readFile(full));if(bytes.byteLength!==file.bytes||await repositoryDigest(bytes)!==file.sha256)throw Error('Room original-source integrity');
+}
+if(originals.size)throw Error('Incomplete Room original-source inventory');
 
 const warehouseManifest=JSON.parse(await fs.readFile(path.join(world,'world.json'),'utf8'));
 const connectionsRef=warehouseManifest.components.connections;
@@ -33,11 +57,11 @@ if(connectionsBytes.byteLength!==connectionsRef.bytes||await repositoryDigest(co
 const warehousePortals=JSON.parse(new TextDecoder().decode(connectionsBytes)).portals;
 for(const route of catalog.routes){const portals=route.sourceWorldId===opening.worldId?warehousePortals:loaded.project.portals;const door=portals.find(p=>p.id===route.portalId);if(!door?.enabled||door.destination.worldId!==route.destinationWorldId||door.destination.portalId!==route.destinationPortalId)throw Error('Catalog route differs from authored world');}
 
-if(await repositoryDigest(new Uint8Array(await fs.readFile(path.join(sourceRoot,'world.json'))))!==sunset.contentDigest)throw Error('Sunset manifest pin changed');
-const destination=path.join(output,sunset.bundlePath);await fs.mkdir(destination,{recursive:false});let total=0;
+if(await repositoryDigest(new Uint8Array(await fs.readFile(path.join(sourceRoot,'world.json'))))!==room.contentDigest)throw Error('Table Tennis Room manifest pin changed');
+const destination=path.join(output,room.bundlePath);await fs.mkdir(destination,{recursive:false});let total=0;
 for(const relative of [...needed].sort()){
- if(!tracked.has('worlds/sunset/'+relative))throw Error('Uncommitted public Sunset file');const full=await fs.realpath(path.join(sourceRoot,relative)),info=await fs.lstat(full);
- if(!full.startsWith(sourceRoot+path.sep)||!info.isFile()||info.isSymbolicLink())throw Error('Unsupported Sunset file');total+=info.size;if(total>32*1024*1024||needed.size>100)throw Error('Sunset package budget');
+ if(!tracked.has('worlds/table-tennis-room/'+relative))throw Error('Uncommitted public Table Tennis Room file');const full=await fs.realpath(path.join(sourceRoot,relative)),info=await fs.lstat(full);
+ if(!full.startsWith(sourceRoot+path.sep)||!info.isFile()||info.isSymbolicLink())throw Error('Unsupported Table Tennis Room file');total+=info.size;if(total>32*1024*1024||needed.size>100)throw Error('Table Tennis Room package budget');
  const target=path.join(destination,relative);await fs.mkdir(path.dirname(target),{recursive:true});await fs.copyFile(full,target);
 }
 async function inspect(dir){const info=await fs.lstat(dir);if(info.isSymbolicLink())throw Error('Symlink in public editor');if(info.isDirectory())for(const name of await fs.readdir(dir))await inspect(path.join(dir,name));else if(!info.isFile())throw Error('Invalid editor file');}
@@ -58,7 +82,7 @@ for(const name of priorNames){
 await inspect(path.join(previous,'editor'));await fs.cp(path.join(previous,'editor'),path.join(output,'editor'),{recursive:true,errorOnExist:true,force:false});
 await fs.copyFile(path.join(build,'published-worlds.json'),path.join(output,'published-worlds.json'));
 await fs.copyFile(fileURLToPath(new URL('../node_modules/@sparkjsdev/spark/LICENSE',import.meta.url)),path.join(output,'licenses/SPARK-LICENSE.txt'));
-let credits=await fs.readFile(path.join(output,'credits.html'),'utf8');credits=credits.replace('</html>',`<section><h2>Sunset Courtyard</h2><p>Original 719,538-Gaussian reconstruction supplied by the project owner. Walking uses the reviewed ground corridor and gameplay scale. Scan data retain their existing rights; source recording and training material are not distributed.</p><p>Gaussian rendering uses Spark 2.4.0 and Three.js 0.180.0. <a href="licenses/SPARK-LICENSE.txt">Spark licence</a>. <a href="${sunset.bundlePath}ATTRIBUTION.md">Scene attribution</a>.</p></section></html>`);await fs.writeFile(path.join(output,'credits.html'),credits);
+let credits=await fs.readFile(path.join(output,'credits.html'),'utf8');credits=credits.replace('</html>',`<section><h2>Table Tennis Room</h2><p><a href="https://superspl.at/scene/0d9e613b">Table Tennis Room</a> by ethan3111, licensed under <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. Adapted for ElseMesh with decimation to ${TABLE_TENNIS_SPLAT_PROFILE.asset.count.toLocaleString('en-US')} Gaussians, orientation and gameplay-scale changes, and authored collision/support geometry.</p><p>Gaussian rendering uses Spark 2.4.0 and Three.js 0.180.0. <a href="licenses/SPARK-LICENSE.txt">Spark licence</a>. <a href="${room.bundlePath}ATTRIBUTION.md">Scene attribution</a>.</p></section></html>`);await fs.writeFile(path.join(output,'credits.html'),credits);
 // The installed local companion is separately licensed from application code.
 const duckFiles=['microduck-realtime.glb','ATTRIBUTION.md','LICENSE-MODELS.md','LICENSE-APACHE-2.0.txt','manifest.json','collision-proxy.json'];
 await fs.mkdir(path.join(output,'models/microduck'));
@@ -79,5 +103,5 @@ const sourceContract=await fs.readFile(new URL('../src/world-runtime/vendor/worl
 // Upstream contract provenance covers its unchanged source bytes only.
 // Record and preserve the build derivative separately, including final chunks.
 const outputSurfaceDerivative=await packageOutputSurfaceDerivative(build,output);
-await fs.writeFile(path.join(output,'publication.json'),JSON.stringify({schema:'elsemesh.publication/1',outputSurfaceDerivative,...preserved,engineCommit,worldContract:{sourceNormalization:'UTF-8 LF',commit:contractProvenance.commit,bundleSha256:contractProvenance.bundleSha256,baseBundleSha256:contractProvenance.baseBundleSha256??contractProvenance.bundleSha256,downstreamPatches:contractProvenance.downstreamPatches??[]},worldRepositoryCommit:commit,openingWorldId:opening.worldId,worlds:catalog.worlds,routes:catalog.routes,scene:{count:719538,assetSha256:loaded.project.splatScene.asset.sha256,physicsSha256:loaded.project.splatScene.physics.sha256},previousPublicEditorPreserved:true},null,2)+'\n');
-console.log(JSON.stringify({output,worldRepositoryCommit:commit,sunsetBytes:total,worlds:catalog.worlds}));
+await fs.writeFile(path.join(output,'publication.json'),JSON.stringify({schema:'elsemesh.publication/1',outputSurfaceDerivative,...preserved,engineCommit,worldContract:{sourceNormalization:'UTF-8 LF',commit:contractProvenance.commit,bundleSha256:contractProvenance.bundleSha256,baseBundleSha256:contractProvenance.baseBundleSha256??contractProvenance.bundleSha256,downstreamPatches:contractProvenance.downstreamPatches??[]},worldRepositoryCommit:commit,openingWorldId:opening.worldId,worlds:catalog.worlds,routes:catalog.routes,scene:{name:TABLE_TENNIS_SPLAT_PROFILE.name,count:TABLE_TENNIS_SPLAT_PROFILE.asset.count,assetSha256:loaded.project.splatScene.asset.sha256,physicsSha256:loaded.project.splatScene.physics.sha256,sourceManifestSha256:provenance.sourceManifestSha256,reviewSha256:provenance.reviewSha256,auditedOriginalBytes:originalBytes},previousPublicEditorPreserved:true},null,2)+'\n');
+console.log(JSON.stringify({output,worldRepositoryCommit:commit,roomBytes:total,auditedOriginalBytes:originalBytes,originalSourcesBundled:false,worlds:catalog.worlds}));

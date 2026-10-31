@@ -1,8 +1,8 @@
+import {assertQualifiedReadinessProfile} from './SplatSceneProfiles.js';
 import {T} from './vendor/world-engine-contract.js';
 const registered=new WeakMap(),seen=new WeakSet(),disposed=new WeakSet();
 const diagnosticIds=new WeakMap();let nextDiagnosticId=0;const resourceId=value=>{if(!value)return null;if(value.id!==undefined)return value.id;if(value.uuid!==undefined)return value.uuid;if(!diagnosticIds.has(value))diagnosticIds.set(value,'resource:'+ ++nextDiagnosticId);return diagnosticIds.get(value);};
 const KEYS=new Set(['extSplats','extSplats2']);
-const SHA='66334b9bcea5abb6b2a310c44c584fd7fdc8fb999db9c718c785473c41019298';
 const fail=(reason,details=null)=>{const error=Error('Managed Spark sampler readiness contract changed. ['+reason+']');error.reason=reason;error.details=details;error.callSites=(error.stack??'').split('\n').slice(2,7).map(line=>line.trim().replace(/\?[^ )]*/g,''));error.message+=' '+JSON.stringify({details,callSites:error.callSites}).slice(0,2400);throw error;};
 const textureDetails=texture=>({id:texture?.id??null,class:texture?.constructor?.name??null,dataArray:texture instanceof T.DataArrayTexture,isDataArrayTexture:texture?.isDataArrayTexture===true,renderTarget:texture?.isRenderTargetTexture===true,width:texture?.image?.width??null,height:texture?.image?.height??null,depth:texture?.image?.depth??null,format:texture?.format??null,type:texture?.type??null,internalFormat:texture?.internalFormat??null,minFilter:texture?.minFilter??null,magFilter:texture?.magFilter??null,wrapS:texture?.wrapS??null,wrapT:texture?.wrapT??null,wrapR:texture?.wrapR??null,generateMipmaps:texture?.generateMipmaps??null,flipY:texture?.flipY??null,colorSpace:texture?.colorSpace??null});
 const targetDetails=target=>target?{id:resourceId(target),arrayTarget:target.isWebGLArrayRenderTarget===true,width:target.width,height:target.height,depth:target.depth,textures:(target.textures??[]).map(texture=>texture?.id??null)}:null;
@@ -14,9 +14,10 @@ function layout(texture){
 /** Internal adapter call only, after pinned qualification and completed warmup.
  * This is a one-time snapshot, not a mutable tag or a lazy enrollment mechanism.
  */
-export function registerPinnedSparkReadiness(adapter,{asset}={}){
+export function registerPinnedSparkReadiness(adapter,{asset,project}={}){
+ const profile=assertQualifiedReadinessProfile({asset,project});
  const {root,spark,state}=adapter??{},material=spark?.material,uniforms=spark?.uniforms,geometry=spark?.geometry;
- if(!root||!spark||!state?.warmed||state.status!=='ready'||state.disposed||state.numSplats!==719538||asset?.sha256!==SHA||asset.bytes!==12690032||asset.count!==719538||!contains(root,spark)||!(material instanceof T.ShaderMaterial)||!(spark instanceof T.Mesh)||material.uniforms!==uniforms||!geometry||spark.accumExtSplats!==false||spark.covSplats!==false||seen.has(spark)||registered.has(material)||disposed.has(material))throw Error('Pinned Spark readiness registration requires its verified prepared adapter.');
+ if(!root||!spark||!state?.warmed||state.status!=='ready'||state.disposed||state.numSplats!==profile.asset.count||!contains(root,spark)||!(material instanceof T.ShaderMaterial)||!(spark instanceof T.Mesh)||material.uniforms!==uniforms||!geometry||spark.accumExtSplats!==false||spark.covSplats!==false||seen.has(spark)||registered.has(material)||disposed.has(material))throw Error('Pinned Spark readiness registration requires its verified prepared adapter.');
  const accumulators=[...new Set([spark.display,spark.current,...(spark.accumulators??[])])];
  if(accumulators.length<1||accumulators.length>3||accumulators.some(a=>!a||a.extSplats!==false||a.covSplats!==false))fail('registration.accumulators',{count:accumulators.length,accumulators:accumulators.map(a=>({extSplats:a?.extSplats,covSplats:a?.covSplats,target:targetDetails(a?.target)}))});
  const targets=new Map(),textures=new Map(),originalTargets=new Map(accumulators.map(accumulator=>[accumulator,accumulator.target??null]));

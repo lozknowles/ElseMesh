@@ -41906,7 +41906,10 @@ function validateSplatScene(value) {
   const t = value.transform;
   if (!record(t) || !keys(t, ["position", "rotation", "scale"]) || !vec(t.position, 2e3) || !vec(t.rotation, Math.PI * 2) || !number(t.scale, 1e-6, 1e3) || value.scaleStatus !== "assumed-gameplay") return ["Invalid bounded splat scene transform or scale status."];
   const p = value.provenance;
-  if (!record(p) || !keys(p, ["videoSha256", "plySha256", "reviewSha256", "qualificationSha256"]) || !Object.values(p).every(hash)) return ["Invalid splat scene provenance hashes."];
+  if (!record(p)) return ["Invalid splat scene provenance hashes."];
+  const legacy = keys(p, ["videoSha256", "plySha256", "reviewSha256", "qualificationSha256"]) && Object.values(p).every(hash);
+  const sog = keys(p, ["sourceFormat", "sourceManifestSha256", "reviewSha256", "qualificationSha256"]) && p.sourceFormat === "sog" && [p.sourceManifestSha256, p.reviewSha256, p.qualificationSha256].every(hash);
+  if (!legacy && !sog) return ["Invalid splat scene provenance hashes."];
   return [];
 }
 async function digest(bytes) {
