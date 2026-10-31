@@ -10,7 +10,7 @@ export const GRAPHICS_PRESETS = Object.freeze({
 
 const OPTIONS = Object.freeze({
  mode: ['manual', 'target30'],
- maxOutputPixels: [500000, 1000000, 1500000, 2100000],
+ maxOutputPixels: [500000, 921600, 1000000, 1500000, 2073600, 2100000],
  portalLongEdge: [256, 384, 512, 768, 1024],
  minimumScale: [.5, .7, .85]
 });

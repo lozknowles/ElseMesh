@@ -128,6 +128,7 @@ async function init(){
   const list=document.querySelector('#player-tips ul');if(list){list.replaceChildren();for(const tip of [
    'WASD to walk, Space to jump and Shift to run. On a phone or tablet, use the movement, look, jump and Use controls.',
    'Drag the mouse or use arrow keys to look. Press V to switch between first-person and follow view.',
+   'Press M or tap Menu to change screen resolution, portal quality and the current world time.',
    'Find the gold Table Tennis Room doorway beside the Dock portal in the warehouse. Move around it to see the room, then walk through when its view is ready.',
    'In the Table Tennis Room, walk within the room boundaries and around the table. Return through the same gold doorway.',
    'The Dock doorway leads to Bracken Quay Dock. Walk back through its doorway to return to the warehouse.',
@@ -250,12 +251,13 @@ async function init(){
    const canMove=!graphics.open&&!terminal.open&&!retro.active&&!media?.controlsOpen&&!interactionPending&&!controlsHelp.open&&!accessPanel.root.open&&!portals.pending&&!portals.authorityOffline&&!app.freeCam&&!playerEyes?.panel.open;
    if(playerEyes?.controller.status().active&&!playerEyes.controls.maintain())playerEyes.ownView('Viewer session changed');
    let eyeActive=!!playerEyes?.controller.status().active,eyeFrame=eyeActive?playerEyes.controller.update():null;eyeActive=!!eyeFrame;
-    if(eyeActive||!app.freeCam)host.update(dt,time,{move:eyeActive||canMove,interact:!eyeActive&&canMove,viewCamera:eyeFrame&&eyeFrame.target.worldId===host.active?.identity.worldId?eyeFrame.camera:engine.camera});
+   const env=graphics.environment(host.environment()??{timeOfDay:14,cloudCoverage:.49,windSpeed:6,sunAzimuth:0});
+    if(eyeActive||!app.freeCam)host.update(dt,time,{move:eyeActive||canMove,interact:!eyeActive&&canMove,environment:env,viewCamera:eyeFrame&&eyeFrame.target.worldId===host.active?.identity.worldId?eyeFrame.camera:engine.camera});
     if(canMove&&!eyeActive){const device=retro.nearest(engine.camera.position),tv=nearestMedia();if(input.hit('KeyE')){if(device){const computer=host.active.project.objects.find(o=>o.id===device.objectId);if(computer)void openComputer(computer,host.active,device);else if(!ownerMode()){interactionContext=interactionState();retro.open(device);}else report('Access restricted');}else if(tv)void openMedia(tv,host.active);}}
    if(host.active&&!app.freeCam)followCamera.update(dt,host.active,{suspended:eyeActive||playerEyes?.panel.open||terminal.open||retro.active||!!media?.controlsOpen||controlsHelp.open||accessPanel.root.open||portals.pending});
    if(host.active)avatar.update(dt,host.active.player,engine.camera,app.freeCam||followCamera.enabled||eyeActive);else avatar.group.visible=false;
    portals.update(dt,time,{allowCrossing:!eyeActive,viewCamera:eyeFrame?.camera??engine.camera,viewWorldId:eyeFrame?.target.worldId??host.active?.identity.worldId});publicDuck?.update(dt);if(eyeActive){eyeFrame=playerEyes.controller.update();eyeActive=!!eyeFrame;}if(playerEyes&&performance.now()>=(playerEyes.nextPanelAt??0)){playerEyes.panel.refresh();playerEyes.nextPanelAt=performance.now()+250;}arrivals.update();portalEffects.update(dt,time);input.endFrame();
-   const env=host.environment()??{timeOfDay:14,cloudCoverage:.49,windSpeed:6,sunAzimuth:0};let weatherState;const water=host.active?.project.water;
+   let weatherState;const water=host.active?.project.water;
    if(isWebGL){weatherState=updateWebGLRepositoryEnvironment(engine,host.active,time,env);renderer.toneMapping=host.active?.splatScene?.expectedToneMapping??backendPortals.views.ordinaryToneMapping;let eyeDrawn=false;if(eyeFrame){eyeFrame.camera.aspect=engine.width/engine.height;eyeFrame.camera.updateProjectionMatrix();try{eyeDrawn=playerEyes.renderer.render(eyeFrame,{width:engine.width,height:engine.height,time});}catch(error){playerEyes.lastError=String(error?.message??error);playerEyes.ownView('Player eye rendering unavailable');report('Player eyes unavailable: '+playerEyes.lastError);}if(eyeDrawn)playerEyes.drawnFrames++;else playerEyes.ownView('Player scene authorization changed');}if(!eyeDrawn){portals.render({width:engine.width,height:engine.height,time});host.active?.nativeIsland?.bindView(engine.camera);renderMainScene();}}
    else{const shelters=repositoryWeatherShelters(host.active?.project);setMistShelters(medium.uniforms,shelters);clouds.coverage.value=env.cloudCoverage??.49;G.windSpeed.value=env.windSpeed??6;
    G.seaLevel.value=host.active?.nativeIsland?.water.seaLevel??host.active?.project.water?.level??0;

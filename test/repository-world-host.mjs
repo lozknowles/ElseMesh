@@ -8,6 +8,11 @@ const loaded=name=>{const project=createWorld(name);return {project,identity:{wo
 const input=()=>({pressed:new Set(),clears:0,_clearTransientInput(){this.clears++;},consumeLook:()=>({x:0,y:0}),moveAxes:()=>({x:0,y:0,sprint:0}),down:()=>false,hit:()=>false});
 const candidate=descriptor=>({root:new Group(),terrain:descriptor.terrain,colliders:new Colliders(),descriptor,matrices:new Map()});
 const setup=(buildCandidate=async d=>candidate(d))=>{const engine={scene:new Scene(),camera:new PerspectiveCamera()},inp=input();return new RepositoryWorldHost({engine,input:inp,buildCandidate});};
+test('presentation time updates neon lighting without replacing authored or authoritative world time',async()=>{
+ const hours=[],host=setup(async d=>{const c=candidate(d),neon=new Group();neon.userData.updateNeon=(time,hour)=>hours.push(hour);c.root.add(neon);return c;});await host.activate(loaded('lighting'));
+ const authored=host.active.project.environment,originalHour=authored.timeOfDay;host.update(0,1,{move:false,interact:false,environment:{...authored,timeOfDay:0}});assert.equal(hours.at(-1),0);assert.equal(host.environment().timeOfDay,originalHour);assert.equal(host.active.project.environment,authored);
+ host.update(0,2,{move:false,interact:false});assert.equal(hours.at(-1),originalHour??14);host.dispose();
+});
 test('A to B to A atomically replaces player, root, terrain and collisions',async()=>{
  const host=setup(),a=loaded('a'),b=loaded('b');await host.activate(a);const old=host.active;await host.activate(b);
  assert.equal(old.root.parent,null);assert.notEqual(host.active.player,old.player);assert.notEqual(host.active.colliders,old.colliders);assert.equal(host.engine.scene.children.length,1);
