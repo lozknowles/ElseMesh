@@ -2,23 +2,23 @@
   "schema": "elsemesh.publication/1",
   "outputSurfaceDerivative": {
     "manifest": "output-surface-derivative.json",
-    "sha256": "3a2bcec64f4639c302c4603e8f108b4f26b871cf54ee26538b51e4827ee60836",
+    "sha256": "58ad636d6c6aaada9de15e36f455d86a3fa3c6ed6d3fca6c26cf4d3ed04ff4b7",
     "version": "1.0.0",
     "upstreamSourceSha256": "633a828536b774c71c2f0feae31f262fef387233afad1c2fa2e90b624288d42a",
     "transformSha256": "2dccb420c87deab0ed7508cbd4989a20112b2e0f558c9790ef9d6160eaf93ab9",
     "transformedModuleSha256": "037f6dea42d7d076530362fed49dc96d222793e04e97c22c5cff176a3b8d0fd7",
     "finalChunks": {
       "assets/Colliders-u7qqebLy.js": "5c513d01330b57d2db44907fc7eb26434573d8b93f92099ca5ed9b826c9c44ab",
-      "assets/main-CdCIOx7W.js": "d3aea09fd85c231262ba2b180feec7fcfd1551f82be5e79ca825c23b2219119b",
+      "assets/main-R7xNYQMW.js": "f86dd1ae5c732519eaa08cfe20688dbffaa37d46b57fbf47c5b1cccdb7847f1c",
       "assets/PlayerEyeControls-CWnrbWq1.js": "007010d9cec58fd310bd4fd5a32849792307e716175d03ccc919cdab944d65d2",
       "assets/PlayerEyePanel-DRdLArCK.js": "0f23f6d155c6c9a507ca0730fcd27add967a3c44b71f16b5fd4a8a59182dadc6",
       "assets/PlayerEyeView-DvEGwbv3.js": "efe7fae17e59db0b69d6a8d20e467f15793160cfc815e02fdbcfd0dcd4cd9d18",
       "assets/RepositoryPlayerEyes-BXZVQ6pq.js": "4986d0f5b08c8ed55a033dd86eecad1ab598c2222ecf19d63f171fbd7fe8401a",
       "assets/spark.module-C6xmu7Sr.js": "e7703b7f7cf4b376e44d3e94a36eaddda805609f2533e269f978b52c40c1df0a",
       "assets/SplatScenePhysics-BszIUdlc.js": "58482c966b875f63327a41178b35bb15352d0b2662cbafe0cb651fc37a217bcf",
-      "assets/WebGLPlayerEyeRenderer-181z5Owg.js": "94ac352d5ca2f2e98d926d16b1ef214337fa7931e5743f833d96d4a87981af69",
-      "assets/WebGLPortalViews-C-hM9UEN.js": "298a8255db5e7bd87638e8a930d05ada26fc18beaed4d018cd46df9793f76feb",
-      "assets/WebGLRepositoryScene-vbiGuCst.js": "c32bf31f8baf15e95de6456e172033f50803153871f75386427eacda9e1890b0",
+      "assets/WebGLPlayerEyeRenderer-CyR1pR7T.js": "4e5ea204e73daf5d32462f640f47764aa8d87869d9bfaf0b863b43a182177335",
+      "assets/WebGLPortalViews-CpAk-NJI.js": "48b83a4a43ac608e3f63ed519d2439b3299038d54c77d01640948fb429229d7d",
+      "assets/WebGLRepositoryScene-NWhNH5Dj.js": "2931d53c150bc31e5850e343274f3a8d0225939cb17f1bde4108b224e0d69cf6",
       "assets/world-engine-contract-CVcMZ1Us.js": "b0089ce1cba2470f57b54b86c49317b4b031d29dc9dda4164dd37ffda01ca8a1"
     }
   },
@@ -32,7 +32,7 @@
       "bundledWithOpening": false
     }
   ],
-  "engineCommit": "5ffc8d20594aa85fd032e3094337f43483ed055f",
+  "engineCommit": "d3a3ab0d5b47decbd73878460faf620107483a02",
   "worldContract": {
     "sourceNormalization": "UTF-8 LF",
     "commit": "7acac33d27c917302622c9b4b745ad20399fe40e",
@@ -40,7 +40,7 @@
     "baseBundleSha256": "633a828536b774c71c2f0feae31f262fef387233afad1c2fa2e90b624288d42a",
     "downstreamPatches": []
   },
-  "worldRepositoryCommit": "8d2e138c783a8cbbee3212eb4060839e807ee0f0",
+  "worldRepositoryCommit": "e36d616209f0ae53c9272ddd401177a43bdf49e1",
   "openingWorldId": "elsemesh.world:2842c4f2-93a0-4492-b942-e53e524de319",
   "worlds": [
     {
@@ -60,8 +60,8 @@
     },
     {
       "worldId": "elsemesh.world:81ae2994-59ba-499b-bb79-ba72927f6720",
-      "contentDigest": "a914aa4ba9a8efe7e0b4afcc5115be414fe00a93728d28b4998ad32929264838",
-      "bundlePath": "worlds/a914aa4ba9a8efe7e0b4afcc5115be414fe00a93728d28b4998ad32929264838/"
+      "contentDigest": "9e542b658db7b7a9c45e780d9f1d81ae9d917a1743ea5186c8c834368005caae",
+      "bundlePath": "worlds/9e542b658db7b7a9c45e780d9f1d81ae9d917a1743ea5186c8c834368005caae/"
     }
   ],
   "routes": [
@@ -119,9 +119,9 @@
   },
   "previousPublicEditorPreserved": true,
   "neonShift": {
-    "contentDigest": "a914aa4ba9a8efe7e0b4afcc5115be414fe00a93728d28b4998ad32929264838",
+    "contentDigest": "9e542b658db7b7a9c45e780d9f1d81ae9d917a1743ea5186c8c834368005caae",
     "intervalMs": 60000,
-    "bytes": 67681,
+    "bytes": 94402,
     "files": 13,
     "implementation": "engine-owned WebGL procedural visual pool; fixed authored collision and return anchor"
   }
