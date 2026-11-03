@@ -52,6 +52,21 @@ test('WebGL portal budgets, explicit authorization and detached ownership',()=>{
  for(const [w,h]of [[1920,1080],[1080,1920],[1,8192]]){const s=portalTargetSize(w,h);assert.ok(Math.max(s.width,s.height)<=512);}
  views.dispose();
 });
+
+test('public placeholders skip color and depth until a fresh live draw, including parked return and revoked access',()=>{
+ const {views,mainCamera}=setup();views.setTransparentPlaceholders();
+ const aperture=views.setDestination('public',{source:pose()}),entry=views.entries.get('public');
+ for(const state of ['unavailable','loading','restricted','cached','live']){views.setState('public',state);assert.equal(entry.material.visible,false,state);assert.equal(aperture.visible,true);}
+ views.setDestination('public',{candidate:{root:new T.Group()},ownsCandidate:false,authorizedView:true,source:pose(),destination:pose([10,0,0]),state:'live'});
+ assert.equal(entry.material.visible,false);views.render();assert.equal(entry.material.visible,true);
+ mainCamera.position.z=-3;views.render();assert.equal(entry.aperture.userData.portalViewState,'cached');assert.equal(entry.material.visible,false);
+ mainCamera.position.z=3;views.render();assert.equal(entry.material.visible,true);
+ const entries=views.park();assert.equal(entry.material.visible,false);views.restore({},entries);assert.equal(entry.material.visible,false);assert.equal(entry.hasImage,false);
+ views.setDestination('public',{candidate:{root:new T.Group()},ownsCandidate:false,authorizedView:true,state:'live'});views.render();assert.equal(entry.material.visible,true);
+ views.setDestination('public',{authorizedView:false});assert.equal(entry.material.visible,false);assert.equal(entry.aperture.userData.portalViewState,'restricted');
+ const fork=views.fork();assert.equal(fork.transparentPlaceholders,true);fork.setDestination('return',{source:pose()});assert.equal(fork.entries.get('return').material.visible,false);fork.dispose();views.dispose();
+ const owner=setup().views;owner.setDestination('owner',{source:pose()});assert.equal(owner.entries.get('owner').material.visible,true);owner.dispose();
+});
 test('mapped WebGL camera, destination clipping, recursion limit and state restoration on error',()=>{
  const {views,renderer:r}=setup(),root=new T.Group(),nested=new T.Mesh(new T.PlaneGeometry(),new T.MeshBasicMaterial());nested.userData.portalAperture=true;root.add(nested);
  views.setDestination('a',{candidate:{root},authorizedView:true,source:pose(),destination:pose([10,0,0]),state:'live'});
@@ -100,13 +115,13 @@ test('ordinary portal views and their forks keep two slots, invalid cap override
 test('aligned second hop renders only a live reciprocal authorized scene and restores on failure',()=>{
  const {views,renderer:r}=setup({maxViews:3});
  const source=pose(),exit=pose([10,0,0]),nestedSource={...pose([10,0,3],Math.PI),id:'b-c',enabled:true,destination:{worldId:'C',portalId:'c-b'}},nestedExit={...pose([20,0,0]),id:'c-b',enabled:true,destination:{worldId:'B',portalId:'b-c'}};
- const node=new T.Mesh(new T.PlaneGeometry(),new T.MeshBasicMaterial());node.userData.portalAperture=true;node.userData.portalId='b-c';const original=node.material,root=new T.Group();root.add(node);
+ const node=new T.Mesh(new T.PlaneGeometry(),new T.MeshBasicMaterial());node.userData.portalAperture=true;node.userData.portalId='b-c';const original=node.material,root=new T.Group();root.add(node);original.visible=false;
  const b={root,identity:{worldId:'B'},project:{portals:[nestedSource]}},c={root:new T.Group(),identity:{worldId:'C'},project:{portals:[nestedExit]}};
  views.setDestination('a-b',{source,destination:exit,candidate:b,ownsCandidate:false,authorizedView:true,state:'live'});
  views.setDestination('a-c',{source:pose([30,0,0]),destination:nestedExit,candidate:c,ownsCandidate:false,authorizedView:true,state:'live'});
  const outer=views.entries.get('a-b'),third=views.entries.get('a-c');let ownerDraws=0;r.render=scene=>{ownerDraws++;assert.equal(scene,outer.scene);assert.equal(node.visible,false);};views.render();assert.equal(ownerDraws,1,'ordinary owner grants never enable second-hop access');views.resolveNestedDestination=()=>third.state==='live'?{candidate:c,scene:third.scene}:null;let calls=[],fail=false;
- r.render=(scene,camera)=>{calls.push(scene);if(scene===third.scene){assert.ok(Math.abs(camera.position.z+6)<1e-8);}if(scene===outer.scene){assert.equal(node.visible,true);assert.notEqual(node.material,original);if(fail)throw Error('outer failed');}};
- views.render({width:800,height:600});assert.deepEqual(calls,[third.scene,outer.scene]);assert.equal(node.material,original);assert.equal(node.visible,true);assert.equal(views.nestedTargets.length,1);
+ r.render=(scene,camera)=>{calls.push(scene);if(scene===third.scene){assert.ok(Math.abs(camera.position.z+6)<1e-8);}if(scene===outer.scene){assert.equal(node.visible,true);assert.notEqual(node.material,original);assert.equal(node.material.visible,true,'live second-hop material replaces the hidden public placeholder');if(fail)throw Error('outer failed');}};
+ views.render({width:800,height:600});assert.deepEqual(calls,[third.scene,outer.scene]);assert.equal(node.material,original);assert.equal(original.visible,false);assert.equal(node.visible,true);assert.equal(views.nestedTargets.length,1);
  const target=r.target;fail=true;assert.throws(()=>views.render({width:800,height:600}),/outer failed/);assert.equal(node.material,original);assert.equal(node.visible,true);assert.equal(r.target,target);
  fail=false;views.setState('a-c','restricted');calls=[];r.render=(scene)=>{calls.push(scene);if(scene===outer.scene)assert.equal(node.visible,false);};views.render();assert.deepEqual(calls,[outer.scene]);views.dispose();assert.equal(views.nestedTargets.length,0);
 });

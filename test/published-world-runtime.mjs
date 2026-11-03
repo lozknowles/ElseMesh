@@ -169,3 +169,15 @@ test('nested admissions are invalidated by generation, leased source and leased 
  let release;r.engine.prepareRepositoryResources=async()=>new Promise(resolve=>release=resolve);assert.equal(r.resolveNestedPreview({...f.request,visibilityFrame:2}),null);while(!release)await new Promise(resolve=>setImmediate(resolve));const work=r.nestedLoads.get(f.record.loaded.identity.worldId).promise;assert.equal(r.resolveNestedPreview({...f.request,visibilityFrame:3}),null);release();await work;assert.ok(r.resolveNestedPreview({...f.request,visibilityFrame:4}));
  const outer=r.cache.get(f.host.active.loaded);outer.pin={};assert.equal(r.resolveNestedPreview({...f.request,visibilityFrame:5}),null);outer.pin=null;f.record.pin={};assert.equal(r.resolveNestedPreview({...f.request,visibilityFrame:6}),null);f.record.pin=null;assert.ok(r.resolveNestedPreview({...f.request,visibilityFrame:7}));r.dispose();f.host.dispose();
 });
+test('physical public sweep requests a frame meld, authorizes only its successful destination, and respects own-view crossing flag',async()=>{
+ const f=await fixture(),r=f.runtime,source=f.host.active;await r.preview(source.project.portals[0]);const ticket={},events=[];
+ r.meld={request(args){events.push(['request',args]);return ticket;},authorize(t,active,generation){events.push(['authorize',t,active,generation]);},cancel(t){events.push(['cancel',t]);}};
+ source.player.position.set(0,0,-.05);r.update(0,0,{allowCrossing:false});assert.equal(r.pending,false);assert.equal(events.length,0);
+ r.lastPosition=[0,0,.1];r.update(0,0,{allowCrossing:true});assert.equal(events[0][0],'request');assert.equal(events[0][1].source,source);
+ while(r.pending)await new Promise(resolve=>setImmediate(resolve));assert.equal(events[1][0],'authorize');assert.equal(events[1][1],ticket);assert.equal(events[1][2],f.host.active);assert.equal(events[1][3],f.host.generation);
+ r.disconnect();assert.equal(events.at(-1)[0],'cancel');f.host.dispose();
+});
+test('failed physical crossing cancels its image without authorizing the failed candidate',async()=>{
+ const f=await fixture({failDestination:true}),r=f.runtime,events=[],ticket={};r.meld={request:()=>ticket,authorize:()=>events.push('authorize'),cancel:t=>events.push(t)};
+ f.host.active.player.position.set(0,0,-.05);r.update();while(r.pending)await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(events,[ticket]);r.dispose();f.host.dispose();
+});

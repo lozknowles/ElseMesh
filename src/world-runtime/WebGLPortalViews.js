@@ -102,8 +102,9 @@ const candidateWorldId=c=>c?.loaded?.identity?.worldId??c?.identity?.worldId??c?
  * authorize one extra hop; owner views retain their depth-one behavior. */
 export class WebGLPortalViews{
  constructor({renderer,engine,mainCamera,configureScene,maxLongEdge=512,maxViews=PORTAL_VIEW_LIMIT,ordinaryToneMapping}){if(![2,3].includes(maxViews))throw Error('Portal views require two or three slots');this.engine=engine;this.maxViews=maxViews;this.forkOptions={renderer,engine,mainCamera,configureScene,maxLongEdge,maxViews,ordinaryToneMapping:ordinaryToneMapping??(renderer??engine?.renderer)?.toneMapping};this.maxLongEdge=maxLongEdge;this.renderer=renderer??engine?.renderer;this.mainCamera=mainCamera??engine?.camera;this.configureScene=configureScene;this.entries=new Map();this.active=null;this.ordinaryToneMapping=this.forkOptions.ordinaryToneMapping;}
- fork(){return new WebGLPortalViews(this.forkOptions);}
- park(){const entries=this.entries;this.entries=new Map();this.active=null;return entries;}
+ setTransparentPlaceholders(enabled=true){this.transparentPlaceholders=enabled===true;for(const e of this.entries.values())this._status(e);return this;}
+ fork(){return new WebGLPortalViews(this.forkOptions).setTransparentPlaceholders(this.transparentPlaceholders);}
+ park(){const entries=this.entries;for(const e of entries.values())this._status(e);this.entries=new Map();this.active=null;return entries;}
  restore(active,entries){
   if(this.entries.size)this.clear();this.active=active;this.entries=entries??new Map();
   // Graphics may remain resident, but VIEW grants are scoped to the new membership.
@@ -131,7 +132,12 @@ export class WebGLPortalViews{
  getAperture(id){return this.entries.get(id)?.aperture??null;}
  getScene(id){return this.entries.get(id)?.scene??null;}
  setState(id,state){const e=this.entries.get(id);if(e){e.state=state;this._status(e);}}
- _status(e,drawn=false){let s=!e.authorizedView&&['live','cached'].includes(e.state)?'restricted':e.state;if((s==='cached'&&!e.hasImage)||(s==='live'&&!drawn))s=e.hasImage?'cached':'loading';e.material.uniforms.portalState.value=PORTAL_VIEW_STATES[s]??0;e.aperture.userData.portalViewState=s;}
+ _status(e,drawn=false){let s=!e.authorizedView&&['live','cached'].includes(e.state)?'restricted':e.state;if((s==='cached'&&!e.hasImage)||(s==='live'&&!drawn))s=e.hasImage?'cached':'loading';e.material.uniforms.portalState.value=PORTAL_VIEW_STATES[s]??0;e.aperture.userData.portalViewState=s;
+  // Public openings show the local scene until this frame has a usable image.
+  // Skip the material (and its depth), not the mesh: an authorized second-hop
+  // pass may temporarily replace this placeholder with its own live material.
+  e.material.visible=!this.transparentPlaceholders||s==='live';
+ }
  render({width=1,height=1,time=0}={}){
   const r=this.renderer,m=this.mainCamera;this.visibilityFrame=(this.visibilityFrame??0)+1;this.nestedDraws=0;this.nestedTargets??=[];m.updateMatrixWorld();
   const frustum=new T.Frustum().setFromProjectionMatrix(new T.Matrix4().multiplyMatrices(m.projectionMatrix,m.matrixWorldInverse)),position=new T.Vector3().setFromMatrixPosition(m.matrixWorld);

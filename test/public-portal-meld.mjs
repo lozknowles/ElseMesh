@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {PublicPortalMeld} from '../src/world-runtime/PublicPortalMeld.js';
+function fixture(){
+ const events=()=>({handlers:new Map(),addEventListener(k,v){this.handlers.set(k,v);},removeEventListener(k){this.handlers.delete(k);}});
+ const source={identity:{worldId:'A'}},destination={identity:{worldId:'B'}},motion={...events(),matches:false};let time=0,copies=0,created=0;
+ const canvas={...events(),width:1600,height:900,getBoundingClientRect:()=>({left:0,top:0,width:800,height:450})};
+ const doc={...events(),visibilityState:'visible',body:{append(){}},createElement(){created++;return {style:{},dataset:{},setAttribute(){},getContext:()=>({drawImage(c,x,y,w,h){assert.equal(c,canvas);assert.equal(w,960);assert.equal(h,540);copies++;}}),remove(){this.removed=true;}};}};
+ const win={...events(),matchMedia:()=>motion},meld=new PublicPortalMeld({canvas,document:doc,window:win,now:()=>time});
+ const request=()=>meld.request({source,generation:3,destinationWorldId:'B'}),frame=(active=source,generation=3,eligible=true)=>meld.afterFrame({active,generation,eligible});
+ return {meld,source,destination,canvas,doc,win,motion,request,frame,setTime:v=>time=v,copies:()=>copies,created:()=>created};
+}
+test('idle frames allocate/copy nothing; source captures once and authorized destination dissolves over 380ms',()=>{
+ const f=fixture();for(let i=0;i<100;i++)f.frame();assert.equal(f.created(),0);
+ const t=f.request();assert.equal(f.copies(),0);f.frame();f.frame();assert.equal(f.copies(),1);assert.match(f.meld.overlay.style.cssText,/display:none/);
+ f.meld.authorize(t,f.destination,4);assert.match(f.meld.overlay.style.cssText,/display:none/);f.frame(f.destination,4);assert.equal(f.meld.overlay.style.display,'block');assert.equal(f.meld.diagnostics().shown,1);
+ f.setTime(190);f.frame(f.destination,4);assert.ok(Number(f.meld.overlay.style.opacity)<1);assert.match(f.meld.overlay.style.maskImage,/radial-gradient/);
+ f.setTime(380);f.frame(f.destination,4);assert.equal(f.meld.overlay,null);assert.equal(f.copies(),1);f.meld.dispose();
+});
+test('missing source frame and wrong destination cannot show an image',()=>{
+ for(const capture of [false,true]){const f=fixture(),t=f.request();if(capture)f.frame();f.meld.authorize(t,{identity:{worldId:'C'}},4);f.frame(f.destination,4);assert.equal(f.meld.ticket,null);assert.equal(f.meld.diagnostics().shown,0);f.meld.dispose();}
+ const f=fixture(),t=f.request();f.meld.authorize(t,f.destination,4);assert.equal(f.meld.ticket,null);f.meld.dispose();
+});
+test('new reversal invalidates old snapshot and stale authorization cannot erase the new request',()=>{
+ const f=fixture(),old=f.request();f.frame();const current=f.request();f.meld.authorize(old,f.destination,4);assert.equal(f.meld.ticket,current);f.frame();assert.equal(f.copies(),2);f.meld.cancel();f.meld.dispose();
+});
+test('shared eyes, media, source changes and resize invalidate before capture or presentation',()=>{
+ for(const invalidate of [f=>f.frame(f.source,3,false),f=>f.frame(f.destination,4),f=>{f.canvas.width++;f.frame();},f=>f.win.handlers.get('resize')(),f=>f.canvas.handlers.get('webglcontextlost')(),f=>f.win.handlers.get('pagehide')()]){const f=fixture();f.request();invalidate(f);assert.equal(f.meld.ticket,null);assert.equal(f.copies(),0);f.meld.dispose();}
+ const f=fixture(),t=f.request();f.frame();f.meld.authorize(t,f.destination,4);f.frame(f.destination,5);assert.equal(f.meld.ticket,null);f.meld.dispose();
+});
+test('reduced motion disables capture and disposal removes event handlers',()=>{
+ const f=fixture();f.motion.matches=true;assert.equal(f.request(),null);f.frame();assert.equal(f.copies(),0);f.meld.dispose();assert.equal(f.canvas.handlers.size,0);assert.equal(f.win.handlers.size,0);assert.equal(f.doc.handlers.size,0);
+});
