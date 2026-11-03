@@ -114,15 +114,19 @@ export class WebGLPortalViews{
   }
  }
  _drawWithNested(e,size,time){
+  const outer={renderer:this.renderer,sourceCamera:this.mainCamera,camera:e.camera,source:e.source,destination:e.destination,scene:e.scene,candidate:e.candidate,target:e.target,width:size.width,height:size.height,time,ordinaryToneMapping:this.ordinaryToneMapping};
+  if(!this.resolveNestedDestination)return drawWebGLPortal(outer);
   mapViewCamera(this.mainCamera,e.camera,e.source,e.destination);
   const visibleApertures=new Set(),restores=[],project=candidateProject(e.candidate),worldId=candidateWorldId(e.candidate);
   // A direct owner grant through another door does not authorize this viewpoint.
   try{
    const apertures=[];e.candidate.root.traverse(node=>{if(node.userData.portalAperture)apertures.push(node);});
    for(const node of apertures.slice(0,this.maxViews)){
-    if(this.nestedDraws>=this.maxViews||!this.resolveNestedDestination)break;
+    if(this.nestedDraws>=this.maxViews)break;
     const source=project?.portals?.find(p=>p.id===node.userData.portalId);
     if(source?.id===e.destination.id||!source?.enabled||source.view?.enabled===false||!webGLPortalInView(e.camera,source)||!portalApertureIntersectsFrustum({planes:[portalDestinationPlane(e.destination)]},source))continue;
+    const [x,y,z]=source.position;
+    if(Math.hypot(e.camera.position.x-x,e.camera.position.y-y,e.camera.position.z-z)>=(source.view?.maxDistance??30))continue;
     let detachRoot=null;
     try{
     const resolved=this.resolveNestedDestination({outerCandidate:e.candidate,source,camera:e.camera}),candidate=resolved?.candidate;
@@ -143,7 +147,7 @@ export class WebGLPortalViews{
     }catch(error){e.nestedError=String(error?.message??error);}
     finally{detachRoot?.removeFromParent();}
    }
-   drawPortalView({renderer:this.renderer,sourceCamera:this.mainCamera,camera:e.camera,source:e.source,destination:e.destination,scene:e.scene,candidate:e.candidate,target:e.target,width:size.width,height:size.height,time,ordinaryToneMapping:this.ordinaryToneMapping,visibleApertures});
+   drawPortalView({...outer,visibleApertures});
   }finally{for(const[node,material]of restores)node.material=material;}
  }
  _releaseCandidate(e){if(e.candidate){if(e.candidate.root.parent===e.scene)e.candidate.root.removeFromParent();if(e.ownsCandidate)disposeWebGLRepositoryScene(e.candidate);e.candidate=null;}}

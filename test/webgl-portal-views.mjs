@@ -119,5 +119,6 @@ test('second-hop failure leaves the outer image healthy and restores detached pa
  views.setDestination('a-b',{source:pose(),destination:pose([10,0,0]),candidate:{root,identity:{worldId:'B'},project:{portals:[source]}},ownsCandidate:false,authorizedView:true,state:'live'});const outer=views.entries.get('a-b');let outerDraws=0,resolves=0;
  views.resolveNestedDestination=()=>{resolves++;return {candidate};};r.render=(scene)=>{if(scene===outer.scene){outerDraws++;assert.equal(node.visible,false);}else{assert.equal(candidate.root.parent,scene);throw Error('second-hop unavailable');}};
  views.render({width:800,height:600});assert.equal(outerDraws,1);assert.equal(outer.aperture.userData.portalViewState,'live');assert.equal(candidate.root.parent,null);assert.equal(outer.nestedError,'second-hop unavailable');assert.equal(views.nestedTargets.length,1);assert.equal(views.nestedTargets[0].target.width,256);assert.equal(views.nestedTargets[0].target.height,192);
- source.position[2]=-3;views.render();assert.equal(resolves,1,'clipped aperture never demands a package');assert.equal(candidate.root.parent,null);views.dispose();
+ source.view={maxDistance:1};views.render();assert.equal(resolves,1,'distant second aperture respects its authored preview distance');
+ source.view={maxDistance:30};source.position[2]=-3;views.render();assert.equal(resolves,1,'clipped aperture never demands a package');assert.equal(candidate.root.parent,null);views.dispose();
 });

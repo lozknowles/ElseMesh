@@ -16,6 +16,10 @@ One wall-clock state per frame serves previews and the active world. Entry does 
 
 ## Gates and evidence
 
+In the published WebGL player, walking through the front of the violet doorway works while facing either way. After arriving, the player can immediately back through the return plane. The transfer uses the movement segment and aperture, and resets that segment at the new arrival position. The player can also stand still at the exit without triggering a second transfer.
+
+When a second front-facing portal is visible through the first, the published WebGL player can show the world beyond it. Both hops must match the public catalog and the authored reciprocal endpoints. The second view uses a half-resolution target, observes the portal's preview distance and shares a bounded draw budget. It stops at the second crossing. This behavior applies to published WebGL worlds; network-owner and native previews retain their existing depth.
+
 PLAN, 2026-11-01: architect approved permanent connected streets and visible closed ground floors. Required one shared lot definition, containment of all visual extents, real jump/corner checks, bounded instancing and return navigation. Primary adopted these and added a fixed footprint guard after source inspection showed that terrain clamps beyond its edges and collider height alone cannot guard an already raised pose. Workers separately own source/CPU qualification and art/guard; primary owns shared definitions, integration, publishing and browser acceptance.
 
 CPU checks cover the exact 80 collider lots, all 320 sides, the connected graph, 640 jump/climb approaches, 380 perimeter positions and 562 reciprocal portal lanes. Guard tests cover disk footprints, swept movement, collision pushes, invalid poses, movement modes and preserved gravity. Render tests cover 1,411,200 actual instance bounds across 120 generations/seven morph fractions, constant resources/readiness and once-only disposal with shared survivors.
