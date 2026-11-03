@@ -5,7 +5,7 @@ function fixture(){
  const events=()=>({handlers:new Map(),addEventListener(k,v){this.handlers.set(k,v);},removeEventListener(k){this.handlers.delete(k);}});
  const source={identity:{worldId:'A'}},destination={identity:{worldId:'B'}},motion={...events(),matches:false};let time=0,copies=0,created=0;
  const canvas={...events(),width:1600,height:900,getBoundingClientRect:()=>({left:0,top:0,width:800,height:450})};
- const doc={...events(),visibilityState:'visible',body:{append(){}},createElement(){created++;return {style:{},dataset:{},setAttribute(){},getContext:()=>({drawImage(c,x,y,w,h){assert.equal(c,canvas);assert.equal(w,960);assert.equal(h,540);copies++;}}),remove(){this.removed=true;}};}};
+ const doc={...events(),visibilityState:'visible',body:{append(){}},createElement(){created++;return {style:{},dataset:{},setAttribute(){},getContext:()=>({drawImage(c,x,y,w,h){assert.equal(c,canvas);assert.equal(w,canvas.width);assert.equal(h,canvas.height);copies++;}}),remove(){this.removed=true;}};}};
  const win={...events(),matchMedia:()=>motion},meld=new PublicPortalMeld({canvas,document:doc,window:win,now:()=>time});
  const request=()=>meld.request({source,generation:3,destinationWorldId:'B'}),frame=(active=source,generation=3,eligible=true)=>meld.afterFrame({active,generation,eligible});
  return {meld,source,destination,canvas,doc,win,motion,request,frame,setTime:v=>time=v,copies:()=>copies,created:()=>created};
@@ -30,4 +30,13 @@ test('shared eyes, media, source changes and resize invalidate before capture or
 });
 test('reduced motion disables capture and disposal removes event handlers',()=>{
  const f=fixture();f.motion.matches=true;assert.equal(f.request(),null);f.frame();assert.equal(f.copies(),0);f.meld.dispose();assert.equal(f.canvas.handlers.size,0);assert.equal(f.win.handlers.size,0);assert.equal(f.doc.handlers.size,0);
+});
+
+test('a valid captured pending source survives preparation delays beyond 1.5 seconds without extra copies',async()=>{
+ const f=fixture(),t=f.request();f.frame();assert.equal(f.meld.overlay.width,1600);assert.equal(f.meld.overlay.height,900);
+ await new Promise(resolve=>setTimeout(resolve,1550));f.setTime(10000);f.frame();assert.equal(f.meld.ticket,t);assert.equal(f.copies(),1);
+ f.meld.authorize(t,f.destination,4);f.frame(f.destination,4);assert.equal(f.meld.diagnostics().shown,1);f.setTime(10380);f.frame(f.destination,4);assert.equal(f.meld.ticket,null);f.meld.dispose();
+});
+test('a hidden captured source is discarded if an intervening non-ordinary view is rendered',()=>{
+ const f=fixture(),t=f.request();f.frame();f.frame(f.source,3,false);f.meld.authorize(t,f.destination,4);f.frame(f.destination,4);assert.equal(f.meld.ticket,null);assert.equal(f.meld.diagnostics().shown,0);f.meld.dispose();
 });

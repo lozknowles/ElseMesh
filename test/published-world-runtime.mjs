@@ -181,3 +181,8 @@ test('failed physical crossing cancels its image without authorizing the failed 
  const f=await fixture({failDestination:true}),r=f.runtime,events=[],ticket={};r.meld={request:()=>ticket,authorize:()=>events.push('authorize'),cancel:t=>events.push(t)};
  f.host.active.player.position.set(0,0,-.05);r.update();while(r.pending)await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(events,[ticket]);r.dispose();f.host.dispose();
 });
+test('physical WebGL meld path suppresses legacy beams even when reduced motion skips its image',async()=>{
+ const f=await fixture(),r=f.runtime,transitions=[];r.portalEffects={transition:value=>transitions.push(value),removeRoot(){}};r.meld={request:()=>null,authorize(){},cancel(){}};
+ let source=f.host.active;await r.preview(source.project.portals[0]);source.player.position.set(0,0,-.05);r.update();while(r.pending)await new Promise(resolve=>setImmediate(resolve));assert.equal(r.crossings,1);assert.deepEqual(transitions,[]);
+ source=f.host.active;await r.preview(source.project.portals[0]);source.player.position.set(0,0,-.05);assert.equal(await r.cross(source.project.portals[0],source),true);assert.deepEqual(transitions,['active']);r.dispose();f.host.dispose();
+});
