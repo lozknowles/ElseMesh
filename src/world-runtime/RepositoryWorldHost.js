@@ -1,6 +1,7 @@
+import { repositoryInteractionIndex, nearestRepositoryComputer, nearestRepositoryMedia } from './RepositoryInteractions.js';
 import { Player } from '../player/Player.js';
-import { Vector3, Euler } from '../engine/index.js';
-import { loadWorldSource, describeRuntimeWorld, validateNeonSign, checkWorldSourceUpdate, effectiveObjectState } from './vendor/world-engine-contract.js';
+import { Euler } from '../engine/index.js';
+import { loadWorldSource, describeRuntimeWorld, validateNeonSign, checkWorldSourceUpdate } from './vendor/world-engine-contract.js';
 import { buildNativeNeon } from './NativeNeon.js';
 import { nativeGeometry } from './RepositoryScene.js';
 import { buildRepositoryScene, disposeRepositoryScene } from './RepositoryScene.js';
@@ -64,6 +65,7 @@ export class RepositoryWorldHost {
    // Prepare view state directly: Player.update would consume live input and may adjust an arrival.
    camera.position.copy(player.position);camera.position.y+=1.62;
    camera.quaternion.setFromEuler(new Euler(player.pitch,player.yaw,0,'YXZ'));camera.updateMatrixWorld();
+   repositoryInteractionIndex(descriptor.project.objects);
    const prepared={...candidate,loaded,identity:loaded.identity,descriptor,player,project:descriptor.project,generation,resourceLease,preparedState:'preparing'};
    if(!resourceLease){await this.prepareResources(prepared);prepared.resourceLease=resourceLease=await this.registerResources(prepared);}
    if(generation!==this.generation||this.disposed){if(resourceLease)resourceLease.release();else this.disposeCandidate(candidate);return false;}
@@ -131,13 +133,8 @@ export class RepositoryWorldHost {
  setLocalConfig(id,config){const errors=validateNeonSign(config);if(errors.length)throw Error(errors.join(' '));const signs=this.active.project.objects.filter(o=>o.kind==='neon-sign').map(o=>({id:o.id,config:structuredClone(this.overlay?.signs?.find(s=>s.id===o.id)?.config??o.neon)}));const sign=signs.find(s=>s.id===id);if(!sign)throw Error('Computer target sign is missing.');sign.config=structuredClone(config);this.setRuntimeOverlay({worldHour:this.environment().timeOfDay,signs});}
  setLocalPower(id,powered){const signs=this.active.project.objects.filter(o=>o.kind==='neon-sign').map(o=>({id:o.id,config:structuredClone(this.overlay?.signs?.find(s=>s.id===o.id)?.config??o.neon)}));const sign=signs.find(s=>s.id===id);if(!sign)throw Error('Computer target sign is missing.');sign.config.powered=!!powered;this.setRuntimeOverlay({worldHour:this.environment().timeOfDay,signs});}
  environment(){const env=this.active?.project.environment;if(!env)return null;return this.overlay?{...env,timeOfDay:this.overlay.worldHour??env.timeOfDay}:env;}
- nearestComputer(){
-  if(!this.active)return null;let found=null,best=3;
-  for(const object of this.active.project.objects){if(object.kind!=='computer'||!effectiveObjectState(this.active.project.objects,object.id).visible)continue;
-   const matrix=this.active.matrices.get(object.id);const point=new Vector3().setFromMatrixPosition(matrix);point.y+=.5;
-   const distance=point.distanceTo(this.engine.camera.position);if(distance<best){best=distance;found=object;}
-  }return found;
- }
+ nearestComputer(){return nearestRepositoryComputer(this.active,this.engine.camera.position);}
+ nearestMedia(){return nearestRepositoryMedia(this.active);}
  update(dt,time,{move=true,interact=move,viewCamera=this.engine.camera,environment=this.environment()}={}){
   if(!this.active)return;const {player,root,forest}=this.active;this.active.query?.setTime(time);
   const nativeIsland=this.active.nativeIsland;

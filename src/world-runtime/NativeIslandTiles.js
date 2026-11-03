@@ -49,12 +49,21 @@ export class NativeIslandTiles {
   if(!tiles.length)throw Error('Arrival is outside native terrain.');return this.retain(tiles);
  }
  requestView(x,z,radius=220,visible=()=>true){
-  const tiles=this.tiles.filter(t=>visible(t)&&t.bounds[0]<=x+radius&&t.bounds[2]>=x-radius&&t.bounds[1]<=z+radius&&t.bounds[3]>=z-radius).sort((a,b)=>Math.hypot((a.bounds[0]+a.bounds[2])/2-x,(a.bounds[1]+a.bounds[3])/2-z)-Math.hypot((b.bounds[0]+b.bounds[2])/2-x,(b.bounds[1]+b.bounds[3])/2-z));
+  const tiles=[],minX=x-radius,maxX=x+radius,minZ=z-radius,maxZ=z+radius;
+  for(const tile of this.tiles){const b=tile.bounds;
+   if(b[0]<=maxX&&b[2]>=minX&&b[1]<=maxZ&&b[3]>=minZ&&visible(tile)){
+    // Compute each key once. Retain hypot's rounding/ties and overflow handling.
+    tiles.push({tile,distance:Math.hypot((b[0]+b[2])/2-x,(b[1]+b[3])/2-z)});
+   }
+  }
+  tiles.sort((a,b)=>a.distance-b.distance);
   // Coarse terrain remains renderable while nearby fine tiles stream. Keep the
   // background queue small so arrivals and TV sight tiles can take priority.
   const maxPending=8;
-  for(const tile of [...tiles].reverse())if(this.entries.get(tile.id)?.data)this.request(tile).catch(()=>{});
-  for(const tile of tiles){if(this.entries.has(tile.id))continue;if(this.queue.length+this.running>=maxPending)break;this.request(tile).catch(()=>{});}
+  // Touch far-to-near, including stable distance ties, exactly as request did.
+  // Resident promises have already settled; refreshing LRU needs no new promise.
+  if(!this.disposed)for(let i=tiles.length-1;i>=0;i--){const entry=this.entries.get(tiles[i].tile.id);if(entry?.data)entry.used=++this.clock;}
+  for(const {tile} of tiles){if(this.entries.has(tile.id))continue;if(this.queue.length+this.running>=maxPending)break;this.request(tile).catch(()=>{});}
  }
  stats(){return{residentTiles:[...this.entries.values()].filter(e=>e.data).length,bytes:this.bytes,maxBytes:this.maxBytes,running:this.running,queued:this.queue.length,failures:this.failures.slice(-8),gpuSparse:false};}
  dispose(){if(this.disposed)return;this.disposed=true;for(const c of this.inflight)c.abort();for(const e of this.queue)e.reject(Error('Native tile cache disposed.'));this.queue=[];for(const e of this.entries.values())if(e.data)this.onEvict(e.tile,e.data);this.entries.clear();this.bytes=0;}

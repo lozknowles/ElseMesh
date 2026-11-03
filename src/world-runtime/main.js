@@ -56,7 +56,7 @@ import {WorldWelcomeController,WorldWelcomeView,LocalWelcomeSpeech,validWorldWel
 import {ObjectControlsHelp} from './ObjectControlsHelp.js';
 import {ObjectAccessPanel} from './ObjectAccessPanel.js';
 import { RepositoryRetro } from './RepositoryRetro.js';
-import { effectiveObjectState,parseGitHubWorldLocation, resolveGitHubWorldSource } from './vendor/world-engine-contract.js';
+import { parseGitHubWorldLocation, resolveGitHubWorldSource } from './vendor/world-engine-contract.js';
 
 const status=document.querySelector('#status'),hud=document.querySelector('#hud'),terminal=document.querySelector('#terminal');
 const openingSplash=document.querySelector('#opening-splash');
@@ -160,8 +160,7 @@ async function init(){
  }
  const mediaReady=()=>!!host.active&&!portals.pending&&!portals.authorityOffline&&(!ownerMode()||(portals.connected&&!portals.transport.closed&&!portals.transport.frozen&&portals.transport.worldId===host.active.identity.worldId));
  media=new MediaScreen({describeObstruction:()=>app.mediaOcclusion?.reasons?.join('; ')||'Scene geometry overlaps the TV sightline.',getContext:()=>({ready:mediaReady(),active:host.active,key:[host.generation,host.active?.identity.contentDigest,portals.transport.connectionEpoch,portals.transport.membership?.sessionId,portals.transport.generation].join('|'),camera:engine.camera,viewport:engine.canvas.getBoundingClientRect(),objectMatrix:id=>host.active?.matrices.get(id)}),isAuthorized:(id,action)=>!ownerMode()||objectAccess.valid(id,action),isUnobstructed:(projection,c,object)=>{const avatarRoots=[avatar.group,portals.activeLayer?.group].filter(Boolean),proof=collectMediaScreenOccluders(c.active,{camera:c.camera,projection,screenObjectId:object.id,avatarRoots});app.mediaOcclusion=proof;return mediaScreenCellVisibility(projection,c.camera,proof.bounds,proof);},onEnter:()=>input.suspend(),onExit:()=>{resumeUI(mediaContext);mediaContext=null;engine.canvas.focus();}});
- function nearestMedia(){const active=host.active;if(!active)return null;let found=null,best=Infinity;const feet=active.player.position;
-  for(const o of active.project.objects){if(o.kind!=='media-screen'||!effectiveObjectState(active.project.objects,o.id).visible)continue;const m=active.matrices.get(o.id);if(!m)continue;const d=Math.hypot(m.elements[12]-feet.x,m.elements[13]-(feet.y+1.65),m.elements[14]-feet.z);if(d<Math.min(8,Math.max(3,o.mediaScreen.width))&&d<best){found=o;best=d;}}return found;}
+ const nearestMedia=()=>host.nearestMedia();
  async function openMedia(object,active){if(interactionPending||terminal.open||retro.active||media.controlsOpen)return;interactionPending=true;try{
   if(ownerMode()){if(!objectAccess.snapshot)await objectAccess.read();await objectAccess.use(object.id,'media.play');}
   if(host.active!==active||!mediaReady())return;mediaContext=interactionState();media.enter(object,active);
@@ -257,7 +256,7 @@ async function init(){
    let eyeActive=!!playerEyes?.controller.status().active,eyeFrame=eyeActive?playerEyes.controller.update():null;eyeActive=!!eyeFrame;
    const env=graphics.environment(host.environment()??{timeOfDay:14,cloudCoverage:.49,windSpeed:6,sunAzimuth:0});
     if(eyeActive||!app.freeCam)host.update(dt,time,{move:eyeActive||canMove,interact:!eyeActive&&canMove,environment:env,viewCamera:eyeFrame&&eyeFrame.target.worldId===host.active?.identity.worldId?eyeFrame.camera:engine.camera});
-    if(canMove&&!eyeActive){const device=retro.nearest(engine.camera.position),tv=nearestMedia();if(input.hit('KeyE')){if(device){const computer=host.active.project.objects.find(o=>o.id===device.objectId);if(computer)void openComputer(computer,host.active,device);else if(!ownerMode()){interactionContext=interactionState();retro.open(device);}else report('Access restricted');}else if(tv)void openMedia(tv,host.active);}}
+    if(canMove&&!eyeActive&&input.hit('KeyE')){const device=retro.nearest(engine.camera.position),tv=nearestMedia();if(device){const computer=host.active.project.objects.find(o=>o.id===device.objectId);if(computer)void openComputer(computer,host.active,device);else if(!ownerMode()){interactionContext=interactionState();retro.open(device);}else report('Access restricted');}else if(tv)void openMedia(tv,host.active);}
    if(host.active&&!app.freeCam)followCamera.update(dt,host.active,{suspended:eyeActive||playerEyes?.panel.open||terminal.open||retro.active||!!media?.controlsOpen||controlsHelp.open||accessPanel.root.open||portals.pending});
    if(host.active)avatar.update(dt,host.active.player,engine.camera,app.freeCam||followCamera.enabled||eyeActive);else avatar.group.visible=false;
    portals.update(dt,time,{allowCrossing:!eyeActive,viewCamera:eyeFrame?.camera??engine.camera,viewWorldId:eyeFrame?.target.worldId??host.active?.identity.worldId});publicDuck?.update(dt);if(eyeActive){eyeFrame=playerEyes.controller.update();eyeActive=!!eyeFrame;}if(playerEyes&&performance.now()>=(playerEyes.nextPanelAt??0)){playerEyes.panel.refresh();playerEyes.nextPanelAt=performance.now()+250;}arrivals.update();portalEffects.update(dt,time);input.endFrame();

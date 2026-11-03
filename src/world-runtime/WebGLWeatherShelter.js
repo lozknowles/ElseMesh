@@ -8,6 +8,8 @@ uniform vec3 weatherShelterMin[4];
 uniform vec3 weatherShelterMax[4];
 varying vec3 vWeatherWorld;
 float weatherExteriorDistance(vec3 start,vec3 end){
+ // With no cover, the old four empty intervals contribute exactly zero.
+ if(weatherShelterCount==0)return distance(start,end);
  float lows[4];float highs[4];
  for(int i=0;i<4;i++){
   float lo=1.0;float hi=1.0;
@@ -22,6 +24,9 @@ float weatherExteriorDistance(vec3 start,vec3 end){
    }
    if(hi<=lo){lo=1.0;hi=1.0;}
   }
+  // The authored warehouse currently supplies one volume. Keep the same
+  // interval arithmetic, but avoid sorting/merging three empty intervals.
+  if(weatherShelterCount==1)return distance(start,end)*(1.0-max(0.0,hi-max(lo,0.0)));
   lows[i]=lo;highs[i]=hi;
  }
  for(int i=0;i<4;i++)for(int j=i+1;j<4;j++)if(lows[j]<lows[i]){float a=lows[i];lows[i]=lows[j];lows[j]=a;a=highs[i];highs[i]=highs[j];highs[j]=a;}
