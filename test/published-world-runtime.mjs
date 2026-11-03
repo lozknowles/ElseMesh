@@ -128,3 +128,14 @@ test('four-world cache shutdown fences a pending Neon compile and retires all th
  const f=await fixture({fourWorlds:true}),r=f.runtime,source=f.host.active;await Promise.all(r.routedPortals(source.identity.worldId,source.project).map(p=>r.preview(p)));f.setSignature(2);const cache=r.cache,neon=[...cache.records.values()].find(record=>record.loaded.project.metadata.name==='Neon Shift');let release;f.host.engine.prepareRepositoryResources=async()=>new Promise(resolve=>release=resolve);
  const pending=f.host.acquireResources(neon.loaded);while(!release)await new Promise(resolve=>setImmediate(resolve));assert.ok(neon.pin);r.disconnect();assert.equal(cache.records.size,4);assert.equal(f.disposed.length,0);assert.equal(neon.disposed,false);release();await assert.rejects(pending,/superseded/);await cache.whenDisposed;assert.equal(cache.records.size,0);assert.equal(f.disposed.length,3);assert.equal(f.disposed.includes(source.root),false);f.host.dispose();assert.equal(f.disposed.length,4);assert.equal(new Set(f.disposed).size,4);
 });
+
+test('published visible second hop demand-loads only the validated catalogue and deduplicates work',async()=>{
+ const f=await fixture({fourWorlds:true}),r=f.runtime,opening=f.host.active;
+ const room=opening.project.portals.find(p=>p.id==='elsemesh-portal:0'),dock=opening.project.portals.find(p=>p.id==='elsemesh-portal:dock');
+ await r.preview(room);opening.player.position.set(0,0,-.1);assert.equal(await r.cross(room,opening,{position:[0,0,.1],yaw:0,pitch:0}),true);
+ await r.preview(f.host.active.project.portals[0]);const record=[...r.cache.records.values()].find(x=>x.loaded.identity.worldId===opening.identity.worldId),request={outerCandidate:record.candidate,source:dock};
+ const before=f.fetches.length;assert.equal(r.resolveNestedPreview({...request,source:opening.project.portals[0]}),null);assert.equal(f.fetches.length,before,'unlisted aperture never loads');
+ assert.equal(r.resolveNestedPreview(request),null);assert.equal(r.resolveNestedPreview(request),null);assert.equal(r.nestedLoads.size,1);
+ await r.nestedLoads.get(dock.destination.worldId).promise;await new Promise(resolve=>setImmediate(resolve));const result=r.resolveNestedPreview(request);assert.equal(result.candidate.descriptor.worldId,dock.destination.worldId);assert.equal(r.cache.records.size,3);assert.equal(r.cache.limit,4);assert.equal(r.transport.identity,undefined);
+ r.disconnect();assert.equal(r.resolveNestedPreview(request),null);r.dispose();f.host.dispose();
+});

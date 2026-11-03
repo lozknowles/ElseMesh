@@ -46,9 +46,15 @@ export function portalApertureIntersectsFrustum(frustum,source){
  return true;
 }
 /** Draw an already authorized resident scene without parenting or owning it. */
-export function drawWebGLPortal({renderer:r,sourceCamera,camera:cam,source,destination,scene,candidate,target,width,height,time=0,ordinaryToneMapping}){
+export function drawWebGLPortal(options){
+ return drawPortalView({...options,visibleApertures:new Set()});
+}
+function mapViewCamera(sourceCamera,cam,source,destination){
  sourceCamera.updateMatrixWorld();cam.matrixAutoUpdate=false;cam.matrix.multiplyMatrices(portalMappingMatrix(source,destination),sourceCamera.matrixWorld);cam.matrix.decompose(cam.position,cam.quaternion,cam.scale);cam.matrixWorldNeedsUpdate=true;cam.projectionMatrix.copy(sourceCamera.projectionMatrix);cam.projectionMatrixInverse.copy(sourceCamera.projectionMatrixInverse);cam.near=sourceCamera.near;cam.far=sourceCamera.far;cam.updateMatrixWorld(true);
- const hidden=[];scene.traverse(node=>{if(node.userData.portalAperture||node.material?.userData?.portalAperture){hidden.push([node,node.visible]);node.visible=false;}});
+}
+function drawPortalView({renderer:r,sourceCamera,camera:cam,source,destination,scene,candidate,target,width,height,time=0,ordinaryToneMapping,visibleApertures=new Set()}){
+ mapViewCamera(sourceCamera,cam,source,destination);
+ const hidden=[];scene.traverse(node=>{if((node.userData.portalAperture||node.material?.userData?.portalAperture)&&!visibleApertures.has(node)){hidden.push([node,node.visible]);node.visible=false;}});
  try{return withWebGLPortalRenderState(r,()=>{
   candidate.nativeIsland?.bindView(cam);candidate.root.userData.updateWebGL?.(time);candidate.root.traverse(node=>{node.userData.updateNeon?.(time,candidate.descriptor?.project.environment?.timeOfDay??14);node.userData.updateTreeLOD?.(time,cam.position);});
   r.clippingPlanes=[portalDestinationPlane(destination)];r.localClippingEnabled=true;r.autoClear=true;if(r.xr)r.xr.enabled=false;r.setRenderTarget(target);
@@ -56,9 +62,12 @@ export function drawWebGLPortal({renderer:r,sourceCamera,camera:cam,source,desti
   const ratio=r.getPixelRatio?.()??1;r.setViewport(0,0,width/ratio,height/ratio);r.setScissorTest(false);r.render(scene,cam);return true;
  });}finally{for(const[node,visible]of hidden)node.visible=visible;}
 }
-/** Detached independent authorized previews, hard recursion depth one. */
+const candidateProject=c=>c?.project??c?.descriptor?.project;
+const candidateWorldId=c=>c?.loaded?.identity?.worldId??c?.identity?.worldId??c?.descriptor?.worldId;
+/** Detached independent authorized previews. An explicit public resolver may
+ * authorize one extra hop; owner views retain their depth-one behavior. */
 export class WebGLPortalViews{
- constructor({renderer,engine,mainCamera,configureScene,maxLongEdge=512,maxViews=PORTAL_VIEW_LIMIT,ordinaryToneMapping}){if(![2,3].includes(maxViews))throw Error('Portal views require two or three slots');this.maxViews=maxViews;this.forkOptions={renderer,engine,mainCamera,configureScene,maxLongEdge,maxViews,ordinaryToneMapping:ordinaryToneMapping??(renderer??engine?.renderer)?.toneMapping};this.maxLongEdge=maxLongEdge;this.renderer=renderer??engine?.renderer;this.mainCamera=mainCamera??engine?.camera;this.configureScene=configureScene;this.entries=new Map();this.active=null;this.ordinaryToneMapping=this.forkOptions.ordinaryToneMapping;}
+ constructor({renderer,engine,mainCamera,configureScene,maxLongEdge=512,maxViews=PORTAL_VIEW_LIMIT,ordinaryToneMapping}){if(![2,3].includes(maxViews))throw Error('Portal views require two or three slots');this.engine=engine;this.maxViews=maxViews;this.forkOptions={renderer,engine,mainCamera,configureScene,maxLongEdge,maxViews,ordinaryToneMapping:ordinaryToneMapping??(renderer??engine?.renderer)?.toneMapping};this.maxLongEdge=maxLongEdge;this.renderer=renderer??engine?.renderer;this.mainCamera=mainCamera??engine?.camera;this.configureScene=configureScene;this.entries=new Map();this.active=null;this.ordinaryToneMapping=this.forkOptions.ordinaryToneMapping;}
  fork(){return new WebGLPortalViews(this.forkOptions);}
  park(){const entries=this.entries;this.entries=new Map();this.active=null;return entries;}
  restore(active,entries){
@@ -90,7 +99,7 @@ export class WebGLPortalViews{
  setState(id,state){const e=this.entries.get(id);if(e){e.state=state;this._status(e);}}
  _status(e,drawn=false){let s=!e.authorizedView&&['live','cached'].includes(e.state)?'restricted':e.state;if((s==='cached'&&!e.hasImage)||(s==='live'&&!drawn))s=e.hasImage?'cached':'loading';e.material.uniforms.portalState.value=PORTAL_VIEW_STATES[s]??0;e.aperture.userData.portalViewState=s;}
  render({width=1,height=1,time=0}={}){
-  const r=this.renderer,m=this.mainCamera;m.updateMatrixWorld();
+  const r=this.renderer,m=this.mainCamera;this.nestedDraws=0;this.nestedTargets??=[];m.updateMatrixWorld();
   const frustum=new T.Frustum().setFromProjectionMatrix(new T.Matrix4().multiplyMatrices(m.projectionMatrix,m.matrixWorldInverse)),position=new T.Vector3().setFromMatrixPosition(m.matrixWorld);
   for(const e of this.entries.values()){
    this._status(e);e.material.uniforms.framebufferSize.value.set(width,height);e.material.uniforms.portalTime.value=time;
@@ -100,12 +109,45 @@ export class WebGLPortalViews{
    if(!portalApertureIntersectsFrustum(frustum,e.source))continue;
    const size=portalTargetSize(width,height,this.maxLongEdge);e.target.setSize(size.width,size.height);
    const toneMapped=!e.candidate.splatScene;if(e.material.toneMapped!==toneMapped){e.material.toneMapped=toneMapped;e.material.needsUpdate=true;}
-   try{drawWebGLPortal({renderer:r,sourceCamera:m,camera:e.camera,source:e.source,destination:e.destination,scene:e.scene,candidate:e.candidate,target:e.target,width:size.width,height:size.height,time,ordinaryToneMapping:this.ordinaryToneMapping});e.hasImage=true;this._status(e,true);}
+   try{this._drawWithNested(e,size,time);e.hasImage=true;this._status(e,true);}
    catch(error){if(!e.candidate.splatScene)throw error;e.error=String(error?.message??error);e.state='unavailable';e.hasImage=false;this._status(e);}
   }
  }
+ _drawWithNested(e,size,time){
+  mapViewCamera(this.mainCamera,e.camera,e.source,e.destination);
+  const visibleApertures=new Set(),restores=[],project=candidateProject(e.candidate),worldId=candidateWorldId(e.candidate);
+  // A direct owner grant through another door does not authorize this viewpoint.
+  try{
+   const apertures=[];e.candidate.root.traverse(node=>{if(node.userData.portalAperture)apertures.push(node);});
+   for(const node of apertures.slice(0,this.maxViews)){
+    if(this.nestedDraws>=this.maxViews||!this.resolveNestedDestination)break;
+    const source=project?.portals?.find(p=>p.id===node.userData.portalId);
+    if(source?.id===e.destination.id||!source?.enabled||source.view?.enabled===false||!webGLPortalInView(e.camera,source)||!portalApertureIntersectsFrustum({planes:[portalDestinationPlane(e.destination)]},source))continue;
+    let detachRoot=null;
+    try{
+    const resolved=this.resolveNestedDestination({outerCandidate:e.candidate,source,camera:e.camera}),candidate=resolved?.candidate;
+    const destination=candidateProject(candidate)?.portals?.find(p=>p.id===source.destination?.portalId);
+    if(!worldId||!destination?.enabled||destination.view?.enabled===false||destination.destination?.worldId!==worldId||destination.destination?.portalId!==source.id)continue;
+    let scene=resolved.scene;
+    if(!scene&&candidate.root.parent?.isScene)scene=candidate.root.parent;
+    if(!scene&&!candidate.root.parent){e.nestedScenes??=new WeakMap();scene=e.nestedScenes.get(candidate);if(!scene){scene=new T.Scene();this.configureScene?.(scene,candidate);e.nestedScenes.set(candidate,scene);}scene.add(candidate.root);detachRoot=candidate.root;}
+    if(!scene)continue;
+    const slot=this.nestedDraws++;let nested=this.nestedTargets[slot];
+    if(!nested){const target=new T.WebGLRenderTarget(1,1,{depthBuffer:true,type:T.HalfFloatType});nested={target,material:createWebGLPortalMaterial(target),camera:new T.PerspectiveCamera()};this.nestedTargets[slot]=nested;}
+    const nestedWidth=Math.max(1,Math.ceil(size.width/2)),nestedHeight=Math.max(1,Math.ceil(size.height/2));
+    nested.target.setSize(nestedWidth,nestedHeight);nested.material.uniforms.framebufferSize.value.set(size.width,size.height);nested.material.uniforms.portalState.value=PORTAL_VIEW_STATES.live;
+    if(nested.material.toneMapped!==!candidate.splatScene){nested.material.toneMapped=!candidate.splatScene;nested.material.needsUpdate=true;}
+    // This pass hides every aperture, so cycles and render-target feedback stop.
+    drawPortalView({renderer:this.renderer,sourceCamera:e.camera,camera:nested.camera,source,destination,scene,candidate,target:nested.target,width:nestedWidth,height:nestedHeight,time,ordinaryToneMapping:this.ordinaryToneMapping});
+    restores.push([node,node.material]);node.material=nested.material;visibleApertures.add(node);
+    }catch(error){e.nestedError=String(error?.message??error);}
+    finally{detachRoot?.removeFromParent();}
+   }
+   drawPortalView({renderer:this.renderer,sourceCamera:this.mainCamera,camera:e.camera,source:e.source,destination:e.destination,scene:e.scene,candidate:e.candidate,target:e.target,width:size.width,height:size.height,time,ordinaryToneMapping:this.ordinaryToneMapping,visibleApertures});
+  }finally{for(const[node,material]of restores)node.material=material;}
+ }
  _releaseCandidate(e){if(e.candidate){if(e.candidate.root.parent===e.scene)e.candidate.root.removeFromParent();if(e.ownsCandidate)disposeWebGLRepositoryScene(e.candidate);e.candidate=null;}}
  remove(id){const e=this.entries.get(id);if(!e)return;e.aperture.removeFromParent();this._releaseCandidate(e);e.aperture.geometry.dispose();e.material.dispose();e.target.dispose();this.entries.delete(id);}
- clear(){for(const id of [...this.entries.keys()])this.remove(id);}
+ clear(){for(const id of [...this.entries.keys()])this.remove(id);for(const n of this.nestedTargets??[]){n.material.dispose();n.target.dispose();}this.nestedTargets=[];}
  dispose(){this.clear();this.active=null;}
 }

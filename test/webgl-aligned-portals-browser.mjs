@@ -1,0 +1,23 @@
+import {createServer} from 'vite';
+import {chromium} from 'playwright';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
+const output=resolve(process.argv[2]??'../../outputs/aligned-preview');await mkdir(output,{recursive:true});
+const server=await createServer({server:{port:5196,strictPort:true}});server.middlewares.use((req,res,next)=>{if(req.url==='/portal-fixture'){res.setHeader('Content-Type','text/html');res.end('<html><body></body></html>');}else next();});await server.listen();
+let browser;try{browser=await chromium.launch({channel:'msedge',headless:true});const page=await browser.newPage({viewport:{width:512,height:512}});await page.route('**/portal-fixture',route=>route.fulfill({contentType:'text/html',body:'<html><body></body></html>'}));await page.goto('http://127.0.0.1:5196/portal-fixture');
+const report=await page.evaluate(async()=>{
+ const {T}=await import('/src/world-runtime/vendor/world-engine-contract.js'),{WebGLPortalViews}=await import('/src/world-runtime/WebGLPortalViews.js');
+ document.body.replaceChildren();const r=new T.WebGLRenderer({preserveDrawingBuffer:true});r.setSize(512,512);r.setPixelRatio(1);document.body.append(r.domElement);const camera=new T.PerspectiveCamera(60,1,.1,100);camera.position.set(0,0,4);camera.lookAt(0,0,0);
+ const main=new T.Scene();main.background=new T.Color('#111111');const views=new WebGLPortalViews({renderer:r,mainCamera:camera,maxViews:3,configureScene:s=>s.background=new T.Color('#0044bb')});
+ const pose=(position,yaw=0)=>({position,yaw,width:3,height:3});const nested={...pose([10,0,3],Math.PI),width:1.5,height:1.5,id:'b-c',enabled:true,destination:{worldId:'C',portalId:'c-b'}},exit={...pose([20,0,0]),id:'c-b',enabled:true,destination:{worldId:'B',portalId:'b-c'}};
+ const root=new T.Group(),node=new T.Mesh(new T.PlaneGeometry(nested.width,nested.height),new T.MeshBasicMaterial({color:'red',side:T.DoubleSide}));node.position.fromArray(nested.position);node.rotation.y=nested.yaw;node.userData.portalAperture=true;node.userData.portalId=nested.id;root.add(node);
+ const cRoot=new T.Group(),marker=new T.Mesh(new T.PlaneGeometry(8,8),new T.MeshBasicMaterial({color:'#00ff00',side:T.DoubleSide}));marker.position.set(20,0,3);cRoot.add(marker);
+ const b={root,identity:{worldId:'B'},project:{portals:[nested]}},c={root:cRoot,identity:{worldId:'C'},project:{portals:[exit]}};
+ main.add(views.setDestination('a-b',{source:pose([0,0,0]),destination:pose([10,0,0]),candidate:b,ownsCandidate:false,authorizedView:true,state:'live'}));views.setDestination('a-c',{source:pose([30,0,0]),destination:exit,candidate:c,ownsCandidate:false,authorizedView:true,state:'live'});
+ views.resolveNestedDestination=()=>views.entries.get('a-c').state==='live'?{candidate:c,scene:views.entries.get('a-c').scene}:null;const gl=r.getContext(),pixel=()=>{const a=new Uint8Array(4);gl.readPixels(256,256,1,1,gl.RGBA,gl.UNSIGNED_BYTE,a);return [...a];};let draws=0;const original=r.render.bind(r);r.render=(...args)=>{draws++;return original(...args);};
+ views.setState('a-c','restricted');views.render({width:512,height:512});original(main,camera);const before=pixel(),beforeImage=r.domElement.toDataURL();
+ views.setState('a-c','live');draws=0;views.render({width:512,height:512});original(main,camera);const after=pixel(),afterImage=r.domElement.toDataURL(),nestedDraws=draws;
+ if(!(before[2]>before[1]&&after[1]>200&&after[0]<20&&after[2]<20))throw Error('Nested marker pixel failed: '+JSON.stringify({before,after}));
+ nested.yaw+=.15;node.rotation.y=nested.yaw;views.render({width:512,height:512});original(main,camera);const angled=pixel(),angledImage=r.domElement.toDataURL();if(angled[1]<200)throw Error('Angled marker absent');views.setState('a-c','restricted');views.render({width:512,height:512});original(main,camera);const revoked=pixel();if(revoked[2]<100||revoked[1]>100)throw Error('Revoked destination leaked');const debug=gl.getExtension('WEBGL_debug_renderer_info'),adapter=debug?gl.getParameter(debug.UNMASKED_RENDERER_WEBGL):'unknown';views.dispose();r.dispose();return {fixture:'Controlled in-memory aligned and angled portal pairs using production WebGLPortalViews',scope:'Local hardware browser proof; synthetic geometry, no natural stock-world alignment or live deployment claim',before,after,angled,revoked,nestedDraws,adapter,beforeImage,afterImage,angledImage};
+});for(const key of ['beforeImage','afterImage','angledImage']){await writeFile(resolve(output,key+'.png'),Buffer.from(report[key].split(',')[1],'base64'));delete report[key];}await writeFile(resolve(output,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+}finally{await browser?.close();await server.close();}

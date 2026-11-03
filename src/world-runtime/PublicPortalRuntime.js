@@ -11,9 +11,9 @@ export class PublicPortalRuntime{
  constructor({catalog,engine,host,input,views,buildScene,disposeCandidate,addPortalFrame,portalEffects,onStatus=()=>{},onChange=()=>{},onActivated=()=>{},baseURL=location.href,fetcher=fetch}={}){
   this.catalog=validatePublishedWorldCatalog(catalog,{baseURL});check(engine&&host&&input&&views&&buildScene&&disposeCandidate,'Public runtime dependencies missing');Object.assign(this,{engine,host,input,views,buildScene,disposeCandidate,addPortalFrame,portalEffects,onStatus,onChange,onActivated,baseURL,fetcher});
   this.mode='published';this.connected=false;this.config=null;this.transport={closed:true,frozen:false,connectionEpoch:0};this.loaded=new Map();this.descriptors=new Map();this.presence=new Map();this.previewRecords=new Map();this.loads=new Map();this.builds=new Map();this.pending=false;this.authorityOffline=false;this.enabled=false;this.disposed=false;this.epoch=0;this.lastPosition=null;this.errors=new Map();this.crossings=0;this.activeRecord=null;this.preparations=new Map();this.closingCaches=new Set();
-  this.originalHooks={acquireResources:host.acquireResources,registerResources:host.registerResources,retainResources:host.retainResources};this.newCache();
+  this.originalHooks={acquireResources:host.acquireResources,registerResources:host.registerResources,retainResources:host.retainResources};this.newCache();this.nestedLoads=new Map();this.views.resolveNestedDestination=request=>this.resolveNestedPreview(request);
  }
- newCache(){this.cache=new PublishedWorldCache({limit:this.catalog.worlds.length,renderer:this.engine.backend??'webgl2',dispose:c=>{this.portalEffects?.removeRoot(c.root);this.disposeCandidate(c);},readinessFingerprint:this.engine.repositoryReadinessSignature});}
+ newCache(){this.nestedLoads?.clear();this.cache=new PublishedWorldCache({limit:this.catalog.worlds.length,renderer:this.engine.backend??'webgl2',dispose:c=>{this.portalEffects?.removeRoot(c.root);this.disposeCandidate(c);},readinessFingerprint:this.engine.repositoryReadinessSignature});}
  entry(id){return this.catalog.worlds.find(w=>w.worldId===id);}
  routedPortals(worldId,project){return (project.portals??[]).filter(p=>this.route(worldId,p.id));}
  route(worldId,portalId){return this.catalog.routes.find(r=>r.sourceWorldId===worldId&&r.portalId===portalId);}
@@ -90,6 +90,21 @@ export class PublicPortalRuntime{
   }finally{if(epoch===this.epoch){this.pending=false;const sameSource=this.host.active===source&&this.host.generation===generation,ownDestination=activated&&this.host.active===activated&&this.host.generation===activationGeneration;if(this.enabled&&(sameSource||ownDestination)){this.input._clearTransientInput?.();if(wasEnabled)this.input.resume();}}}
  }
  update(){if(!this.enabled||this.pending||!this.host.active)return;const active=this.host.active,position=active.player.position.toArray();for(const portal of this.routedPortals(active.identity.worldId,active.project)){const route=this.route(active.identity.worldId,portal.id);if(!route)continue;const local=portalLocalPoint(portal,position);const record=this.previewRecords.get(portal.id);if(portal.enabled&&portal.view?.enabled!==false&&Math.hypot(...local)<(portal.view?.maxDistance??30)&&(!record||record.retryAt&&record.retryAt<performance.now()))void this.preview(portal);if(active.player.mode==='walk'&&this.lastPosition&&sweepPortalCapsule({portal,previousFeet:this.lastPosition,nextFeet:position,radius:.3,bodyHeight:1.8})){const checkpoint={position:[...this.lastPosition],velocity:active.player.velocity.toArray(),yaw:active.player.yaw,pitch:active.player.pitch};void this.cross(portal,active,checkpoint);break;}}this.lastPosition=position;}
+ resolveNestedPreview({outerCandidate,source}){
+  if(!this.enabled||this.pending||this.disposed)return null;
+  const worldId=outerCandidate?.loaded?.identity?.worldId??outerCandidate?.identity?.worldId??outerCandidate?.descriptor?.worldId,route=this.route(worldId,source.id);
+  if(!route||route.destinationWorldId!==source.destination?.worldId||route.destinationPortalId!==source.destination?.portalId)return null;
+  const loaded=this.loaded.get(route.destinationWorldId),record=loaded&&this.cache.get(loaded);
+  if(record&&this.cache.isReady(record)&&!record.pin){try{this.validateRoute({identity:{worldId}},source,record);return {candidate:record.active?this.host.active:record.candidate,scene:record.active?this.engine.scene:null};}catch{return null;}}
+  // A visible second aperture can demand one catalogue package, never a third
+  // rendering hop or an owner subscription. The validated cache is capped at four.
+  const previous=this.nestedLoads.get(route.destinationWorldId);
+  if(!record&&(!previous||previous.retryAt&&previous.retryAt<performance.now())){
+   const epoch=this.epoch,request={};this.nestedLoads.set(route.destinationWorldId,request);
+   request.promise=this.package(route.destinationWorldId).then(()=>{if(epoch===this.epoch)this.nestedLoads.delete(route.destinationWorldId);},()=>{if(epoch===this.epoch)request.retryAt=performance.now()+5000;});
+  }
+  return null;
+ }
  render(frame){this.views.render(frame);}
  getPeerLayer(){return null;}avatarRepresentations(){return [];}recover(){return Promise.reject(Error('Published single-player travel has no network recovery'));}
  diagnostics(){return {mode:'published',activeWorldId:this.host.active?.identity.worldId,pending:this.pending,enabled:this.enabled,crossings:this.crossings,cacheCount:this.cache.records.size,previewCount:[...this.previewRecords.values()].filter(r=>r.record).length,errors:[...this.errors].map(([portalId,error])=>({portalId,error})),portals:[...this.views.entries].map(([id,e])=>({id,state:e.aperture.userData.portalViewState,worldId:this.previewRecords.get(id)?.worldId}))};}

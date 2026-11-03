@@ -96,3 +96,28 @@ test('ordinary portal views and their forks keep two slots, invalid cap override
  const {views}=setup();assert.equal(views.maxViews,2);const fork=views.fork();assert.equal(fork.maxViews,2);for(let i=0;i<3;i++)fork.setDestination('owner-'+i,{source:pose()});assert.equal(fork.entries.size,2);assert.equal(fork.getAperture('owner-0'),null);views.dispose();fork.dispose();
  for(const maxViews of [0,1,4,3.5,Infinity,'3',null])assert.throws(()=>setup({maxViews}),/slots/);
 });
+
+test('aligned second hop renders only a live reciprocal authorized scene and restores on failure',()=>{
+ const {views,renderer:r}=setup({maxViews:3});
+ const source=pose(),exit=pose([10,0,0]),nestedSource={...pose([10,0,3],Math.PI),id:'b-c',enabled:true,destination:{worldId:'C',portalId:'c-b'}},nestedExit={...pose([20,0,0]),id:'c-b',enabled:true,destination:{worldId:'B',portalId:'b-c'}};
+ const node=new T.Mesh(new T.PlaneGeometry(),new T.MeshBasicMaterial());node.userData.portalAperture=true;node.userData.portalId='b-c';const original=node.material,root=new T.Group();root.add(node);
+ const b={root,identity:{worldId:'B'},project:{portals:[nestedSource]}},c={root:new T.Group(),identity:{worldId:'C'},project:{portals:[nestedExit]}};
+ views.setDestination('a-b',{source,destination:exit,candidate:b,ownsCandidate:false,authorizedView:true,state:'live'});
+ views.setDestination('a-c',{source:pose([30,0,0]),destination:nestedExit,candidate:c,ownsCandidate:false,authorizedView:true,state:'live'});
+ const outer=views.entries.get('a-b'),third=views.entries.get('a-c');let ownerDraws=0;r.render=scene=>{ownerDraws++;assert.equal(scene,outer.scene);assert.equal(node.visible,false);};views.render();assert.equal(ownerDraws,1,'ordinary owner grants never enable second-hop access');views.resolveNestedDestination=()=>third.state==='live'?{candidate:c,scene:third.scene}:null;let calls=[],fail=false;
+ r.render=(scene,camera)=>{calls.push(scene);if(scene===third.scene){assert.ok(Math.abs(camera.position.z+6)<1e-8);}if(scene===outer.scene){assert.equal(node.visible,true);assert.notEqual(node.material,original);if(fail)throw Error('outer failed');}};
+ views.render({width:800,height:600});assert.deepEqual(calls,[third.scene,outer.scene]);assert.equal(node.material,original);assert.equal(node.visible,true);assert.equal(views.nestedTargets.length,1);
+ const target=r.target;fail=true;assert.throws(()=>views.render({width:800,height:600}),/outer failed/);assert.equal(node.material,original);assert.equal(node.visible,true);assert.equal(r.target,target);
+ fail=false;views.setState('a-c','restricted');calls=[];r.render=(scene)=>{calls.push(scene);if(scene===outer.scene)assert.equal(node.visible,false);};views.render();assert.deepEqual(calls,[outer.scene]);views.dispose();assert.equal(views.nestedTargets.length,0);
+});
+
+
+
+test('second-hop failure leaves the outer image healthy and restores detached package parenting',()=>{
+ const {views,renderer:r}=setup({maxViews:3}),root=new T.Group(),node=new T.Mesh(new T.PlaneGeometry(),new T.MeshBasicMaterial());node.userData.portalAperture=true;node.userData.portalId='b-c';root.add(node);
+ const source={...pose([10,0,3],Math.PI),id:'b-c',enabled:true,destination:{worldId:'C',portalId:'c-b'}},destination={...pose([20,0,0]),id:'c-b',enabled:true,destination:{worldId:'B',portalId:'b-c'}},candidate={root:new T.Group(),identity:{worldId:'C'},project:{portals:[destination]}};
+ views.setDestination('a-b',{source:pose(),destination:pose([10,0,0]),candidate:{root,identity:{worldId:'B'},project:{portals:[source]}},ownsCandidate:false,authorizedView:true,state:'live'});const outer=views.entries.get('a-b');let outerDraws=0,resolves=0;
+ views.resolveNestedDestination=()=>{resolves++;return {candidate};};r.render=(scene)=>{if(scene===outer.scene){outerDraws++;assert.equal(node.visible,false);}else{assert.equal(candidate.root.parent,scene);throw Error('second-hop unavailable');}};
+ views.render({width:800,height:600});assert.equal(outerDraws,1);assert.equal(outer.aperture.userData.portalViewState,'live');assert.equal(candidate.root.parent,null);assert.equal(outer.nestedError,'second-hop unavailable');assert.equal(views.nestedTargets.length,1);assert.equal(views.nestedTargets[0].target.width,256);assert.equal(views.nestedTargets[0].target.height,192);
+ source.position[2]=-3;views.render();assert.equal(resolves,1,'clipped aperture never demands a package');assert.equal(candidate.root.parent,null);views.dispose();
+});
