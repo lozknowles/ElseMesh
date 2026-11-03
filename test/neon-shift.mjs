@@ -38,6 +38,26 @@ test('foundation batching keeps resources shared with surviving source nodes ali
 
 test('five attributed authored meshes preserve detailed indexed silhouettes and normalized lot bounds',()=>{assert.equal(NEON_CITY_ASSETS.length,5);for(const asset of NEON_CITY_ASSETS){assert.match(asset.sourceSHA256,/^[a-f0-9]{64}$/);assert.ok(asset.index.length/3>1000);assert.equal(asset.position.length,asset.normal.length);assert.equal(asset.position.length,asset.color.length);assert.ok(asset.index.every(i=>i<asset.position.length/3));assert.ok(asset.position.every(v=>v>=-.5000001&&v<=.5000001));assert.ok(new Set(asset.position.filter((_,i)=>i%3===1)).size>15,'Authored vertical setbacks must survive conversion');}});
 
+test('retiring Neon releases each owned instance buffer once, leaving unrelated meshes alone',()=>{
+ const c=candidate();
+ const shift=installNeonShiftWorld(c,{identity:{worldId:SHIFT_WORLD_ID,contentDigest:SHIFT_CONTENT_DIGEST}});
+ const counts=new Map();
+ shift.root.traverse(mesh=>{
+  if(!mesh.isInstancedMesh)return;
+  counts.set(mesh,0);
+  mesh.addEventListener('dispose',()=>counts.set(mesh,counts.get(mesh)+1));
+ });
+ const unrelated=new T.InstancedMesh(new T.BoxGeometry(),new T.MeshBasicMaterial(),1);
+ c.root.add(unrelated);
+ let unrelatedDisposals=0;
+ unrelated.addEventListener('dispose',()=>unrelatedDisposals++);
+ disposeWebGLRepositoryScene(c);
+ disposeWebGLRepositoryScene(c);
+ assert.ok(counts.size>8 && [...counts.values()].every(count=>count===1));
+ assert.equal(unrelatedDisposals,0);
+ unrelated.dispose();
+});
+
 test('illustrated commercial circuits retain readable light through asynchronous brief brownouts',()=>{assert.equal(new Set(NEON_SHOP_NAMES).size,8);let differing=0,dips=0;for(let t=0;t<60;t+=.01){const levels=NEON_SHOP_NAMES.map((_,c)=>neonSignBrightness(t,c));for(const b of levels)assert.ok(b>.60&&b<.98);if(levels.some(b=>b<.8))dips++;if(Math.max(...levels)-Math.min(...levels)>.15)differing++;}assert.ok(dips>50);assert.ok(differing>50);for(let c=0;c<8;c++)for(let t=0;t<30;t+=.01)assert.ok(Math.abs(neonSignBrightness(t+.01,c)-neonSignBrightness(t,c))<.06,'Recoveries must not introduce instantaneous on/off changes');});
 
 test('stable minute frames avoid tower and roof uploads, while sign circuits continue changing',()=>{const c=candidate(),shift=installNeonShiftWorld(c,{identity:{worldId:SHIFT_WORLD_ID,contentDigest:SHIFT_CONTENT_DIGEST}}),base=(neonShiftFrame().generation+1)*SHIFT_INTERVAL_MS+4000;advanceNeonShiftClock(base);shift.update(10);const moving=shift.root.children.filter(n=>n.userData.neonLotIndices||['NeonShift_Setbacks','NeonShift_RoofPlant'].includes(n.name)),versions=moving.map(n=>n.instanceMatrix.version),sign=shift.root.getObjectByName('NeonShift_IllustratedSign_RAMEN 24'),before=sign.material.color.r;shift.update(12);assert.deepEqual(moving.map(n=>n.instanceMatrix.version),versions);assert.notEqual(sign.material.color.r,before);disposeWebGLRepositoryScene(c);});

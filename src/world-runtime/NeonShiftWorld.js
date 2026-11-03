@@ -24,6 +24,10 @@ export function installNeonShiftWorld(candidate,loaded){
  // Its fixed colliders remain untouched, including during a jump or a shift.
  candidate.root.traverse(node=>{if(!node.userData.editorObjectId?.startsWith('neon-boundary-'))return;node.traverse(part=>{if(part.material){part.material.transparent=true;part.material.opacity=.09;part.material.depthWrite=false;part.material.emissive?.set('#18dfff');}});});
  const root=new T.Group();root.name='NeonShift_ProceduralCity';candidate.root.add(root);
+ // Three releases per-instance GPU buffers on the mesh's dispose event,
+ // independently of the later shared geometry/material cleanup. Register the
+ // owner before building the batches so a partial installation is covered too.
+ candidate.disposeNeonInstances=()=>root.traverse(node=>{if(node.isInstancedMesh)node.dispose();});
  const box=new T.BoxGeometry(1,1,1),glowMaterial=new T.MeshBasicMaterial({color:'#ffffff',toneMapped:false}),floorMaterial=new T.MeshStandardMaterial({color:'#030714',metalness:.75,roughness:.24});
  const towerBatches=createNeonTowerBatches(),grid=new T.InstancedMesh(box,glowMaterial,194),traffic=new T.InstancedMesh(box,glowMaterial,24),rain=new T.InstancedMesh(box,new T.MeshBasicMaterial({color:'#5ccaff',transparent:true,opacity:.32,depthWrite:false,toneMapped:false}),160);
  // Original authored geometry supplies the facade structure; retire the old cage.

@@ -51,6 +51,8 @@ export function buildWebGLNeon(config){
 }
 export function disposeWebGLRepositoryScene(candidate){
  if(!candidate||candidate.disposed)return;candidate.disposed=true;
+ candidate.disposeNeonInstances?.();
+ candidate.disposeNeonInstances=null;
  candidate.splatScene?.dispose();
  candidate.nativeIsland?.dispose();
  candidate.root?.removeFromParent();const geometries=new Set(),materials=new Set(),textures=new Set();
