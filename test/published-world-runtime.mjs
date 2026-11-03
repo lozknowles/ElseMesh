@@ -186,3 +186,19 @@ test('physical WebGL meld path suppresses legacy beams even when reduced motion 
  let source=f.host.active;await r.preview(source.project.portals[0]);source.player.position.set(0,0,-.05);r.update();while(r.pending)await new Promise(resolve=>setImmediate(resolve));assert.equal(r.crossings,1);assert.deepEqual(transitions,[]);
  source=f.host.active;await r.preview(source.project.portals[0]);source.player.position.set(0,0,-.05);assert.equal(await r.cross(source.project.portals[0],source),true);assert.deepEqual(transitions,['active']);r.dispose();f.host.dispose();
 });
+test('accepted crossing primes only the exact resident reciprocal before the first destination frame',async()=>{
+ const f=await fixture({threeWorlds:true}),r=f.runtime,source=f.host.active,door=source.project.portals.find(p=>p.id==='elsemesh-portal:0');await r.preview(door);const fetchCount=f.fetches.length,cacheCount=r.cache.records.size;
+ source.player.position.set(0,0,-.05);assert.equal(await r.cross(door,source),true);
+ // A browser drains activation microtasks before entering its next RAF. No
+ // destination update/preview call is needed to admit this first-frame view.
+ await new Promise(resolve=>setImmediate(resolve));const exit=f.host.active.project.portals[0],entry=r.views.entries.get(exit.id);
+ assert.equal(entry.authorizedView,true);assert.equal(entry.state,'live');assert.equal(entry.candidate.root,source.root);assert.equal(entry.destination.id,door.id);assert.equal(r.previewRecords.size,1);assert.equal(f.fetches.length,fetchCount);assert.equal(r.cache.records.size,cacheCount);
+ r.dispose();f.host.dispose();
+});
+test('reciprocal priming keeps view disable and proximity scope, and preview failure cannot roll back accepted travel',async()=>{
+ for(const scenario of ['disabled','distance','invalid']){
+  const f=await fixture(),r=f.runtime,source=f.host.active,door=source.project.portals[0];await r.preview(door);
+  r.onChange=active=>{const exit=active.project.portals[0];if(scenario==='disabled')exit.view.enabled=false;else if(scenario==='distance')exit.view.maxDistance=.01;else exit.destination.portalId='elsemesh-portal:wrong';};
+  source.player.position.set(0,0,-.05);assert.equal(await r.cross(door,source),true);await new Promise(resolve=>setImmediate(resolve));assert.equal(f.host.active.project.metadata.name,'B');assert.equal(r.crossings,1);assert.equal([...r.views.entries.values()].some(e=>e.authorizedView),false);assert.equal(r.errors.size,scenario==='invalid'?1:0);r.dispose();f.host.dispose();
+ }
+});

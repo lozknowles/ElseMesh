@@ -76,6 +76,22 @@ export class PublicPortalRuntime{
    this.views.setDestination(portal.id,{source:portal,destination:exit,candidate:record.candidate,ownsCandidate:false,authorizedView:true,state:'live'});await this.views.whenReady?.(portal.id);check(this.enabled&&epoch===this.epoch&&source===this.host.active,'Published preview superseded');this.previewRecords.set(portal.id,{worldId:route.destinationWorldId,record});this.errors.delete(portal.id);return true;
   }catch(error){if(epoch===this.epoch&&source===this.host.active){this.views.setState(portal.id,'unavailable');this.previewRecords.set(portal.id,{worldId:route.destinationWorldId,error:error.message,retryAt:performance.now()+5000});this.errors.set(portal.id,error.message);this.onStatus('Portal unavailable: '+error.message);}return false;}
  }
+ primeReciprocalPreview(exitId,previous){
+  // Start the ordinary validated preview in the accepted activation's microtask
+  // turn. Otherwise the first destination RAF starts this asynchronous work too
+  // late for its own draw, briefly showing local scenery through an empty door.
+  // Only the exact resident world just left is eligible; other doors retain the
+  // usual proximity demand-loading path. No prior target image is reused.
+  const active=this.host.active;
+  const exit=active?.project.portals?.find(portal=>portal.id===exitId);
+  if(!this.enabled||!exit?.enabled||exit.view?.enabled===false)return;
+  const route=this.route(active.identity.worldId,exit.id);
+  const record=this.cache.get(previous.loaded);
+  if(route?.destinationWorldId!==previous.identity.worldId||!record||record.active||record.pin||record.candidate.root!==previous.root)return;
+  const local=portalLocalPoint(exit,active.player.position.toArray());
+  if(Math.hypot(...local)>=(exit.view?.maxDistance??30))return;
+  void this.preview(exit);
+ }
  validateSegment(candidate,from,to){
   const physics=candidate.splatScene?.physics;if(physics){check(physics.segment(from,to,{radius:.3,height:1.8,footRadius:.35,stepHeight:.001}).valid,'Destination corridor does not support arrival and exit');return;}
   const distance=Math.hypot(...to.map((v,i)=>v-from[i]));check(distance<=2,'Arrival segment is too long');const steps=Math.max(1,Math.ceil(distance/.02));
@@ -87,7 +103,7 @@ export class PublicPortalRuntime{
   try{const route=this.route(source.identity.worldId,portal.id),record=await this.package(route.destinationWorldId);check(this.enabled&&epoch===this.epoch&&source===this.host.active&&generation===this.host.generation,'Published travel superseded');const exit=this.validateRoute(source,portal,record),feet=source.player.position.toArray(),mapped=mapPortalPoint(portal,exit,feet),local=portalLocalPoint(exit,mapped),front=[...local];front[2]=Math.max(.15,front[2]);const arrival=portalWorldPoint(exit,front),end=[...front];end[2]=Math.max(.4,end[2]);const egress=portalWorldPoint(exit,end);await record.candidate.nativeIsland?.ensureArrival(arrival);
    check(this.enabled&&epoch===this.epoch&&source===this.host.active&&generation===this.host.generation,'Published travel superseded');this.validateSegment(record.candidate,mapped,arrival);this.validateSegment(record.candidate,arrival,egress);
    const pose={position:arrival,velocity:mapPortalDirection(portal,exit,source.player.velocity.toArray()),yaw:mapPortalYaw(portal,exit,source.player.yaw),pitch:source.player.pitch};this.preparePending=this.host.prepare(record.loaded,{pose});prepared=await this.preparePending;this.preparePending=null;check(prepared&&this.enabled&&epoch===this.epoch&&source===this.host.active&&generation===this.host.generation,'Published travel superseded');
-   check(await this.host.activatePrepared(prepared),'Published activation superseded');prepared=null;activated=this.host.active;activationGeneration=this.host.generation;this.meld?.authorize(meld,activated,activationGeneration);this.crossings++;this.setActive(this.host.active);if(!physical||!this.meld)this.portalEffects?.transition('active');this.onStatus('Arrived in '+this.host.active.project.metadata.name+' · single player');return true;
+   check(await this.host.activatePrepared(prepared),'Published activation superseded');prepared=null;activated=this.host.active;activationGeneration=this.host.generation;this.meld?.authorize(meld,activated,activationGeneration);this.crossings++;this.setActive(this.host.active);this.primeReciprocalPreview(exit.id,source);if(!physical||!this.meld)this.portalEffects?.transition('active');this.onStatus('Arrived in '+this.host.active.project.metadata.name+' · single player');return true;
   }catch(error){this.meld?.cancel(meld);if(prepared)this.host.discardPrepared(prepared);if(this.enabled&&epoch===this.epoch&&source===this.host.active&&generation===this.host.generation){source.player.position.fromArray(saved.position);source.player.velocity.set(0,0,0);source.player.yaw=saved.yaw;source.player.pitch=saved.pitch;this.input._clearTransientInput?.();source.player.update(0);this.lastPosition=source.player.position.toArray();this.errors.set(portal.id,error.message);this.onStatus('Stayed in source world: '+error.message);}return false;
   }finally{if(epoch===this.epoch){this.pending=false;const sameSource=this.host.active===source&&this.host.generation===generation,ownDestination=activated&&this.host.active===activated&&this.host.generation===activationGeneration;if(this.enabled&&(sameSource||ownDestination)){this.input._clearTransientInput?.();if(wasEnabled)this.input.resume();}}}
  }
