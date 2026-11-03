@@ -1,3 +1,4 @@
+import {applyNeonAtmosphere} from './NeonAtmosphere.js';
 import {NEON_SHIFT_LOTS,NEON_FOUNDATION_HEIGHT,NEON_STREET_LIMIT,NEON_TOWER_BASE_Y,assertNeonShiftFoundations} from './NeonShiftLots.js';
 import {createNeonStreetBoundary,installNeonStreetClearance} from './NeonStreetBoundary.js';
 import {T} from './vendor/world-engine-contract.js';
@@ -23,11 +24,11 @@ export function installNeonShiftWorld(candidate,loaded){
  // Its fixed colliders remain untouched, including during a jump or a shift.
  candidate.root.traverse(node=>{if(!node.userData.editorObjectId?.startsWith('neon-boundary-'))return;node.traverse(part=>{if(part.material){part.material.transparent=true;part.material.opacity=.09;part.material.depthWrite=false;part.material.emissive?.set('#18dfff');}});});
  const root=new T.Group();root.name='NeonShift_ProceduralCity';candidate.root.add(root);
- const box=new T.BoxGeometry(1,1,1),structureMaterial=new T.MeshStandardMaterial({color:'#677477',metalness:.68,roughness:.52}),glowMaterial=new T.MeshBasicMaterial({color:'#ffffff',toneMapped:false}),floorMaterial=new T.MeshStandardMaterial({color:'#030714',metalness:.75,roughness:.24});
- const towerBatches=createNeonTowerBatches(),edges=new T.InstancedMesh(box,structureMaterial,SHIFT_TOWER_COUNT*12),windows=new T.InstancedMesh(box,structureMaterial,SHIFT_TOWER_COUNT*8),grid=new T.InstancedMesh(box,glowMaterial,194),traffic=new T.InstancedMesh(box,glowMaterial,24),rain=new T.InstancedMesh(box,new T.MeshBasicMaterial({color:'#5ccaff',transparent:true,opacity:.32,depthWrite:false,toneMapped:false}),160);
- edges.name='NeonShift_TowerEdges';windows.name='NeonShift_TowerWindows';
- const foundations=new T.InstancedMesh(box,new T.MeshStandardMaterial({color:'#34444c',metalness:.35,roughness:.7}),NEON_SHIFT_LOTS.length),streetWindows=new T.InstancedMesh(box,new T.MeshStandardMaterial({color:'#66818a',emissive:'#47717d',emissiveIntensity:.26,roughness:.32,metalness:.55}),NEON_SHIFT_LOTS.length*4);foundations.name='NeonShift_Foundations';streetWindows.name='NeonShift_StreetWindows';foundations.userData.editorObjectIds=NEON_SHIFT_LOTS.map(lot=>lot.id);streetWindows.userData.editorObjectIds=NEON_SHIFT_LOTS.flatMap(lot=>Array(4).fill(lot.id));
- for(const mesh of [...towerBatches,edges,windows,grid,traffic,rain,foundations,streetWindows]){mesh.frustumCulled=false;root.add(mesh);}
+ const box=new T.BoxGeometry(1,1,1),glowMaterial=new T.MeshBasicMaterial({color:'#ffffff',toneMapped:false}),floorMaterial=new T.MeshStandardMaterial({color:'#030714',metalness:.75,roughness:.24});
+ const towerBatches=createNeonTowerBatches(),grid=new T.InstancedMesh(box,glowMaterial,194),traffic=new T.InstancedMesh(box,glowMaterial,24),rain=new T.InstancedMesh(box,new T.MeshBasicMaterial({color:'#5ccaff',transparent:true,opacity:.32,depthWrite:false,toneMapped:false}),160);
+ // Original authored geometry supplies the facade structure; retire the old cage.
+ const foundations=new T.InstancedMesh(box,new T.MeshStandardMaterial({color:'#61727b',emissive:'#2c414d',emissiveIntensity:.25,metalness:.25,roughness:.7}),NEON_SHIFT_LOTS.length),streetWindows=new T.InstancedMesh(box,new T.MeshStandardMaterial({color:'#9fb9bf',emissive:'#a9e7ed',emissiveIntensity:.7,roughness:.32,metalness:.35}),NEON_SHIFT_LOTS.length*4);foundations.name='NeonShift_Foundations';streetWindows.name='NeonShift_StreetWindows';foundations.userData.editorObjectIds=NEON_SHIFT_LOTS.map(lot=>lot.id);streetWindows.userData.editorObjectIds=NEON_SHIFT_LOTS.flatMap(lot=>Array(4).fill(lot.id));
+ for(const mesh of [...towerBatches,grid,traffic,rain,foundations,streetWindows]){mesh.frustumCulled=false;root.add(mesh);}
  const floor=new T.Mesh(new T.PlaneGeometry(NEON_STREET_LIMIT*2,NEON_STREET_LIMIT*2),floorMaterial);floor.rotation.x=-Math.PI/2;floor.position.y=.012;root.add(floor);installNeonStreetSurface(floor,grid);
  const architecture=installNeonArchitecture(root,box);
  const matrix=new T.Matrix4(),position=new T.Vector3(),scale=new T.Vector3(),rotation=new T.Quaternion(),color=new T.Color();
@@ -53,12 +54,9 @@ export function installNeonShiftWorld(candidate,loaded){
    for(let i=0;i<SHIFT_TOWER_COUNT;i++){
     const a=previous.towers[i],b=current.towers[i],x=lerp(a.x,b.x,t),z=lerp(a.z,b.z,t),w=lerp(a.width,b.width,t),d=lerp(a.depth,b.depth,t),h=lerp(a.height,b.height,t),c=colors[b.color];
     const batch=towerBatches[i%towerBatches.length];set(batch,Math.floor(i/towerBatches.length),x,NEON_TOWER_BASE_Y+h/2,z,w,h,d);
-    for(const dx of [-1,1])for(const dz of [-1,1])set(edges,edge++,x+dx*w/2,NEON_TOWER_BASE_Y+h/2,z+dz*d/2,.08,h,.08,'#6b7677');
-    for(const y of [NEON_TOWER_BASE_Y+.1,NEON_TOWER_BASE_Y+h]){for(const dz of [-1,1])set(edges,edge++,x,y,z+dz*d/2,w,.08,.08,'#7b8581');for(const dx of [-1,1])set(edges,edge++,x+dx*w/2,y,z,.08,.08,d,'#7b8581');}
-    for(let j=0;j<8;j++){const y=NEON_TOWER_BASE_Y+(j+1)*h/9;set(windows,window++,x,y,z+d/2+.025,w*.97,.20,.035,'#505f65');}
    }
    // Road markings retain their muted material palette through theme shifts.
-   for(const mesh of [...towerBatches,edges,windows,grid]){mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;}
+   for(const mesh of [...towerBatches,grid]){mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;}
    lastBlend=t;
   }
   const seconds=Math.floor(state.timestamp/1000);if(seconds!==lastSecond){lastSecond=seconds;const ctx=board.context;if(ctx){ctx.clearRect(0,0,1024,256);ctx.fillStyle='#040c1fea';ctx.fillRect(0,0,1024,256);ctx.textAlign='center';ctx.fillStyle=p.accent;ctx.font='bold 74px monospace';ctx.fillText('NEON SHIFT',512,88);ctx.font='35px monospace';ctx.fillStyle=p.second;ctx.fillText(p.name+' // SECTOR '+(state.generation%10000).toString().padStart(4,'0'),512,150);ctx.fillStyle='#d5fbff';ctx.font='30px monospace';ctx.fillText('REALITY SHIFTS IN '+String(Math.floor(state.remaining/60)).padStart(2,'0')+':'+String(state.remaining%60).padStart(2,'0'),512,211);board.texture.needsUpdate=true;}}
@@ -68,6 +66,6 @@ export function installNeonShiftWorld(candidate,loaded){
   root.userData.shiftState={generation:state.generation,theme:p.name,remaining:state.remaining,blend:t,towers:SHIFT_TOWER_COUNT,streetLimit:NEON_STREET_LIMIT,fixedLots:NEON_SHIFT_LOTS.length,towerBaseY:NEON_TOWER_BASE_Y};
  }
  candidate.root.userData.updateWebGL=time=>{oldUpdate?.(time);update(time);};
- candidate.shiftingWorld={root,update,configureScene(scene){scene.background=new T.Color('#111c29');scene.fog=new T.FogExp2('#172638',.005);const lights=scene.userData.repositoryLights;if(lights){lights.sky.intensity=1.25;lights.sun.intensity=1.2;}},diagnostics:()=>{const geometries=new Set(),materials=new Set(),textures=new Set();let instances=0,triangles=0;root.traverse(n=>{if(n.geometry){geometries.add(n.geometry);const count=n.isInstancedMesh?n.count:1;triangles+=(n.geometry.index?.count??n.geometry.attributes.position?.count??0)/3*count;if(n.isInstancedMesh)instances+=n.count;}for(const m of Array.isArray(n.material)?n.material:n.material?[n.material]:[]){materials.add(m);for(const value of Object.values(m))if(value?.isTexture)textures.add(value);}});return{...root.userData.shiftState,...architecture.diagnostics(),geometries:geometries.size,materials:materials.size,textures:textures.size,instances,triangles};}};
+ candidate.shiftingWorld={root,update,configureScene(scene){applyNeonAtmosphere(scene,project.environment?.timeOfDay??21);},diagnostics:()=>{const geometries=new Set(),materials=new Set(),textures=new Set();let instances=0,triangles=0;root.traverse(n=>{if(n.geometry){geometries.add(n.geometry);const count=n.isInstancedMesh?n.count:1;triangles+=(n.geometry.index?.count??n.geometry.attributes.position?.count??0)/3*count;if(n.isInstancedMesh)instances+=n.count;}for(const m of Array.isArray(n.material)?n.material:n.material?[n.material]:[]){materials.add(m);for(const value of Object.values(m))if(value?.isTexture)textures.add(value);}});return{...root.userData.shiftState,...architecture.diagnostics(),geometries:geometries.size,materials:materials.size,textures:textures.size,instances,triangles};}};
  update(0);root.updateMatrixWorld(true);return candidate.shiftingWorld;
 }

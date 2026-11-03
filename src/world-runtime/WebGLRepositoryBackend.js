@@ -1,4 +1,5 @@
 import {updateWebGLWeatherShelter} from './WebGLWeatherShelter.js';
+import {applyNeonAtmosphere} from './NeonAtmosphere.js';
 import {repositoryPeerFacing} from '../player/AvatarFacing.js';
 import {repositoryProjectWaterHeight} from './RepositoryWater.js';
 import {T} from './vendor/world-engine-contract.js';
@@ -50,5 +51,6 @@ export function updateWebGLRepositoryEnvironment(engine,active,time,environment)
  const color=new T.Color().setRGB(.04+day*.46,.06+day*.60,.11+day*.64);engine.scene.background.copy(color);
  const underwater=engine.camera.position.y<repositoryProjectWaterHeight(active?.project,engine.camera.position.x,engine.camera.position.z,time);
  engine.scene.fog.color.copy(underwater?new T.Color('#1b6a77'):color);engine.scene.fog.density=underwater?.045:Math.min(.008,(env.mistDensity??.004)*.08)*(1+.12*Math.sin(time*(env.mistSpeed??2)*.07));
+ if(active?.shiftingWorld && !underwater)applyNeonAtmosphere(engine.scene,hour,flash);
  const shelter=updateWebGLWeatherShelter(engine,active,time,underwater);active?.nativeIsland?.setEnvironment(env);active?.root.userData.updateWebGL?.(time);return {flash,backend:'webgl2',underwater:!!underwater,...shelter};
 }

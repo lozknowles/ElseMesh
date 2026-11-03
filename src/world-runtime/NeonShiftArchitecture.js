@@ -3,9 +3,25 @@ import {NEON_SHIFT_LOTS,NEON_TOWER_BASE_Y} from './NeonShiftLots.js';
 import {NEON_CITY_ASSETS} from './NeonCityAssets.js';
 
 export function createNeonTowerBatches(){
- const material=new T.MeshStandardMaterial({color:'#aeb9bf',vertexColors:true,metalness:.32,roughness:.7,emissive:'#263844',emissiveIntensity:.3});
+ // Project the shared night facade onto the actual authored building surfaces,
+ // including their setbacks. Emission stays independent of scene key lights.
+ const paint=(ctx,w,h,emission)=>{
+  ctx.fillStyle=emission?'#000000':'#68757e';ctx.fillRect(0,0,w,h);
+  for(let row=0;row<32;row++)for(let col=0;col<8;col++){
+   const x=col*64,y=row*64,hash=(row*31+col*17)%13,lit=hash<7;
+   if(!emission){ctx.fillStyle='#273c47';ctx.fillRect(x+9,y+6,46,52);ctx.fillStyle='#152936';ctx.fillRect(x+13,y+10,38,44);}
+   if(lit){ctx.fillStyle=hash%3===0?'#6cbdcc':hash%3===1?'#e6ac68':'#c3b99b';ctx.globalAlpha=emission?.72:1;ctx.fillRect(x+14,y+11,36,42);ctx.globalAlpha=1;}
+   ctx.fillStyle=emission?'#000000':'#4d6069';ctx.fillRect(x+30,y+9,3,46);ctx.fillRect(x+12,y+36,40,3);
+   if(!emission){ctx.fillStyle='#849093';ctx.fillRect(x,y,64,3);ctx.fillStyle='#354953';ctx.fillRect(x,y+61,64,3);ctx.globalAlpha=.13;ctx.fillStyle='#10232e';for(let streak=0;streak<4;streak++)ctx.fillRect(x+streak*17,y+3,2,58);ctx.globalAlpha=1;}
+  }
+  // Roof faces sample this dark corner rather than a window.
+  ctx.fillStyle=emission?'#000000':'#52616a';ctx.fillRect(0,0,6,6);
+ };
+ const map=canvasTexture(512,2048,(ctx,w,h)=>paint(ctx,w,h,false)),emissiveMap=canvasTexture(512,2048,(ctx,w,h)=>paint(ctx,w,h,true));
+ const material=new T.MeshStandardMaterial({color:'#c6d2d8',map,emissiveMap,metalness:.28,roughness:.66,emissive:'#ffffff',emissiveIntensity:1.8});
  return NEON_CITY_ASSETS.map((asset,variant)=>{
-  const geometry=new T.BufferGeometry();for(const key of ['position','normal','color'])geometry.setAttribute(key,new T.Float32BufferAttribute(asset[key],3));geometry.setIndex(asset.index);geometry.computeBoundingBox();geometry.computeBoundingSphere();
+  const geometry=new T.BufferGeometry();for(const key of ['position','normal','color'])geometry.setAttribute(key,new T.Float32BufferAttribute(asset[key],3));
+  const uv=[];for(let i=0;i<asset.position.length;i+=3){const n=asset.normal,p=asset.position;if(Math.abs(n[i+1])>.65){uv.push(.002,.002);continue;}uv.push(Math.abs(n[i])>Math.abs(n[i+2])?p[i+2]+.5:p[i]+.5,p[i+1]+.5);}geometry.setAttribute('uv',new T.Float32BufferAttribute(uv,2));geometry.setIndex(asset.index);geometry.computeBoundingBox();geometry.computeBoundingSphere();
   const lots=NEON_SHIFT_LOTS.map((_,i)=>i).filter(i=>i%NEON_CITY_ASSETS.length===variant),mesh=new T.InstancedMesh(geometry,material,lots.length);mesh.name=variant===0?'NeonShift_Towers':'NeonShift_Towers_'+variant;mesh.userData.neonLotIndices=lots;mesh.userData.assetSource=asset.name;mesh.userData.assetSourceSHA256=asset.sourceSHA256;return mesh;
  });
 }
@@ -50,7 +66,7 @@ export function neonSignBrightness(time,circuit){
  return .945+.025*Math.sin(time*.48+circuit*2.3999632297)-(.23+random*.08)*dip;
 }
 export function installNeonArchitecture(root,box){
- const structure=new T.MeshStandardMaterial({color:'#657377',metalness:.65,roughness:.6}),concrete=new T.MeshStandardMaterial({color:'#3d494e',roughness:.9,metalness:.12}),glass=new T.MeshStandardMaterial({color:'#182c35',emissive:'#174553',emissiveIntensity:.35,metalness:.7,roughness:.25});
+ const structure=new T.MeshStandardMaterial({color:'#75898d',emissive:'#6aa5af',emissiveIntensity:.24,metalness:.5,roughness:.6}),concrete=new T.MeshStandardMaterial({color:'#64737b',roughness:.9,metalness:.12}),glass=new T.MeshStandardMaterial({color:'#35515d',emissive:'#73bccb',emissiveIntensity:.55,metalness:.5,roughness:.25});
  const count=NEON_SHIFT_LOTS.length,beams=new T.InstancedMesh(box,structure,count*24),doors=new T.InstancedMesh(box,glass,count*4),awnings=new T.InstancedMesh(box,concrete,count*4),setbacks=new T.InstancedMesh(box,concrete,count*3),plant=new T.InstancedMesh(box,structure,count*5);
  const meshes=[beams,doors,awnings,setbacks,plant];for(const mesh of meshes){mesh.frustumCulled=false;root.add(mesh);}beams.name='NeonShift_FoundationFrames';doors.name='NeonShift_StorefrontDoors';awnings.name='NeonShift_Canopies';setbacks.name='NeonShift_Setbacks';plant.name='NeonShift_RoofPlant';
  const matrix=new T.Matrix4(),p=new T.Vector3(),q=new T.Quaternion(),s=new T.Vector3(),up=new T.Vector3(0,1,0);
