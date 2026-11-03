@@ -10,9 +10,9 @@ Return remains `[0,1.8,18]`, spawn `[0,0,14]`. All 320 building sides connect to
 
 ## Rendering and release
 
-The engine adapter requires the exact world identity and current `ShiftingWorldProfile.js` digest. World data contains no executable behavior. Original scene/art use MIT with no external assets or endpoints. Qualification is the public WebGL game.
+The engine adapter requires the exact world identity and current `ShiftingWorldProfile.js` digest. World data contains no executable behavior. Five CC0 tower models from Kenney’s City Kit (Commercial) 2.1 provide the building shapes. The engine bundles the adapted meshes locally. Shopfront lettering, illustrations, wet street finish and sign lighting are original to ElseMesh. See [credits](../CREDITS.md) and the [source models](../tools/neon-source/).
 
-One wall-clock state per frame serves previews and the active world. Entry does not reset it. Forward clock jumps catch up directly; rollback freezes until time catches up. Morphs last 2.4 seconds. The fixed pool has 2,458 instances, 6 geometries, 8 materials, 2 textures, 25 mesh objects and 33,502 triangles before renderer-specific passes. This is a new baseline, not unchanged rendering cost. Shifts preserve resource identities and shader structure. Public views stay capped at three; owner/default/native limits remain two, with existing culling and leases.
+One wall-clock state per frame serves previews and the active world. Entry does not reset it. Forward clock jumps catch up directly. Clock rollback freezes the phase until time catches up. Morphs last 2.4 seconds. The live November 1 build used 2,458 instances and 33,502 triangles before renderer-specific passes. The new city has its own measured resource counts. Shifts preserve resource identities and shader structure. Public views stay capped at three. Owner/default/native limits remain two, with existing culling and leases.
 
 ## Gates and evidence
 

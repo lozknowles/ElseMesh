@@ -109,3 +109,12 @@ test('public game has four fixed world packages and complete admitted Dock runti
  const credits=await fs.readFile(path.join(root,'credits.html'),'utf8');for(const text of ['Bracken Quay Dock','MPL-2.0 AND CC-BY-4.0',dock.bundlePath+'NOTICE',dock.bundlePath+'models/port/licensing/README.md'])assert.ok(credits.includes(text));
 });
 test('Neon Shift publishes only its pinned original scene, fixed collisions and notices',async()=>{const entry=catalog.worlds.find(w=>w.worldId===SHIFT_WORLD_ID);assert.ok(entry);assert.equal(entry.contentDigest,SHIFT_CONTENT_DIGEST);const {loaded,files,total}=await readNeonShiftPublication(path.join(root,entry.bundlePath));assert.equal(files.size,13);assert.equal(loaded.project.assets.length,0);assert.ok(total<128*1024);assert.equal(loaded.project.portals[0].destination.worldId,catalog.openingWorldId);for(const name of ['README.md','ATTRIBUTION.md','LICENSE'])assert.ok(files.has(name));});
+
+test('packaged credits identify the tower artist and preserve the source licence',async()=>{
+ const credits=await fs.readFile(path.join(root,'credits.html'),'utf8');
+ assert.ok(credits.includes('https://kenney.nl/assets/city-kit-commercial'));
+ assert.ok(credits.includes('href="licenses/KENNEY-CITY-KIT.txt"'));
+ const notice=await fs.readFile(path.join(root,'licenses/KENNEY-CITY-KIT.txt'),'utf8');
+ assert.match(notice,/City Kit Commercial \(2\.1\)/);
+ assert.match(notice,/Creative Commons Zero, CC0/);
+});

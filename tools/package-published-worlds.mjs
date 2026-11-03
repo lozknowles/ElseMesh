@@ -103,7 +103,12 @@ if(duckAsset.byteLength!==6929080||await repositoryDigest(duckAsset)!=='f8776b98
 for(const name of ['ATTRIBUTION.md','LICENSE-MODELS.md','LICENSE-APACHE-2.0.txt','manifest.json','collision-proxy.json'])await fs.access(path.join(output,'models/microduck',name));
 credits=await fs.readFile(path.join(output,'credits.html'),'utf8');credits=credits.replace('</html>','<section><h2>Microduck local companion</h2><p>Original robot geometry by Pollen Robotics, adapted to articulated glTF and animated from the official policy. Geometry and adaptations: CC BY-NC-SA 4.0, separate from application MIT code. This is a noncommercial demonstration. <a href="models/microduck/ATTRIBUTION.md">Attribution</a> · <a href="models/microduck/LICENSE-MODELS.md">Model licence</a> · <a href="models/microduck/LICENSE-APACHE-2.0.txt">Description and policy licence</a>.</p><p>The companion runs locally in this browser session and is not a shared or persistent online character.</p></section></html>');await fs.writeFile(path.join(output,'credits.html'),credits);
 // Preserve the already-published editor and optional-world pins, not an older snapshot.
-if(shift){const credits=await fs.readFile(path.join(output,'credits.html'),'utf8');await fs.writeFile(path.join(output,'credits.html'),credits.replace('</html>',`<section><h2>Neon Shift</h2><p>Original procedural city and safe plaza by DRG Software Solutions LLC, MIT. Generated locally by ElseMesh; layouts reshape every minute while the return gate stays fixed. <a href="${shift.bundlePath}ATTRIBUTION.md">Attribution</a> · <a href="${shift.bundlePath}LICENSE">Licence</a>.</p></section></html>`));}
+if(shift){
+ const notice='licenses/KENNEY-CITY-KIT.txt';
+ await fs.copyFile(new URL('../LICENSES/KENNEY-CITY-KIT.txt',import.meta.url),path.join(output,notice));
+ const credits=await fs.readFile(path.join(output,'credits.html'),'utf8');
+ await fs.writeFile(path.join(output,'credits.html'),credits.replace('</html>',`<section><h2>Neon Shift</h2><p>Original world and signs by DRG Software Solutions LLC. Tower geometry adapted from Kenney’s <a href="https://kenney.nl/assets/city-kit-commercial">City Kit (Commercial) 2.1</a>, released under CC0. <a href="${notice}">Asset licence</a> · <a href="${shift.bundlePath}ATTRIBUTION.md">World attribution</a> · <a href="${shift.bundlePath}LICENSE">World licence</a>.</p></section></html>`));
+}
 const priorPublication=JSON.parse(await fs.readFile(path.join(previous,'publication.json'),'utf8'));
 if(priorPublication.schema!=='elsemesh.publication/1')throw Error('Unsupported prior publication provenance');
 const preserved={};

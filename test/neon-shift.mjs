@@ -4,6 +4,8 @@ import{Colliders}from'../src/world/Colliders.js';
 import{T}from'../src/world-runtime/vendor/world-engine-contract.js';
 import{SHIFT_WORLD_ID,SHIFT_CONTENT_DIGEST}from'../src/world-runtime/ShiftingWorldProfile.js';
 import{SHIFT_INTERVAL_MS,createShiftClock,neonShiftLayout,advanceNeonShiftClock,neonShiftFrame}from'../src/world-runtime/NeonShiftLayout.js';
+import{neonSignBrightness,NEON_SHOP_NAMES}from'../src/world-runtime/NeonShiftArchitecture.js';
+import{NEON_CITY_ASSETS}from'../src/world-runtime/NeonCityAssets.js';
 import{installNeonShiftWorld}from'../src/world-runtime/NeonShiftWorld.js';
 import{webGLRepositoryReadinessSignature}from'../src/world-runtime/WebGLRepositoryReadiness.js';
 import{disposeWebGLRepositoryScene}from'../src/world-runtime/WebGLRepositoryScene.js';
@@ -13,9 +15,9 @@ function candidate(){const root=new T.Group(),retired=[];const objects=NEON_SHIF
 
 test('fixed identity and exact content pin precede procedural resource allocation',()=>{const c={root:new T.Group()};assert.equal(installNeonShiftWorld(c,{identity:{worldId:'other'}}),null);assert.throws(()=>installNeonShiftWorld(c,{identity:{worldId:SHIFT_WORLD_ID,contentDigest:'wrong'}}));assert.equal(c.root.children.length,0);});
 test('many shifts reuse shader/resource pool, preserve readiness and dispose shared assets once',()=>{const c=candidate(),loaded={identity:{worldId:SHIFT_WORLD_ID,contentDigest:SHIFT_CONTENT_DIGEST}},shift=installNeonShiftWorld(c,loaded),signature=webGLRepositoryReadinessSignature(c),first=shift.diagnostics(),ids=()=>{const out=[];c.root.traverse(n=>{if(n.geometry)out.push('g'+n.geometry.id);if(n.material)out.push('m'+n.material.id);});return out;},before=ids(),base=Math.ceil(Date.now()/SHIFT_INTERVAL_MS)*SHIFT_INTERVAL_MS+3000;
- assert.ok(c.retired.every(r=>r.disposals===1));assert.equal(first.instances,2458);assert.equal(first.geometries,6);assert.equal(first.materials,8);assert.equal(first.textures,2);assert.equal(c.terrain.supportsFootprint(0,0),true);
+ assert.ok(c.retired.every(r=>r.disposals===1));assert.ok(first.instances>5000);assert.equal(first.towerAssetVariants,5);assert.equal(first.illustratedSigns,320);assert.equal(first.signDesigns,8);assert.ok(first.triangles>100000);assert.ok(first.textures>=10);assert.equal(c.terrain.supportsFootprint(0,0),true);
  for(let n=0;n<100;n++){advanceNeonShiftClock(base+n*SHIFT_INTERVAL_MS);shift.update(n);assert.equal(webGLRepositoryReadinessSignature(c),signature);assert.deepEqual(ids(),before);const d=shift.diagnostics();for(const k of ['geometries','materials','textures','instances'])assert.equal(d[k],first[k]);}
- const resources=new Set();c.root.traverse(n=>{if(n.geometry)resources.add(n.geometry);if(n.material){resources.add(n.material);if(n.material.map)resources.add(n.material.map);}});const disposals=new Map();for(const r of resources)r.addEventListener('dispose',()=>disposals.set(r,(disposals.get(r)??0)+1));disposeWebGLRepositoryScene(c);disposeWebGLRepositoryScene(c);assert.equal(disposals.size,resources.size);assert.ok([...disposals.values()].every(n=>n===1));assert.ok(c.retired.every(r=>r.disposals===1));
+ const resources=new Set();c.root.traverse(n=>{if(n.geometry)resources.add(n.geometry);if(n.material){resources.add(n.material);for(const value of Object.values(n.material))if(value?.isTexture)resources.add(value);}});const disposals=new Map();for(const r of resources)r.addEventListener('dispose',()=>disposals.set(r,(disposals.get(r)??0)+1));disposeWebGLRepositoryScene(c);disposeWebGLRepositoryScene(c);assert.equal(disposals.size,resources.size);assert.ok([...disposals.values()].every(n=>n===1));assert.ok(c.retired.every(r=>r.disposals===1));
 });
 
 test('actual rendered tower instances remain above closed fixed foundations for every morph, with four visible in-lot street faces',()=>{
@@ -25,11 +27,15 @@ test('actual rendered tower instances remain above closed fixed foundations for 
  for(let i=0;i<80;i++){const lot=NEON_SHIFT_LOTS[i],wall=bounds(foundation,i);assert.ok(Math.abs(wall.y-wall.hy)<1e-6);assert.ok(Math.abs(wall.y+wall.hy-3)<1e-6);for(let face=0;face<4;face++){const b=bounds(bands,i*4+face);assert.ok(Math.abs(b.x-lot.x)+b.hx<5);assert.ok(Math.abs(b.z-lot.z)+b.hz<5);assert.ok(b.y-b.hy>0&&b.y+b.hy<3);assert.ok(face<2?Math.abs(b.z-lot.z)-b.hz>wall.hz:Math.abs(b.x-lot.x)-b.hx>wall.hx,'Lit band lies outside opaque wall and inside reserved lot');}}
  for(let generation=0;generation<120;generation++)for(const phase of [0,240,600,1200,1800,2160,2400]){
   advanceNeonShiftClock(base+generation*SHIFT_INTERVAL_MS+phase);shift.update(generation+phase/1000);
-  for(const [name,perTower]of [['NeonShift_Towers',1],['NeonShift_TowerEdges',12],['NeonShift_TowerWindows',8]]){const mesh=root.getObjectByName(name);for(let i=0;i<mesh.count;i++){const lot=NEON_SHIFT_LOTS[Math.floor(i/perTower)],b=bounds(mesh,i);assert.ok(Math.abs(b.x-lot.x)+b.hx<lot.half-.35);assert.ok(Math.abs(b.z-lot.z)+b.hz<lot.half-.35);assert.ok(b.y-b.hy>=NEON_TOWER_BASE_Y-1e-5);checked++;}}
+  for(const [name,perTower]of [['NeonShift_TowerEdges',12],['NeonShift_TowerWindows',8],['NeonShift_Setbacks',3],['NeonShift_RoofPlant',5],...Array.from({length:5},(_,i)=>[i?'NeonShift_Towers_'+i:'NeonShift_Towers',1])]){const mesh=root.getObjectByName(name);for(let i=0;i<mesh.count;i++){const lot=NEON_SHIFT_LOTS[mesh.userData.neonLotIndices?.[i]??Math.floor(i/perTower)],b=bounds(mesh,i);assert.ok(Math.abs(b.x-lot.x)+b.hx<lot.half-.35);assert.ok(Math.abs(b.z-lot.z)+b.hz<lot.half-.35);assert.ok(b.y-b.hy>=NEON_TOWER_BASE_Y-1e-5);checked++;}}
  }
- assert.equal(checked,80*21*120*7);disposeWebGLRepositoryScene(c);
+ assert.equal(checked,80*29*120*7);disposeWebGLRepositoryScene(c);
 });
 
 test('foundation batching keeps resources shared with surviving source nodes alive until package disposal',()=>{
  const c=candidate(),source=c.root.children[0].children[0],shared=new T.Mesh(source.geometry,source.material);c.root.add(shared);const records=c.retired.slice(0,2);installNeonShiftWorld(c,{identity:{worldId:SHIFT_WORLD_ID,contentDigest:SHIFT_CONTENT_DIGEST}});assert.ok(records.every(r=>r.disposals===0));disposeWebGLRepositoryScene(c);assert.ok(records.every(r=>r.disposals===1));
 });
+
+test('five attributed authored meshes preserve detailed indexed silhouettes and normalized lot bounds',()=>{assert.equal(NEON_CITY_ASSETS.length,5);for(const asset of NEON_CITY_ASSETS){assert.match(asset.sourceSHA256,/^[a-f0-9]{64}$/);assert.ok(asset.index.length/3>1000);assert.equal(asset.position.length,asset.normal.length);assert.equal(asset.position.length,asset.color.length);assert.ok(asset.index.every(i=>i<asset.position.length/3));assert.ok(asset.position.every(v=>v>=-.5000001&&v<=.5000001));assert.ok(new Set(asset.position.filter((_,i)=>i%3===1)).size>15,'Authored vertical setbacks must survive conversion');}});
+
+test('illustrated commercial circuits retain readable light through asynchronous brief brownouts',()=>{assert.equal(new Set(NEON_SHOP_NAMES).size,8);let differing=0,dips=0;for(let t=0;t<60;t+=.01){const levels=NEON_SHOP_NAMES.map((_,c)=>neonSignBrightness(t,c));for(const b of levels)assert.ok(b>.60&&b<.98);if(levels.some(b=>b<.8))dips++;if(Math.max(...levels)-Math.min(...levels)>.15)differing++;}assert.ok(dips>50);assert.ok(differing>50);for(let c=0;c<8;c++)for(let t=0;t<30;t+=.01)assert.ok(Math.abs(neonSignBrightness(t+.01,c)-neonSignBrightness(t,c))<.06,'Recoveries must not introduce instantaneous on/off changes');});

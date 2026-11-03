@@ -157,6 +157,10 @@ These are published techniques. No code from the papers is included.
 The cloud noise, lighting and sampling scheme (`src/sky/Clouds.js`) is adapted from DRG Software Solutions'
 own *Sky Pro WebGPU*. It is published here under this repository's MIT license by its copyright holder.
 
+## Neon Shift towers
+
+The tower models come from [Kenney’s City Kit (Commercial) 2.1](https://kenney.nl/assets/city-kit-commercial). Kenney released them under [CC0](LICENSES/KENNEY-CITY-KIT.txt). ElseMesh adapts their silhouettes, materials and scale for the shifting city. Street signs and lettering are original to this scene.
+
 ## Bracken Quay vehicles
 
 Vehicle authors, licence terms, modifications and source availability are in
