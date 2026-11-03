@@ -2,23 +2,23 @@
   "schema": "elsemesh.publication/1",
   "outputSurfaceDerivative": {
     "manifest": "output-surface-derivative.json",
-    "sha256": "1255bc8eb590e3a39845b0d96ac929b567e7270acd658e1ad7a5f1604652df01",
+    "sha256": "98de1bc7268fcc149ac73eee9041169cbb182593f81fe4071011230ae4615e30",
     "version": "1.0.0",
     "upstreamSourceSha256": "633a828536b774c71c2f0feae31f262fef387233afad1c2fa2e90b624288d42a",
     "transformSha256": "2dccb420c87deab0ed7508cbd4989a20112b2e0f558c9790ef9d6160eaf93ab9",
     "transformedModuleSha256": "037f6dea42d7d076530362fed49dc96d222793e04e97c22c5cff176a3b8d0fd7",
     "finalChunks": {
       "assets/Colliders-u7qqebLy.js": "5c513d01330b57d2db44907fc7eb26434573d8b93f92099ca5ed9b826c9c44ab",
-      "assets/main-DcnEbpHA.js": "6866ec19d5325b16ed4cccb594e59795026a8daa65c63050123728b863e5bd07",
+      "assets/main-BAaVBpT_.js": "789d47ea4d9c3d8c9e949330a2718d28ee576da850fa2d05f19f7e0d7421c096",
       "assets/PlayerEyeControls-CWnrbWq1.js": "007010d9cec58fd310bd4fd5a32849792307e716175d03ccc919cdab944d65d2",
       "assets/PlayerEyePanel-DRdLArCK.js": "0f23f6d155c6c9a507ca0730fcd27add967a3c44b71f16b5fd4a8a59182dadc6",
       "assets/PlayerEyeView-DvEGwbv3.js": "efe7fae17e59db0b69d6a8d20e467f15793160cfc815e02fdbcfd0dcd4cd9d18",
       "assets/RepositoryPlayerEyes-BXZVQ6pq.js": "4986d0f5b08c8ed55a033dd86eecad1ab598c2222ecf19d63f171fbd7fe8401a",
       "assets/spark.module-C6xmu7Sr.js": "e7703b7f7cf4b376e44d3e94a36eaddda805609f2533e269f978b52c40c1df0a",
       "assets/SplatScenePhysics-BszIUdlc.js": "58482c966b875f63327a41178b35bb15352d0b2662cbafe0cb651fc37a217bcf",
-      "assets/WebGLPlayerEyeRenderer-hBFrFnHi.js": "3df8639056c0ef5bb298f2919b3996ccdffba76b0ec8254cb2904b01825e4e77",
-      "assets/WebGLPortalViews-CClKAX_m.js": "3f6de465040e691c86c14d70758ec03e162e72ca3f83738437fdf7af40bb0ce7",
-      "assets/WebGLRepositoryScene-COfxDCO5.js": "45d10b9f7e079b576368d0a09df8f41f6732d0671fea4ebd5f07793d8300a346",
+      "assets/WebGLPlayerEyeRenderer-BTugMbaY.js": "2a9795dfa607ccc4ba836781ebc7b4183cb961ebd6a5e048097ee90fbf4c9e8c",
+      "assets/WebGLPortalViews-HrOKXJ8o.js": "200cf36dacf413ccb5642715a4a67fd09271af906a4584021c2f1e7f45ed3b95",
+      "assets/WebGLRepositoryScene-qDnWkogL.js": "6433039ca8839610a005f4c224a37ea19e6baaebf69e318ec77c39d1201914f7",
       "assets/world-engine-contract-CVcMZ1Us.js": "b0089ce1cba2470f57b54b86c49317b4b031d29dc9dda4164dd37ffda01ca8a1"
     }
   },
@@ -32,7 +32,7 @@
       "bundledWithOpening": false
     }
   ],
-  "engineCommit": "3c29a2d893981a4767615d03ada7f26083508a19",
+  "engineCommit": "f93a4ef19761ba0572493219502d332f3fa1f139",
   "worldContract": {
     "sourceNormalization": "UTF-8 LF",
     "commit": "7acac33d27c917302622c9b4b745ad20399fe40e",
