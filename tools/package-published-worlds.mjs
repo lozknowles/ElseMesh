@@ -83,10 +83,12 @@ for(const name of priorNames){
  if(name.includes('..')||!/^[A-Za-z][A-Za-z0-9_.-]*-[A-Za-z0-9_-]{8}\.(?:js|css)$/.test(name))throw Error('Unexpected prior application asset');
  const from=path.join(priorAssets,name),info=await fs.lstat(from);
  if(!info.isFile()||info.isSymbolicLink()||info.size>5*1024*1024)throw Error('Invalid prior application asset');
- retainedAssetBytes+=info.size;if(retainedAssetBytes>32*1024*1024)throw Error('Prior application asset budget');
  const target=path.join(outputAssets,name);
  const existing=await fs.lstat(target).catch(error=>{if(error.code==='ENOENT')return null;throw error;});
  if(existing){if(!existing.isFile()||existing.isSymbolicLink()||existing.size!==info.size||await repositoryDigest(new Uint8Array(await fs.readFile(target)))!==await repositoryDigest(new Uint8Array(await fs.readFile(from))))throw Error('Application asset name collision');continue;}
+ // A byte-identical current chunk was already validated above. Charge the
+ // compatibility budget only for files the previous release actually adds.
+ retainedAssetBytes+=info.size;if(retainedAssetBytes>32*1024*1024)throw Error('Retained application asset budget');
  await fs.copyFile(from,target);retainedAssetCount++;
 }
 await inspect(path.join(previous,'editor'));await fs.cp(path.join(previous,'editor'),path.join(output,'editor'),{recursive:true,errorOnExist:true,force:false});
