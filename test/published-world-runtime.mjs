@@ -20,6 +20,27 @@ test('cancelled asynchronous preview readiness disposes only the late candidate'
 test('cancel before atomic activation cannot consume a destination lease or move the source',async()=>{const f=await fixture(),r=f.runtime,source=f.host.active;await r.preview(source.project.portals[0]);source.player.position.set(0,0,-.1);let release;f.host.beforeActivate=async()=>new Promise(resolve=>release=resolve);const work=r.cross(source.project.portals[0],source,{position:[0,0,.1],yaw:0,pitch:0});while(!release)await new Promise(resolve=>setImmediate(resolve));r.disconnect();release();assert.equal(await work,false);assert.equal(f.host.active,source);assert.equal(source.root.parent,f.host.engine.scene);assert.equal(r.cache.records.size,0);assert.equal(f.disposed.includes(source.root),false);f.host.dispose();assert.equal(new Set(f.disposed).size,f.disposed.length);});
 
 async function rewarmFixture(){const f=await fixture(),r=f.runtime,a=f.host.active;await r.preview(a.project.portals[0]);a.player.position.set(0,0,-.1);assert.equal(await r.cross(a.project.portals[0],a,{position:[0,0,.1],yaw:0,pitch:0}),true);f.setSignature(2);const record=[...r.cache.records.values()].find(x=>x.loaded.project.metadata.name==='A');return {...f,record};}
+test('backing through the front face and immediately reversing on exit returns without a distance latch',async()=>{
+ const f=await fixture(),r=f.runtime,opening=f.host.active;await r.preview(opening.project.portals[0]);
+ // The player faces away from the source doorway while moving backwards into it.
+ opening.player.yaw=Math.PI;opening.player.velocity.set(0,0,-1);opening.player.position.set(0,0,-.05);r.update();
+ while(r.pending)await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(f.host.active.project.metadata.name,'B');assert.equal(r.crossings,1);
+ const exit=f.host.active;assert.ok(Math.abs(exit.player.yaw)<1e-8);assert.equal(exit.player.position.z,.15);
+ // Stationary/outward frames cannot retrigger the directional sweep.
+ r.update();r.update();assert.equal(r.crossings,1);assert.equal(r.pending,false);
+ // Reverse before ever moving 0.9m away from the door.
+ exit.player.position.set(0,0,-.05);exit.player.velocity.set(0,0,-1);r.update();
+ while(r.pending)await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(f.host.active.identity.worldId,opening.identity.worldId);assert.equal(r.crossings,2);
+ for(let n=0;n<4;n++){const source=f.host.active,target=source.project.portals[0].destination.worldId;r.update();assert.equal(r.pending,false);source.player.position.set(0,0,-.05);r.update();while(r.pending)await new Promise(resolve=>setImmediate(resolve));assert.equal(f.host.active.identity.worldId,target);assert.equal(r.crossings,n+3);}
+ r.dispose();f.host.dispose();
+});
+test('unconfigured backside movement stays in the source world',async()=>{
+ const f=await fixture(),r=f.runtime,source=f.host.active;await r.preview(source.project.portals[0]);
+ r.lastPosition=[0,0,-.15];source.player.position.set(0,0,.15);source.player.yaw=Math.PI;r.update();
+ assert.equal(r.pending,false);assert.equal(r.crossings,0);assert.equal(f.host.active,source);r.dispose();f.host.dispose();
+});
 test('rewarm lease protects full graph until disconnect settles compilation exactly once',async()=>{
  const f=await rewarmFixture(),r=f.runtime,cache=r.cache,source=f.host.active,events=[];for(const record of cache.records.values()){const dispose=record.disposeViews;record.disposeViews=()=>{events.push('views '+record.loaded.project.metadata.name);dispose();};}
  let release,compiles=0;f.host.engine.prepareRepositoryResources=async()=>{compiles++;await new Promise(resolve=>release=resolve);events.push('compile settled');};const first=f.host.acquireResources(f.record.loaded);while(!release)await new Promise(resolve=>setImmediate(resolve));const second=f.host.acquireResources(f.record.loaded);second.catch(()=>{});assert.ok(f.record.pin);assert.equal(compiles,1);r.disconnect();assert.equal(cache.disposed,true);assert.equal(f.record.disposed,false);assert.equal(f.disposed.length,0);assert.deepEqual(events,[]);assert.throws(()=>cache.borrow(f.record.loaded),/closed/);release();await assert.rejects(first,/superseded/);await assert.rejects(second,/superseded/);await cache.whenDisposed;assert.equal(events[0],'compile settled');assert.equal(f.disposed.filter(root=>root===f.record.candidate.root).length,1);assert.equal(f.disposed.includes(source.root),false);assert.equal(cache.records.size,0);f.host.dispose();assert.equal(new Set(f.disposed).size,f.disposed.length);
