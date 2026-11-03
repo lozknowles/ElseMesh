@@ -23,7 +23,7 @@ try{
   const sample=label=>{renderer.setRenderTarget(target);renderer.render(scene,camera);renderer.readRenderTargetPixels(target,0,0,128,128,pixels);const center=Array.from(pixels.slice((64*128+64)*4,(64*128+64)*4+4));let framePixels=0;for(let i=0;i<pixels.length;i+=4)if(pixels[i+2]>80&&pixels[i+1]>60)framePixels++;snapshots.push({label,center,framePixels});};
   sample('loading');for(const state of ['unavailable','restricted','cached']){views.setState('public',state);sample(state);}
   const root=new T.Group(),red=new T.Mesh(new T.PlaneGeometry(20,20),new T.MeshBasicMaterial({color:'red',side:T.DoubleSide}));red.position.set(10,0,1);root.add(red);
-  const live=()=>{views.setDestination('public',{candidate:{root},ownsCandidate:false,authorizedView:true,state:'live',destination:{position:[10,0,0],yaw:0}});views.render({width:128,height:128});};
+  const candidate={root},live=()=>{views.setDestination('public',{candidate,ownsCandidate:false,authorizedView:true,state:'live',destination:{position:[10,0,0],yaw:0}});views.render({width:128,height:128});};
   live();sample('live');views.setState('public','cached');sample('cached-after-live');live();sample('live-again');views.setDestination('public',{authorizedView:false});sample('revoked');
   live();const parked=views.park();sample('parked');views.restore({},parked);sample('return-before-ready');
   views.dispose();effects.dispose();target.dispose();renderer.dispose();return {adapter,snapshots};
