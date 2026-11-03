@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {T} from '../src/world-runtime/vendor/world-engine-contract.js';
-import {WebGLPortalViews,portalTargetSize,portalDestinationPlane,webGLPortalInView,portalApertureIntersectsFrustum} from '../src/world-runtime/WebGLPortalViews.js';
+import {WebGLPortalViews,portalTargetSize,portalDestinationPlane,webGLPortalInView,portalApertureIntersectsFrustum,portalApertureVisibleThrough} from '../src/world-runtime/WebGLPortalViews.js';
 const pose=(position=[0,0,0],yaw=0)=>({position,yaw,width:2,height:3});
 test('a nearby return aperture entirely behind the camera does not draw its destination',()=>{
  const {views,renderer,mainCamera}=setup();let draws=0;renderer.render=()=>draws++;
@@ -117,8 +117,36 @@ test('second-hop failure leaves the outer image healthy and restores detached pa
  const {views,renderer:r}=setup({maxViews:3}),root=new T.Group(),node=new T.Mesh(new T.PlaneGeometry(),new T.MeshBasicMaterial());node.userData.portalAperture=true;node.userData.portalId='b-c';root.add(node);
  const source={...pose([10,0,3],Math.PI),id:'b-c',enabled:true,destination:{worldId:'C',portalId:'c-b'}},destination={...pose([20,0,0]),id:'c-b',enabled:true,destination:{worldId:'B',portalId:'b-c'}},candidate={root:new T.Group(),identity:{worldId:'C'},project:{portals:[destination]}};
  views.setDestination('a-b',{source:pose(),destination:pose([10,0,0]),candidate:{root,identity:{worldId:'B'},project:{portals:[source]}},ownsCandidate:false,authorizedView:true,state:'live'});const outer=views.entries.get('a-b');let outerDraws=0,resolves=0;
- views.resolveNestedDestination=()=>{resolves++;return {candidate};};r.render=(scene)=>{if(scene===outer.scene){outerDraws++;assert.equal(node.visible,false);}else{assert.equal(candidate.root.parent,scene);throw Error('second-hop unavailable');}};
+ const frames=[];views.resolveNestedDestination=request=>{resolves++;frames.push(request.visibilityFrame);return {candidate};};r.render=(scene)=>{if(scene===outer.scene){outerDraws++;assert.equal(node.visible,false);}else{assert.equal(candidate.root.parent,scene);throw Error('second-hop unavailable');}};
  views.render({width:800,height:600});assert.equal(outerDraws,1);assert.equal(outer.aperture.userData.portalViewState,'live');assert.equal(candidate.root.parent,null);assert.equal(outer.nestedError,'second-hop unavailable');assert.equal(views.nestedTargets.length,1);assert.equal(views.nestedTargets[0].target.width,256);assert.equal(views.nestedTargets[0].target.height,192);
- source.view={maxDistance:1};views.render();assert.equal(resolves,1,'distant second aperture respects its authored preview distance');
- source.view={maxDistance:30};source.position[2]=-3;views.render();assert.equal(resolves,1,'clipped aperture never demands a package');assert.equal(candidate.root.parent,null);views.dispose();
+ source.position[0]=14;source.yaw=Math.PI+.3;assert.equal(webGLPortalInView(outer.camera,source),true);views.render();assert.equal(resolves,1,'off-opening tilted aperture inside full frustum never resolves or demand-loads');
+ source.position[0]=10;source.yaw=Math.PI;source.view={maxDistance:1};views.render();assert.equal(resolves,1,'distant second aperture respects its authored preview distance');
+ source.view={maxDistance:30};source.position[2]=-3;views.render();assert.equal(resolves,1,'clipped aperture never demands a package');assert.equal(candidate.root.parent,null);
+ source.position[2]=3;views.render();views.render();assert.deepEqual(frames,[1,5,6],'resolver receives frame gaps after hidden frames and consecutive IDs while visible');views.dispose();
+});
+
+test('nested aperture must intersect the perspective opening, including tilted and grazing corners',()=>{
+ const camera=new T.PerspectiveCamera(100,1,.1,100);camera.position.set(0,0,-3);camera.lookAt(0,0,0);camera.updateMatrixWorld();
+ const opening={...pose(),width:2,height:2},inner=(x,y=0,yaw=Math.PI)=>({...pose([x,y,3],yaw),width:1,height:1});
+ assert.equal(webGLPortalInView(camera,inner(3)),true,'off-opening rectangle is inside the full camera frustum');
+ assert.equal(portalApertureVisibleThrough(camera,opening,inner(3)),false,'sideways outside the opening pyramid');
+ assert.equal(portalApertureVisibleThrough(camera,opening,inner(0)),true);
+ assert.equal(portalApertureVisibleThrough(camera,opening,inner(2.5)),true,'touching projected vertical edge retained');
+ assert.equal(portalApertureVisibleThrough(camera,opening,inner(2.5,2.5)),true,'touching projected corner retained');
+ assert.equal(portalApertureVisibleThrough(camera,opening,inner(2.5001,2.5001)),false,'clear separation rejected');
+ const tilted={...inner(3.1,0,Math.PI+Math.PI/4),width:2};
+ assert.equal(webGLPortalInView(camera,tilted),true);assert.equal(portalApertureVisibleThrough(camera,opening,tilted),false,'tilted rectangle only overlaps the full frustum');
+ tilted.position[0]=2.3;assert.equal(portalApertureVisibleThrough(camera,opening,tilted),true,'tilted edge crossing the opening retained');
+ assert.equal(portalApertureVisibleThrough(camera,opening,{...inner(0),position:[0,0,-1]}),false,'source-clipped side rejected');
+ assert.equal(portalApertureVisibleThrough(camera,opening,{...inner(0,0,Math.PI/4),position:[0,0,0],width:3}),true,'tilted aperture crossing the source clip is retained');
+ camera.position.set(.7,.3,-3);camera.lookAt(0,0,0);camera.updateMatrixWorld();
+ assert.equal(portalApertureVisibleThrough(camera,opening,inner(1.8,2.2)),true,'off-axis projected corner touches the opening');
+ assert.equal(portalApertureVisibleThrough(camera,opening,inner(1.81,2.21)),false,'off-axis projected corner misses the opening');
+ // The pyramid follows the actual off-axis eye and rotated opening, not a
+ // screen-space bounding box centred on the camera direction.
+ const angle=.55,offset=new T.Vector3(7,1,-2),rotate=p=>new T.Vector3(...p).applyAxisAngle(new T.Vector3(0,1,0),angle).add(offset).toArray();
+ camera.position.fromArray(rotate([0,0,-3]));camera.lookAt(new T.Vector3(...rotate([0,0,0])));camera.updateMatrixWorld();
+ const rotatedOpening={...opening,position:rotate(opening.position),yaw:angle},rotated=p=>({...p,position:rotate(p.position),yaw:p.yaw+angle});
+ assert.equal(portalApertureVisibleThrough(camera,rotatedOpening,rotated(inner(3))),false);
+ assert.equal(portalApertureVisibleThrough(camera,rotatedOpening,rotated(inner(2.5,2.5))),true);
 });

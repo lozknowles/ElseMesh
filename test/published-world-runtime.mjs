@@ -139,3 +139,33 @@ test('published visible second hop demand-loads only the validated catalogue and
  await r.nestedLoads.get(dock.destination.worldId).promise;await new Promise(resolve=>setImmediate(resolve));const result=r.resolveNestedPreview(request);assert.equal(result.candidate.descriptor.worldId,dock.destination.worldId);assert.equal(r.cache.records.size,3);assert.equal(r.cache.limit,4);assert.equal(r.transport.identity,undefined);
  r.disconnect();assert.equal(r.resolveNestedPreview(request),null);r.dispose();f.host.dispose();
 });
+
+async function nestedResidentFixture(){const f=await fixture({fourWorlds:true}),r=f.runtime,opening=f.host.active,source=opening.project.portals.find(p=>p.id==='elsemesh-portal:dock');await r.preview(source);return {...f,request:{outerCandidate:r.cache.get(opening.loaded).candidate,source},record:r.previewRecords.get(source.id).record};}
+test('nested steady frames fingerprint once, then visibility re-entry recovers a stale resident',async()=>{
+ const f=await nestedResidentFixture(),r=f.runtime,cache=r.cache,fingerprint=cache.fingerprint;let fingerprints=0,compiles=0;cache.fingerprint=c=>{fingerprints++;return fingerprint(c);};
+ assert.ok(r.resolveNestedPreview({...f.request,visibilityFrame:1}));const initial=fingerprints;assert.ok(initial>0);
+ for(let frame=2;frame<100;frame++)assert.ok(r.resolveNestedPreview({...f.request,visibilityFrame:frame}));assert.equal(fingerprints,initial,'steady admission must be O(1)');
+ f.setSignature(2);r.engine.prepareRepositoryResources=async()=>{compiles++;};assert.equal(r.resolveNestedPreview({...f.request,visibilityFrame:102}),null);const work=r.nestedLoads.get(f.record.loaded.identity.worldId).promise;await work;
+ assert.equal(compiles,1);assert.equal(f.record.pin,null);assert.ok(cache.isReady(f.record));assert.ok(r.resolveNestedPreview({...f.request,visibilityFrame:103}));const warmed=fingerprints;for(let frame=104;frame<150;frame++)assert.ok(r.resolveNestedPreview({...f.request,visibilityFrame:frame}));assert.equal(fingerprints,warmed);r.dispose();f.host.dispose();
+});
+test('nested active destination renders main ownership without fingerprinting or pinning it',async()=>{
+ const f=await nestedResidentFixture(),r=f.runtime,opening=f.host.active,outer=f.record.candidate,source=f.record.loaded.project.portals[0];
+ r.cache.fingerprint=()=>{throw Error('active graph fingerprint must not run');};r.host.acquireResources=()=>{throw Error('active graph cannot be pinned');};
+ for(let frame=0;frame<20;frame++){const result=r.resolveNestedPreview({outerCandidate:outer,source,visibilityFrame:frame});assert.equal(result.candidate,opening);assert.equal(result.scene,r.engine.scene);}assert.equal(r.activeRecord.pin,null);r.dispose();f.host.dispose();
+});
+test('nested stale preparation deduplicates visible frames and disconnect keeps resources protected until settlement',async()=>{
+ const f=await nestedResidentFixture(),r=f.runtime,cache=r.cache;f.setSignature(2);let release,compiles=0;r.engine.prepareRepositoryResources=async()=>{compiles++;await new Promise(resolve=>release=resolve);};
+ assert.equal(r.resolveNestedPreview({...f.request,visibilityFrame:1}),null);while(!release)await new Promise(resolve=>setImmediate(resolve));const work=r.nestedLoads.get(f.record.loaded.identity.worldId).promise;
+ for(let frame=2;frame<40;frame++)assert.equal(r.resolveNestedPreview({...f.request,visibilityFrame:frame}),null);assert.equal(compiles,1);assert.ok(f.record.pin);
+ r.disconnect();assert.equal(f.record.disposed,false);assert.equal(r.nestedLoads.size,0);release();await work;await cache.whenDisposed;assert.equal(f.record.disposed,true);assert.equal(f.disposed.filter(root=>root===f.record.candidate.root).length,1);assert.equal(r.nestedLoads.size,0);f.host.dispose();
+});
+test('nested failed preparation releases its lease and retries after backoff',async()=>{
+ const f=await nestedResidentFixture(),r=f.runtime,id=f.record.loaded.identity.worldId;f.setSignature(2);r.engine.prepareRepositoryResources=async()=>{throw Error('controlled nested failure');};r.resolveNestedPreview({...f.request,visibilityFrame:1});await r.nestedLoads.get(id).promise;assert.equal(f.record.pin,null);assert.ok(r.nestedLoads.get(id).retryAt>0);
+ const fingerprint=r.cache.fingerprint;let calls=0;r.cache.fingerprint=c=>{calls++;return fingerprint(c);};for(let frame=2;frame<10;frame++)assert.equal(r.resolveNestedPreview({...f.request,visibilityFrame:frame}),null);assert.equal(calls,0,'backoff cannot fingerprint every frame');
+ r.nestedLoads.get(id).retryAt=performance.now()-1;r.engine.prepareRepositoryResources=async()=>{};r.resolveNestedPreview({...f.request,visibilityFrame:11});await r.nestedLoads.get(id).promise;assert.ok(r.resolveNestedPreview({...f.request,visibilityFrame:12}));r.dispose();f.host.dispose();
+});
+test('nested admissions are invalidated by generation, leased source and leased destination ownership',async()=>{
+ const f=await nestedResidentFixture(),r=f.runtime;assert.ok(r.resolveNestedPreview({...f.request,visibilityFrame:1}));f.setSignature(2);f.host.generation++;
+ let release;r.engine.prepareRepositoryResources=async()=>new Promise(resolve=>release=resolve);assert.equal(r.resolveNestedPreview({...f.request,visibilityFrame:2}),null);while(!release)await new Promise(resolve=>setImmediate(resolve));const work=r.nestedLoads.get(f.record.loaded.identity.worldId).promise;assert.equal(r.resolveNestedPreview({...f.request,visibilityFrame:3}),null);release();await work;assert.ok(r.resolveNestedPreview({...f.request,visibilityFrame:4}));
+ const outer=r.cache.get(f.host.active.loaded);outer.pin={};assert.equal(r.resolveNestedPreview({...f.request,visibilityFrame:5}),null);outer.pin=null;f.record.pin={};assert.equal(r.resolveNestedPreview({...f.request,visibilityFrame:6}),null);f.record.pin=null;assert.ok(r.resolveNestedPreview({...f.request,visibilityFrame:7}));r.dispose();f.host.dispose();
+});

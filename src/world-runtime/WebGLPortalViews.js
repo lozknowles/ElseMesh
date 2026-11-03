@@ -45,6 +45,40 @@ export function portalApertureIntersectsFrustum(frustum,source){
  }
  return true;
 }
+function apertureCorners(source){
+ const center=new T.Vector3(...source.position),right=new T.Vector3(Math.cos(source.yaw||0),0,-Math.sin(source.yaw||0)).multiplyScalar((source.width||2)/2),up=new T.Vector3(0,(source.height||3)/2,0);
+ return [[-1,-1],[1,-1],[1,1],[-1,1]].map(([x,y])=>center.clone().addScaledVector(right,x).addScaledVector(up,y));
+}
+/** Clip the inner rectangle to the actual eye-to-opening pyramid, destination
+ * half-space and camera frustum together. Independent bounding-plane tests can
+ * admit a tilted rectangle whose surviving portions never overlap the opening.
+ * Keep touching edges/corners conservatively; only an empty polygon is hidden.
+ */
+export function portalApertureVisibleThrough(camera,opening,source){
+ camera.updateMatrixWorld();
+ const eye=new T.Vector3().setFromMatrixPosition(camera.matrixWorld),center=new T.Vector3(...opening.position),corners=apertureCorners(opening);
+ const planes=new T.Frustum().setFromProjectionMatrix(new T.Matrix4().multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse)).planes;
+ planes.push(portalDestinationPlane(opening));
+ for(let i=0;i<4;i++){
+  const normal=new T.Vector3().crossVectors(corners[i].clone().sub(eye),corners[(i+1)%4].clone().sub(eye));
+  if(normal.lengthSq()<1e-20)continue;
+  const plane=new T.Plane().setFromNormalAndCoplanarPoint(normal.normalize(),eye);
+  if(plane.distanceToPoint(center)<0)plane.negate();
+  planes.push(plane);
+ }
+ let polygon=apertureCorners(source);
+ for(const plane of planes){
+  const clipped=[];
+  for(let i=0;i<polygon.length;i++){
+   const a=polygon[i],b=polygon[(i+1)%polygon.length],da=plane.distanceToPoint(a),db=plane.distanceToPoint(b);
+   const tolerance=1e-7*Math.max(1,Math.abs(plane.constant),a.length(),b.length()),insideA=da>=-tolerance,insideB=db>=-tolerance;
+   if(insideA)clipped.push(a);
+   if(insideA!==insideB){const t=Math.max(0,Math.min(1,da/(da-db)));clipped.push(a.clone().lerp(b,t));}
+  }
+  polygon=clipped;if(!polygon.length)return false;
+ }
+ return true;
+}
 /** Draw an already authorized resident scene without parenting or owning it. */
 export function drawWebGLPortal(options){
  return drawPortalView({...options,visibleApertures:new Set()});
@@ -99,7 +133,7 @@ export class WebGLPortalViews{
  setState(id,state){const e=this.entries.get(id);if(e){e.state=state;this._status(e);}}
  _status(e,drawn=false){let s=!e.authorizedView&&['live','cached'].includes(e.state)?'restricted':e.state;if((s==='cached'&&!e.hasImage)||(s==='live'&&!drawn))s=e.hasImage?'cached':'loading';e.material.uniforms.portalState.value=PORTAL_VIEW_STATES[s]??0;e.aperture.userData.portalViewState=s;}
  render({width=1,height=1,time=0}={}){
-  const r=this.renderer,m=this.mainCamera;this.nestedDraws=0;this.nestedTargets??=[];m.updateMatrixWorld();
+  const r=this.renderer,m=this.mainCamera;this.visibilityFrame=(this.visibilityFrame??0)+1;this.nestedDraws=0;this.nestedTargets??=[];m.updateMatrixWorld();
   const frustum=new T.Frustum().setFromProjectionMatrix(new T.Matrix4().multiplyMatrices(m.projectionMatrix,m.matrixWorldInverse)),position=new T.Vector3().setFromMatrixPosition(m.matrixWorld);
   for(const e of this.entries.values()){
    this._status(e);e.material.uniforms.framebufferSize.value.set(width,height);e.material.uniforms.portalTime.value=time;
@@ -124,12 +158,12 @@ export class WebGLPortalViews{
    for(const node of apertures.slice(0,this.maxViews)){
     if(this.nestedDraws>=this.maxViews)break;
     const source=project?.portals?.find(p=>p.id===node.userData.portalId);
-    if(source?.id===e.destination.id||!source?.enabled||source.view?.enabled===false||!webGLPortalInView(e.camera,source)||!portalApertureIntersectsFrustum({planes:[portalDestinationPlane(e.destination)]},source))continue;
+    if(source?.id===e.destination.id||!source?.enabled||source.view?.enabled===false||!webGLPortalInView(e.camera,source)||!portalApertureVisibleThrough(e.camera,e.destination,source))continue;
     const [x,y,z]=source.position;
     if(Math.hypot(e.camera.position.x-x,e.camera.position.y-y,e.camera.position.z-z)>=(source.view?.maxDistance??30))continue;
     let detachRoot=null;
     try{
-    const resolved=this.resolveNestedDestination({outerCandidate:e.candidate,source,camera:e.camera}),candidate=resolved?.candidate;
+    const resolved=this.resolveNestedDestination({outerCandidate:e.candidate,source,camera:e.camera,visibilityFrame:this.visibilityFrame}),candidate=resolved?.candidate;
     const destination=candidateProject(candidate)?.portals?.find(p=>p.id===source.destination?.portalId);
     if(!worldId||!destination?.enabled||destination.view?.enabled===false||destination.destination?.worldId!==worldId||destination.destination?.portalId!==source.id)continue;
     let scene=resolved.scene;

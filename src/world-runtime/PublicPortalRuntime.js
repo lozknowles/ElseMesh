@@ -13,7 +13,7 @@ export class PublicPortalRuntime{
   this.mode='published';this.connected=false;this.config=null;this.transport={closed:true,frozen:false,connectionEpoch:0};this.loaded=new Map();this.descriptors=new Map();this.presence=new Map();this.previewRecords=new Map();this.loads=new Map();this.builds=new Map();this.pending=false;this.authorityOffline=false;this.enabled=false;this.disposed=false;this.epoch=0;this.lastPosition=null;this.errors=new Map();this.crossings=0;this.activeRecord=null;this.preparations=new Map();this.closingCaches=new Set();
   this.originalHooks={acquireResources:host.acquireResources,registerResources:host.registerResources,retainResources:host.retainResources};this.newCache();this.nestedLoads=new Map();this.views.resolveNestedDestination=request=>this.resolveNestedPreview(request);
  }
- newCache(){this.nestedLoads?.clear();this.cache=new PublishedWorldCache({limit:this.catalog.worlds.length,renderer:this.engine.backend??'webgl2',dispose:c=>{this.portalEffects?.removeRoot(c.root);this.disposeCandidate(c);},readinessFingerprint:this.engine.repositoryReadinessSignature});}
+ newCache(){this.nestedAdmissions=new WeakMap();this.nestedLoads?.clear();this.cache=new PublishedWorldCache({limit:this.catalog.worlds.length,renderer:this.engine.backend??'webgl2',dispose:c=>{this.portalEffects?.removeRoot(c.root);this.disposeCandidate(c);},readinessFingerprint:this.engine.repositoryReadinessSignature});}
  entry(id){return this.catalog.worlds.find(w=>w.worldId===id);}
  routedPortals(worldId,project){return (project.portals??[]).filter(p=>this.route(worldId,p.id));}
  route(worldId,portalId){return this.catalog.routes.find(r=>r.sourceWorldId===worldId&&r.portalId===portalId);}
@@ -62,6 +62,7 @@ export class PublicPortalRuntime{
   }
  }
  setActive(active){
+  this.nestedAdmissions=new WeakMap();this.nestedLoads.clear();
   // Reset the sweep at the positive-side arrival. Outward motion cannot cross;
   // a later inward sweep is a deliberate return, even before clearing the frame.
   if(this.activeRecord)this.activeRecord.viewEntries=this.views.park();else this.views.clear();
@@ -90,19 +91,38 @@ export class PublicPortalRuntime{
   }finally{if(epoch===this.epoch){this.pending=false;const sameSource=this.host.active===source&&this.host.generation===generation,ownDestination=activated&&this.host.active===activated&&this.host.generation===activationGeneration;if(this.enabled&&(sameSource||ownDestination)){this.input._clearTransientInput?.();if(wasEnabled)this.input.resume();}}}
  }
  update(){if(!this.enabled||this.pending||!this.host.active)return;const active=this.host.active,position=active.player.position.toArray();for(const portal of this.routedPortals(active.identity.worldId,active.project)){const route=this.route(active.identity.worldId,portal.id);if(!route)continue;const local=portalLocalPoint(portal,position);const record=this.previewRecords.get(portal.id);if(portal.enabled&&portal.view?.enabled!==false&&Math.hypot(...local)<(portal.view?.maxDistance??30)&&(!record||record.retryAt&&record.retryAt<performance.now()))void this.preview(portal);if(active.player.mode==='walk'&&this.lastPosition&&sweepPortalCapsule({portal,previousFeet:this.lastPosition,nextFeet:position,radius:.3,bodyHeight:1.8})){const checkpoint={position:[...this.lastPosition],velocity:active.player.velocity.toArray(),yaw:active.player.yaw,pitch:active.player.pitch};void this.cross(portal,active,checkpoint);break;}}this.lastPosition=position;}
- resolveNestedPreview({outerCandidate,source}){
-  if(!this.enabled||this.pending||this.disposed)return null;
+ resolveNestedPreview({outerCandidate,source,visibilityFrame}){
+  if(!this.enabled||this.pending||this.disposed||this.cache.disposed)return null;
   const worldId=outerCandidate?.loaded?.identity?.worldId??outerCandidate?.identity?.worldId??outerCandidate?.descriptor?.worldId,route=this.route(worldId,source.id);
-  if(!route||route.destinationWorldId!==source.destination?.worldId||route.destinationPortalId!==source.destination?.portalId)return null;
-  const loaded=this.loaded.get(route.destinationWorldId),record=loaded&&this.cache.get(loaded);
-  if(record&&this.cache.isReady(record)&&!record.pin){try{this.validateRoute({identity:{worldId}},source,record);return {candidate:record.active?this.host.active:record.candidate,scene:record.active?this.engine.scene:null};}catch{return null;}}
-  // A visible second aperture can demand one catalogue package, never a third
-  // rendering hop or an owner subscription. The validated cache is capped at four.
-  const previous=this.nestedLoads.get(route.destinationWorldId);
-  if(!record&&(!previous||previous.retryAt&&previous.retryAt<performance.now())){
-   const epoch=this.epoch,request={};this.nestedLoads.set(route.destinationWorldId,request);
-   request.promise=this.package(route.destinationWorldId).then(()=>{if(epoch===this.epoch)this.nestedLoads.delete(route.destinationWorldId);},()=>{if(epoch===this.epoch)request.retryAt=performance.now()+5000;});
+  if(!route||!source.enabled||source.traversal?.enabled===false||route.destinationWorldId!==source.destination?.worldId||route.destinationPortalId!==source.destination?.portalId)return null;
+  const cache=this.cache,outerLoaded=this.loaded.get(worldId),outerRecord=outerLoaded&&cache.get(outerLoaded),loaded=this.loaded.get(route.destinationWorldId),record=loaded&&cache.get(loaded);
+  if(!outerRecord||outerRecord.pin||outerRecord.candidate.root!==outerCandidate?.root){this.nestedAdmissions.delete(source);return null;}
+  let previous=this.nestedLoads.get(route.destinationWorldId);
+  if(previous&&(previous.cache!==cache||previous.epoch!==this.epoch||previous.generation!==this.host.generation||previous.active!==this.host.active)){this.nestedLoads.delete(route.destinationWorldId);previous=null;}
+  if(record?.pin){this.nestedAdmissions.delete(source);return null;}
+  if(previous&&(!previous.retryAt||previous.retryAt>=performance.now()))return null;
+  if(record){
+   // The active graph is already owned/prepared by the main renderer. Never try
+   // to acquire an inactive preparation lease for it.
+   if(record.active){this.nestedAdmissions.delete(source);if(this.host.active?.root!==record.candidate.root)return null;try{this.validateRoute({identity:{worldId}},source,record);return {candidate:this.host.active,scene:this.engine.scene};}catch{return null;}}
+   const admitted=this.nestedAdmissions.get(source),continuous=visibilityFrame===undefined||admitted?.frame===visibilityFrame||admitted?.frame===visibilityFrame-1;
+   if(admitted?.record===record&&admitted.outerCandidate===outerCandidate&&admitted.cache===cache&&admitted.generation===this.host.generation&&admitted.fingerprint===record.fingerprint&&record.ready&&!record.disposed&&continuous){admitted.frame=visibilityFrame;return {candidate:record.candidate,scene:null};}
+   this.nestedAdmissions.delete(source);
+   try{this.validateRoute({identity:{worldId}},source,record);}catch{return null;}
+   if(cache.isReady(record)){this.nestedAdmissions.set(source,{record,outerCandidate,cache,generation:this.host.generation,fingerprint:record.fingerprint,frame:visibilityFrame});return {candidate:record.candidate,scene:null};}
   }
+  // Full structural fingerprints run only on first use/visibility re-entry or a
+  // lifecycle change. Stale residents recover through the same protected lease
+  // as normal travel; repeated visible frames share the one preparation.
+  const epoch=this.epoch,generation=this.host.generation,active=this.host.active,request={cache,epoch,generation,active};this.nestedLoads.set(route.destinationWorldId,request);
+  const current=()=>this.enabled&&!this.disposed&&this.epoch===epoch&&this.cache===cache&&!cache.disposed&&this.host.generation===generation&&this.host.active===active;
+  request.promise=(async()=>{let lease;try{
+   const destination=record??await this.package(route.destinationWorldId);check(current(),'Published nested preparation superseded');
+   if(!cache.isReady(destination)){check(!destination.active&&!destination.pin,'Published nested destination busy');lease=await this.host.acquireResources(destination.loaded);check(lease?.record===destination&&current(),'Published nested preparation superseded');}
+   check(current()&&cache.get(destination.loaded)===destination&&!destination.disposed,'Published nested preparation superseded');
+   if(this.nestedLoads.get(route.destinationWorldId)===request)this.nestedLoads.delete(route.destinationWorldId);
+  }catch{if(current()&&this.nestedLoads.get(route.destinationWorldId)===request)request.retryAt=performance.now()+5000;
+  }finally{lease?.release();}})();
   return null;
  }
  render(frame){this.views.render(frame);}
@@ -115,7 +135,7 @@ export class PublicPortalRuntime{
   const cache=this.cache;for(const prepared of [...this.host.prepared??[]])if(prepared.resourceLease?.record&&cache.records.has(prepared.resourceLease.record.key))this.host.discardPrepared(prepared);
   this.closingCaches.add(cache);const retain=active=>!!active&&(cache.retains(active.root)||[...this.closingCaches].some(c=>c.retains(active.root))||this.originalHooks.retainResources(active));this.host.retainResources=retain;
   cache.dispose({preserveRoot:()=>this.host.active?.root});void cache.whenDisposed.then(()=>{this.closingCaches.delete(cache);if(this.host.retainResources===retain)this.host.retainResources=this.originalHooks.retainResources;});
-  this.previewRecords.clear();this.loaded.clear();this.loads.clear();this.errors.clear();this.lastPosition=null;
+  this.nestedAdmissions=new WeakMap();this.nestedLoads.clear();this.previewRecords.clear();this.loaded.clear();this.loads.clear();this.errors.clear();this.lastPosition=null;
  }
  releaseOfflineResources(){}dispose(){if(this.disposed)return;this.disconnect();this.disposed=true;this.views.dispose();}
 }
