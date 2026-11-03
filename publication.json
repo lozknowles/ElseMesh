@@ -2,23 +2,23 @@
   "schema": "elsemesh.publication/1",
   "outputSurfaceDerivative": {
     "manifest": "output-surface-derivative.json",
-    "sha256": "58ad636d6c6aaada9de15e36f455d86a3fa3c6ed6d3fca6c26cf4d3ed04ff4b7",
+    "sha256": "e2a6c7843f4504c3d9bd4ec599c436e4921a430388e96ca7aea1fe0645762214",
     "version": "1.0.0",
     "upstreamSourceSha256": "633a828536b774c71c2f0feae31f262fef387233afad1c2fa2e90b624288d42a",
     "transformSha256": "2dccb420c87deab0ed7508cbd4989a20112b2e0f558c9790ef9d6160eaf93ab9",
     "transformedModuleSha256": "037f6dea42d7d076530362fed49dc96d222793e04e97c22c5cff176a3b8d0fd7",
     "finalChunks": {
       "assets/Colliders-u7qqebLy.js": "5c513d01330b57d2db44907fc7eb26434573d8b93f92099ca5ed9b826c9c44ab",
-      "assets/main-R7xNYQMW.js": "f86dd1ae5c732519eaa08cfe20688dbffaa37d46b57fbf47c5b1cccdb7847f1c",
+      "assets/main-D7VF8sSP.js": "6f34ba31803777d528c0668f427377340ca9812c80dfffbdd7b547a43e4824d4",
       "assets/PlayerEyeControls-CWnrbWq1.js": "007010d9cec58fd310bd4fd5a32849792307e716175d03ccc919cdab944d65d2",
       "assets/PlayerEyePanel-DRdLArCK.js": "0f23f6d155c6c9a507ca0730fcd27add967a3c44b71f16b5fd4a8a59182dadc6",
       "assets/PlayerEyeView-DvEGwbv3.js": "efe7fae17e59db0b69d6a8d20e467f15793160cfc815e02fdbcfd0dcd4cd9d18",
       "assets/RepositoryPlayerEyes-BXZVQ6pq.js": "4986d0f5b08c8ed55a033dd86eecad1ab598c2222ecf19d63f171fbd7fe8401a",
       "assets/spark.module-C6xmu7Sr.js": "e7703b7f7cf4b376e44d3e94a36eaddda805609f2533e269f978b52c40c1df0a",
       "assets/SplatScenePhysics-BszIUdlc.js": "58482c966b875f63327a41178b35bb15352d0b2662cbafe0cb651fc37a217bcf",
-      "assets/WebGLPlayerEyeRenderer-CyR1pR7T.js": "4e5ea204e73daf5d32462f640f47764aa8d87869d9bfaf0b863b43a182177335",
-      "assets/WebGLPortalViews-CpAk-NJI.js": "48b83a4a43ac608e3f63ed519d2439b3299038d54c77d01640948fb429229d7d",
-      "assets/WebGLRepositoryScene-NWhNH5Dj.js": "2931d53c150bc31e5850e343274f3a8d0225939cb17f1bde4108b224e0d69cf6",
+      "assets/WebGLPlayerEyeRenderer-D0m1S8aq.js": "7d2df272a21f6eee4a1f5d5b69cc085c04fd8877ff8823b91333b6f91a1b7c6e",
+      "assets/WebGLPortalViews-Dykd2g4z.js": "2821d4fb56671eff4afd8aa60198833e79257e6f6b323d3abc883a5a34a3bbf3",
+      "assets/WebGLRepositoryScene-BPki-Z3j.js": "41d61a114fbfdd269db9bf0f73887b52f60bcb1eb5e902cddab663a05fc5fa43",
       "assets/world-engine-contract-CVcMZ1Us.js": "b0089ce1cba2470f57b54b86c49317b4b031d29dc9dda4164dd37ffda01ca8a1"
     }
   },
@@ -32,7 +32,7 @@
       "bundledWithOpening": false
     }
   ],
-  "engineCommit": "d3a3ab0d5b47decbd73878460faf620107483a02",
+  "engineCommit": "54340110971f225ac9a92ddd1e83963679e9cb72",
   "worldContract": {
     "sourceNormalization": "UTF-8 LF",
     "commit": "7acac33d27c917302622c9b4b745ad20399fe40e",
@@ -121,7 +121,7 @@
   "neonShift": {
     "contentDigest": "9e542b658db7b7a9c45e780d9f1d81ae9d917a1743ea5186c8c834368005caae",
     "intervalMs": 60000,
-    "bytes": 94402,
+    "bytes": 94412,
     "files": 13,
     "implementation": "engine-owned WebGL procedural visual pool; fixed authored collision and return anchor"
   }
